@@ -101,11 +101,11 @@ function ProductsPage() {
       <div className="rounded-md border bg-background">
         {isLoading ? (
           <p className="p-6 text-sm text-muted-foreground">Loading…</p>
-        ) : !data?.length ? (
+        ) : !filtered?.length ? (
           <p className="p-6 text-sm text-muted-foreground">No products found.</p>
         ) : (
           <ul className="divide-y">
-            {data.map((p: any) => (
+            {filtered.map((p: any) => (
               <li key={p.id}>
                 <Link
                   to="/products/$id"
@@ -119,6 +119,7 @@ function ProductsPage() {
                     <div className="text-xs text-muted-foreground truncate">
                       {p.sku}
                       {p.brand?.name ? ` · ${p.brand.name}` : ""}
+                      {p.category?.name ? ` · ${p.category.name}` : ""}
                       {p.location?.label ? ` · ${p.location.label}` : ""}
                     </div>
                   </div>
