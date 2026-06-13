@@ -25,7 +25,7 @@ import {
   type MarketplaceId,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { ArrowLeft, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   head: () => ({ meta: [{ title: "Product — Inventory" }] }),
