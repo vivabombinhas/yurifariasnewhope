@@ -29,22 +29,38 @@ function ProductsPage() {
   const [status, setStatus] = useState<string>("all");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["products", { q, status }],
+    queryKey: ["products", { status }],
     queryFn: async () => {
       let query = supabase
         .from("products")
         .select(
-          "id, sku, title, status, price_cents, currency, location:locations(label), brand:brands(name)",
+          "id, sku, title, status, price_cents, currency, location:locations(label), brand:brands(name), category:categories(name)",
         )
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(200);
       if (status !== "all") query = query.eq("status", status as any);
-      if (q.trim()) query = query.or(`title.ilike.%${q}%,sku.ilike.%${q}%`);
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
   });
+
+  const term = q.trim().toLowerCase();
+  const filtered = !term
+    ? data
+    : data?.filter((p: any) => {
+        const hay = [
+          p.sku,
+          p.title,
+          p.brand?.name,
+          p.category?.name,
+          p.location?.label,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(term);
+      });
 
   return (
     <div className="space-y-4">
@@ -61,7 +77,7 @@ function ProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search title or SKU"
+            placeholder="Search SKU, title, brand, category, location"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="pl-9"
@@ -85,11 +101,11 @@ function ProductsPage() {
       <div className="rounded-md border bg-background">
         {isLoading ? (
           <p className="p-6 text-sm text-muted-foreground">Loading…</p>
-        ) : !data?.length ? (
+        ) : !filtered?.length ? (
           <p className="p-6 text-sm text-muted-foreground">No products found.</p>
         ) : (
           <ul className="divide-y">
-            {data.map((p: any) => (
+            {filtered.map((p: any) => (
               <li key={p.id}>
                 <Link
                   to="/products/$id"
@@ -103,6 +119,7 @@ function ProductsPage() {
                     <div className="text-xs text-muted-foreground truncate">
                       {p.sku}
                       {p.brand?.name ? ` · ${p.brand.name}` : ""}
+                      {p.category?.name ? ` · ${p.category.name}` : ""}
                       {p.location?.label ? ` · ${p.location.label}` : ""}
                     </div>
                   </div>
