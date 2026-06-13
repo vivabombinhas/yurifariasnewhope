@@ -299,6 +299,27 @@ function SuggestionEditor({
         </div>
       </div>
 
+      <div className="space-y-2">
+        <Label>Verification needed (operator must confirm in person)</Label>
+        <Input
+          value={(s.verification_needed ?? []).join(", ")}
+          placeholder="size, brand, authenticity, measurements…"
+          onChange={(e) =>
+            update(
+              "verification_needed",
+              e.target.value.split(",").map((t) => t.trim()).filter(Boolean),
+            )
+          }
+        />
+        <div className="flex flex-wrap gap-1">
+          {(s.verification_needed ?? []).map((t, i) => (
+            <Badge key={i} variant="outline" className="text-[10px]">
+              ⚠ {t}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
       {s.confidence_notes && (
         <div className="rounded-md border border-dashed bg-muted/40 p-3 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">AI notes: </span>
