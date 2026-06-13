@@ -263,14 +263,22 @@ function NewProductPage() {
           </div>
           <div className="space-y-2">
             <Label>Location</Label>
-            <Select value={locationId} onValueChange={setLocationId}>
-              <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
-              <SelectContent>
-                {locations.data?.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger className="flex-1"><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectContent>
+                  {locations.data?.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <NewLocationDialog
+                onCreated={(id) => {
+                  qc.invalidateQueries({ queryKey: ["locations"] });
+                  setLocationId(id);
+                }}
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Status</Label>
