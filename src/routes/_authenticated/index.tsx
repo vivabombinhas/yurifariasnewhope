@@ -6,9 +6,12 @@ import { Button } from "@/components/ui/button";
 import { PRODUCT_STATUSES, formatStatus } from "@/lib/marketplaces";
 import { PackagePlus } from "lucide-react";
 
+import { RouteError } from "@/components/RouteError";
+
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({ meta: [{ title: "Dashboard — Inventory" }] }),
   component: Dashboard,
+  errorComponent: RouteError,
 });
 
 function Dashboard() {

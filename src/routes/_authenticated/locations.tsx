@@ -9,9 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
+import { RouteError } from "@/components/RouteError";
+
 export const Route = createFileRoute("/_authenticated/locations")({
   head: () => ({ meta: [{ title: "Locations — Inventory" }] }),
   component: LocationsPage,
+  errorComponent: RouteError,
 });
 
 function LocationsPage() {
