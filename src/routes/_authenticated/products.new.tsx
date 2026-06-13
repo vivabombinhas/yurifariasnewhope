@@ -305,3 +305,78 @@ function NewProductPage() {
     </div>
   );
 }
+
+function NewLocationDialog({ onCreated }: { onCreated: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [area, setArea] = useState("");
+  const [shelf, setShelf] = useState("");
+  const [box, setBox] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit() {
+    if (!area.trim()) {
+      toast.error("Area is required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const label = [area, shelf, box].filter((s) => s.trim()).join(" / ");
+      const { data, error } = await supabase
+        .from("locations")
+        .insert({
+          area: area.trim(),
+          shelf: shelf.trim() || null,
+          box: box.trim() || null,
+          label,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      onCreated(data.id);
+      setOpen(false);
+      setArea("");
+      setShelf("");
+      setBox("");
+      toast.success("Location created");
+    } catch (e: any) {
+      toast.error(e.message ?? "Failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="icon" aria-label="New location">
+          <Plus className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New location</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label>Area</Label>
+            <Input value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Garage" />
+          </div>
+          <div className="space-y-2">
+            <Label>Shelf</Label>
+            <Input value={shelf} onChange={(e) => setShelf(e.target.value)} placeholder="e.g. A2" />
+          </div>
+          <div className="space-y-2">
+            <Label>Box</Label>
+            <Input value={box} onChange={(e) => setBox(e.target.value)} placeholder="e.g. 14" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button type="button" onClick={submit} disabled={saving}>
+            {saving ? "Saving…" : "Create"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
