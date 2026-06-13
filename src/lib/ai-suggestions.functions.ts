@@ -156,6 +156,9 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
     } catch {
       throw new Error("AI returned invalid JSON.");
     }
+    if (!Array.isArray(suggestion.verification_needed)) {
+      suggestion.verification_needed = [];
+    }
 
     await supabase.from("ai_suggestions").insert({
       product_id: data.productId,
