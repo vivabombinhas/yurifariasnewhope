@@ -26,6 +26,7 @@ import {
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
+import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   head: () => ({ meta: [{ title: "Product — Inventory" }] }),
