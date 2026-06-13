@@ -234,7 +234,7 @@ function PhotosSection({
       <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {photos.map((ph) => (
+          {photos.map((ph, i) => (
             <div key={ph.id} className="relative aspect-square overflow-hidden rounded-md border bg-muted">
               {urls[ph.id] ? (
                 <img src={urls[ph.id]} alt="" className="h-full w-full object-cover" />
@@ -246,6 +246,26 @@ function PhotosSection({
                   Cover
                 </span>
               )}
+              <div className="absolute bottom-1 right-1 flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
+                  className="rounded bg-black/60 p-1 text-white disabled:opacity-30"
+                  aria-label="Move left"
+                >
+                  <ArrLeft className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => move(i, 1)}
+                  disabled={i === photos.length - 1}
+                  className="rounded bg-black/60 p-1 text-white disabled:opacity-30"
+                  aria-label="Move right"
+                >
+                  <ArrowRight className="h-3 w-3" />
+                </button>
+              </div>
               <div className="absolute top-1 right-1 flex gap-1">
                 {!ph.is_cover && (
                   <button
