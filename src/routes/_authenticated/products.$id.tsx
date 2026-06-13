@@ -124,6 +124,12 @@ function ProductDetail() {
 
       <PhotosSection productId={id} photos={photos.data ?? []} onChange={() => photos.refetch()} />
 
+      <AiSuggestionPanel
+        product={p}
+        hasPhotos={(photos.data ?? []).length > 0}
+        onApplied={() => product.refetch()}
+      />
+
       <CopyActions product={p} />
 
       <EditForm product={p} onSaved={() => product.refetch()} />
