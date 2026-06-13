@@ -20,7 +20,8 @@ import {
   formatStatus,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { ImagePlus, X } from "lucide-react";
+import { ImagePlus, Plus, X } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/products/new")({
   head: () => ({ meta: [{ title: "New product — Inventory" }] }),
