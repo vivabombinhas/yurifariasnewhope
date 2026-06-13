@@ -217,6 +217,18 @@ function PhotosSection({
     onChange();
   }
 
+  async function move(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    if (j < 0 || j >= photos.length) return;
+    const a = photos[index];
+    const b = photos[j];
+    // swap positions using a temporary out-of-range value to avoid unique conflicts if any
+    await supabase.from("product_photos").update({ position: -1 }).eq("id", a.id);
+    await supabase.from("product_photos").update({ position: a.position }).eq("id", b.id);
+    await supabase.from("product_photos").update({ position: b.position }).eq("id", a.id);
+    onChange();
+  }
+
   return (
     <Card>
       <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
