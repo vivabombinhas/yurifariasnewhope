@@ -19,9 +19,12 @@ import {
 } from "@/lib/marketplaces";
 import { PackagePlus, Search } from "lucide-react";
 
+import { RouteError } from "@/components/RouteError";
+
 export const Route = createFileRoute("/_authenticated/products/")({
   head: () => ({ meta: [{ title: "Products — Inventory" }] }),
   component: ProductsPage,
+  errorComponent: RouteError,
 });
 
 function ProductsPage() {

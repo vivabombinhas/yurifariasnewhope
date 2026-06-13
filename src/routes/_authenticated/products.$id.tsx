@@ -28,9 +28,15 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 
+import { RouteError } from "@/components/RouteError";
+
 export const Route = createFileRoute("/_authenticated/products/$id")({
   head: () => ({ meta: [{ title: "Product — Inventory" }] }),
   component: ProductDetail,
+  errorComponent: RouteError,
+  notFoundComponent: () => (
+    <p className="text-sm text-muted-foreground p-6 text-center">Product not found.</p>
+  ),
 });
 
 function ProductDetail() {

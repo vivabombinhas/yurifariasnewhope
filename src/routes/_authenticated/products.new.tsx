@@ -23,9 +23,12 @@ import { toast } from "sonner";
 import { ImagePlus, Plus, X } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
+import { RouteError } from "@/components/RouteError";
+
 export const Route = createFileRoute("/_authenticated/products/new")({
   head: () => ({ meta: [{ title: "New product — Inventory" }] }),
   component: NewProductPage,
+  errorComponent: RouteError,
 });
 
 function NewProductPage() {
