@@ -77,7 +77,7 @@ function ProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search title or SKU"
+            placeholder="Search SKU, title, brand, category, location"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="pl-9"
