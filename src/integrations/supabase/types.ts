@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_suggestions: {
+        Row: {
+          accepted: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          model: string
+          product_id: string
+          raw: Json
+          suggestion: Json
+        }
+        Insert: {
+          accepted?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          model: string
+          product_id: string
+          raw: Json
+          suggestion: Json
+        }
+        Update: {
+          accepted?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          model?: string
+          product_id?: string
+          raw?: Json
+          suggestion?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_suggestions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brands: {
         Row: {
           created_at: string

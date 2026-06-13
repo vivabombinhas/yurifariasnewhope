@@ -26,6 +26,7 @@ import {
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
+import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 
 export const Route = createFileRoute("/_authenticated/products/$id")({
   head: () => ({ meta: [{ title: "Product — Inventory" }] }),
@@ -122,6 +123,12 @@ function ProductDetail() {
       </header>
 
       <PhotosSection productId={id} photos={photos.data ?? []} onChange={() => photos.refetch()} />
+
+      <AiSuggestionPanel
+        product={p}
+        hasPhotos={(photos.data ?? []).length > 0}
+        onApplied={() => product.refetch()}
+      />
 
       <CopyActions product={p} />
 
