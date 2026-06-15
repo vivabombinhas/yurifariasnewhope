@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { prepareImageForUpload } from "@/lib/image-convert";
 import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ function IntakePage() {
     if (error) throw error;
 
     for (let i = 0; i < photos.length; i++) {
-      const file = photos[i];
+      const file = await prepareImageForUpload(photos[i]);
       const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
       const { error: upErr } = await supabase.storage
         .from("product-photos")
@@ -218,7 +219,7 @@ function IntakePage() {
         if (error) throw error;
 
         for (let i = 0; i < photos.length; i++) {
-          const file = photos[i];
+          const file = await prepareImageForUpload(photos[i]);
           const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
           const { error: upErr } = await supabase.storage
             .from("product-photos")

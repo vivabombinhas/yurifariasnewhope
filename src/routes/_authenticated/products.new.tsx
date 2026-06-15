@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { prepareImageForUpload } from "@/lib/image-convert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -127,7 +128,7 @@ function NewProductPage() {
       if (error) throw error;
 
       for (let i = 0; i < photos.length; i++) {
-        const file = photos[i];
+        const file = await prepareImageForUpload(photos[i]);
         const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
         const { error: upErr } = await supabase.storage
           .from("product-photos")

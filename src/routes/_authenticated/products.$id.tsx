@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { prepareImageForUpload, isAiSupportedPath } from "@/lib/image-convert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -179,6 +180,9 @@ function ProductDetail() {
       <AiSuggestionPanel
         product={p}
         hasPhotos={(photos.data ?? []).length > 0}
+        unsupportedCount={
+          (photos.data ?? []).filter((ph) => !isAiSupportedPath(ph.storage_path)).length
+        }
         onApplied={() => product.refetch()}
       />
 
@@ -245,7 +249,7 @@ function PhotosSection({
     const nextPos = (photos[photos.length - 1]?.position ?? -1) + 1;
     try {
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+        const file = await prepareImageForUpload(files[i]);
         const path = `${productId}/${crypto.randomUUID()}-${file.name}`;
         const { error } = await supabase.storage
           .from("product-photos")
