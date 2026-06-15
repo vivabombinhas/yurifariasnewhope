@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,7 @@ import {
   formatStatus,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { ImagePlus, Plus, X } from "lucide-react";
+import { CheckCircle2, ImagePlus, Plus, X } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { RouteError } from "@/components/RouteError";
@@ -30,6 +30,17 @@ export const Route = createFileRoute("/_authenticated/products/new")({
   component: NewProductPage,
   errorComponent: RouteError,
 });
+
+type SavedInfo = {
+  id: string;
+  sku: string;
+  basic: {
+    locationId: string;
+    category: string;
+    brand: string;
+    condition: string;
+  };
+};
 
 function NewProductPage() {
   const navigate = useNavigate();
@@ -43,6 +54,7 @@ function NewProductPage() {
   const [price, setPrice] = useState("");
   const [locationId, setLocationId] = useState<string>("");
   const [status, setStatus] = useState<string>("received");
+  const [saved, setSaved] = useState<SavedInfo | null>(null);
 
   const locations = useQuery({
     queryKey: ["locations"],
@@ -113,7 +125,6 @@ function NewProductPage() {
         .single();
       if (error) throw error;
 
-      // Upload photos
       for (let i = 0; i < photos.length; i++) {
         const file = photos[i];
         const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
@@ -134,10 +145,35 @@ function NewProductPage() {
     onSuccess: (product) => {
       toast.success(`Created ${product.sku}`);
       qc.invalidateQueries({ queryKey: ["products"] });
-      navigate({ to: "/products/$id", params: { id: product.id } });
+      setSaved({
+        id: product.id,
+        sku: product.sku,
+        basic: { locationId, category, brand, condition },
+      });
     },
     onError: (e: any) => toast.error(e.message ?? "Failed to create product"),
   });
+
+  function resetForm(keep: { location?: boolean; basic?: boolean }) {
+    setPhotos([]);
+    setTitle("");
+    setDescription("");
+    setPrice("");
+    setStatus("received");
+    if (!keep.location && !keep.basic) {
+      setLocationId("");
+      setBrand("");
+      setCategory("");
+      setCondition("");
+    } else if (keep.basic) {
+      // keep location, category, brand, condition as-is
+    } else if (keep.location) {
+      setBrand("");
+      setCategory("");
+      setCondition("");
+    }
+    setSaved(null);
+  }
 
   function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -148,49 +184,96 @@ function NewProductPage() {
     setPhotos((cur) => cur.filter((_, idx) => idx !== i));
   }
 
+  if (saved) {
+    return (
+      <div className="space-y-6 max-w-2xl">
+        <Card>
+          <CardContent className="pt-6 space-y-4 text-center">
+            <CheckCircle2 className="h-12 w-12 mx-auto text-primary" />
+            <div>
+              <h2 className="text-xl font-semibold">Product saved</h2>
+              <p className="text-sm text-muted-foreground">{saved.sku}</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
+              <Button
+                size="lg"
+                className="h-12 text-base"
+                asChild
+              >
+                <Link to="/products/$id" params={{ id: saved.id }}>View product</Link>
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 text-base"
+                onClick={() => resetForm({ location: true })}
+              >
+                Add another item
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-12 text-base"
+                onClick={() => resetForm({ basic: true })}
+              >
+                Duplicate basic info
+              </Button>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/products" })}>
+              Back to products
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">New product</h1>
 
       <Card>
-        <CardContent className="pt-6 space-y-2">
-          <Label>Photos</Label>
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {photos.map((file, i) => (
-              <div key={i} className="relative aspect-square overflow-hidden rounded-md border bg-muted">
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-                {i === 0 && (
-                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-                    Cover
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removePhoto(i)}
-                  className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"
-                  aria-label="Remove"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-muted-foreground hover:bg-muted/50">
-              <ImagePlus className="h-5 w-5" />
-              <span className="text-xs">Add</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                capture="environment"
-                className="hidden"
-                onChange={onPickFiles}
-              />
-            </label>
-          </div>
+        <CardContent className="pt-6 space-y-3">
+          <Label className="text-base">Photos</Label>
+          <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10">
+            <ImagePlus className="h-6 w-6" />
+            <span className="text-sm font-medium">Tap to add photos</span>
+            <span className="text-xs text-muted-foreground">Camera or library</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              capture="environment"
+              className="hidden"
+              onChange={onPickFiles}
+            />
+          </label>
+          {photos.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {photos.map((file, i) => (
+                <div key={i} className="relative aspect-square overflow-hidden rounded-md border bg-muted">
+                  <img
+                    src={URL.createObjectURL(file)}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  {i === 0 && (
+                    <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+                      Cover
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removePhoto(i)}
+                    className="absolute top-1 right-1 rounded-full bg-black/60 p-1.5 text-white"
+                    aria-label="Remove"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -203,7 +286,7 @@ function NewProductPage() {
       >
         <div className="space-y-2">
           <Label htmlFor="title">Title</Label>
-          <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input id="title" className="h-12 text-base" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="desc">Description</Label>
@@ -212,6 +295,7 @@ function NewProductPage() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
+            className="text-base"
           />
         </div>
 
@@ -220,6 +304,7 @@ function NewProductPage() {
             <Label htmlFor="brand">Brand</Label>
             <Input
               id="brand"
+              className="h-12 text-base"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               list="brands-list"
@@ -233,6 +318,7 @@ function NewProductPage() {
             <Label htmlFor="category">Category</Label>
             <Input
               id="category"
+              className="h-12 text-base"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               list="cats-list"
@@ -245,7 +331,7 @@ function NewProductPage() {
           <div className="space-y-2">
             <Label>Condition</Label>
             <Select value={condition} onValueChange={setCondition}>
-              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select" /></SelectTrigger>
               <SelectContent>
                 {PRODUCT_CONDITIONS.map((c) => (
                   <SelectItem key={c} value={c}>{formatStatus(c)}</SelectItem>
@@ -257,7 +343,9 @@ function NewProductPage() {
             <Label htmlFor="price">Price (USD)</Label>
             <Input
               id="price"
+              className="h-12 text-base"
               type="number"
+              inputMode="decimal"
               step="0.01"
               min="0"
               value={price}
@@ -268,7 +356,7 @@ function NewProductPage() {
             <Label>Location</Label>
             <div className="flex gap-2">
               <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger className="flex-1"><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectTrigger className="h-12 text-base flex-1"><SelectValue placeholder="Select location" /></SelectTrigger>
                 <SelectContent>
                   {locations.data?.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
@@ -286,7 +374,7 @@ function NewProductPage() {
           <div className="space-y-2">
             <Label>Status</Label>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PRODUCT_STATUSES.map((s) => (
                   <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
@@ -296,12 +384,12 @@ function NewProductPage() {
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
-          <Button type="submit" disabled={create.isPending} className="flex-1 sm:flex-none">
-            {create.isPending ? "Saving…" : "Save product"}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => navigate({ to: "/products" })}>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+          <Button type="button" variant="outline" className="h-12 text-base" onClick={() => navigate({ to: "/products" })}>
             Cancel
+          </Button>
+          <Button type="submit" disabled={create.isPending} className="h-12 text-base flex-1">
+            {create.isPending ? "Saving…" : "Save product"}
           </Button>
         </div>
       </form>
@@ -351,8 +439,8 @@ function NewLocationDialog({ onCreated }: { onCreated: (id: string) => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="icon" aria-label="New location">
-          <Plus className="h-4 w-4" />
+        <Button type="button" variant="outline" size="icon" className="h-12 w-12" aria-label="New location">
+          <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -362,15 +450,15 @@ function NewLocationDialog({ onCreated }: { onCreated: (id: string) => void }) {
         <div className="space-y-3">
           <div className="space-y-2">
             <Label>Area</Label>
-            <Input value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Garage" />
+            <Input className="h-12 text-base" value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Garage" />
           </div>
           <div className="space-y-2">
             <Label>Shelf</Label>
-            <Input value={shelf} onChange={(e) => setShelf(e.target.value)} placeholder="e.g. A2" />
+            <Input className="h-12 text-base" value={shelf} onChange={(e) => setShelf(e.target.value)} placeholder="e.g. A2" />
           </div>
           <div className="space-y-2">
             <Label>Box</Label>
-            <Input value={box} onChange={(e) => setBox(e.target.value)} placeholder="e.g. 14" />
+            <Input className="h-12 text-base" value={box} onChange={(e) => setBox(e.target.value)} placeholder="e.g. 14" />
           </div>
         </div>
         <DialogFooter>

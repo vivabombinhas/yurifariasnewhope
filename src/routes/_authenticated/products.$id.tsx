@@ -118,14 +118,54 @@ function ProductDetail() {
         </Button>
       </div>
 
-      <header className="space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold">{p.title || "Untitled"}</h1>
-          <Badge variant="secondary">{formatStatus(p.status)}</Badge>
+      <header className="space-y-3">
+        <h1 className="text-2xl font-semibold break-words">{p.title || "Untitled"}</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">SKU</div>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(p.sku ?? "");
+                toast.success("SKU copied");
+              }}
+              className="mt-1 text-base font-semibold font-mono hover:underline"
+            >
+              {p.sku || "—"}
+            </button>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Location</div>
+            <div className="mt-1 text-base font-semibold break-words">
+              {p.location?.label ?? "—"}
+            </div>
+          </div>
+          <div className="rounded-lg border bg-muted/40 p-3">
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</div>
+            <div className="mt-1">
+              <Badge variant="secondary" className="text-sm">{formatStatus(p.status)}</Badge>
+            </div>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {p.sku} · {formatPrice(p.price_cents, p.currency)}
-        </p>
+        <Button
+          size="lg"
+          className="h-12 w-full sm:w-auto"
+          onClick={() => {
+            const full = [
+              p.title,
+              "",
+              p.description,
+              "",
+              `Condition: ${p.condition ?? "—"}`,
+              `Price: ${formatPrice(p.price_cents, p.currency)}`,
+              `SKU: ${p.sku}`,
+            ].join("\n");
+            navigator.clipboard.writeText(full);
+            toast.success("Full listing copied");
+          }}
+        >
+          <Copy className="h-4 w-4 mr-2" /> Copy full listing
+        </Button>
       </header>
 
       <PhotosSection productId={id} photos={photos.data ?? []} onChange={() => photos.refetch()} />
