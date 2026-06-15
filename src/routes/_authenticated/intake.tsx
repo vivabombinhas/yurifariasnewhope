@@ -219,7 +219,7 @@ function IntakePage() {
         if (error) throw error;
 
         for (let i = 0; i < photos.length; i++) {
-          const file = photos[i];
+          const file = await prepareImageForUpload(photos[i]);
           const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
           const { error: upErr } = await supabase.storage
             .from("product-photos")
