@@ -15,9 +15,9 @@ import {
 import {
   PRODUCT_STATUSES,
   formatPrice,
-  formatStatus,
 } from "@/lib/marketplaces";
 import { PackagePlus, Search } from "lucide-react";
+import { useT, tStatus } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
 
@@ -28,6 +28,7 @@ export const Route = createFileRoute("/_authenticated/products/")({
 });
 
 function ProductsPage() {
+  const t = useT();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
 
@@ -68,10 +69,10 @@ function ProductsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Products</h1>
+        <h1 className="text-2xl font-semibold">{t("products.title")}</h1>
         <Button asChild size="sm">
           <Link to="/products/new">
-            <PackagePlus className="h-4 w-4 mr-2" /> New
+            <PackagePlus className="h-4 w-4 mr-2" /> {t("nav.new")}
           </Link>
         </Button>
       </div>
@@ -80,7 +81,7 @@ function ProductsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search SKU, title, brand, category, location"
+            placeholder={t("products.searchPlaceholder")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="pl-9"
@@ -91,10 +92,10 @@ function ProductsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="all">{t("products.allStatuses")}</SelectItem>
             {PRODUCT_STATUSES.map((s) => (
               <SelectItem key={s} value={s}>
-                {formatStatus(s)}
+                {tStatus(t, s)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -103,9 +104,9 @@ function ProductsPage() {
 
       <div className="rounded-md border bg-background">
         {isLoading ? (
-          <p className="p-6 text-sm text-muted-foreground">Loading…</p>
+          <p className="p-6 text-sm text-muted-foreground">{t("common.loading")}</p>
         ) : !filtered?.length ? (
-          <p className="p-6 text-sm text-muted-foreground">No products found.</p>
+          <p className="p-6 text-sm text-muted-foreground">{t("products.none")}</p>
         ) : (
           <ul className="divide-y">
             {filtered.map((p: any) => (
@@ -117,7 +118,7 @@ function ProductsPage() {
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
-                      {p.title || "Untitled"}
+                      {p.title || t("common.untitled")}
                     </div>
                     <div className="text-xs text-muted-foreground truncate">
                       {p.sku}
@@ -131,7 +132,7 @@ function ProductsPage() {
                       {formatPrice(p.price_cents, p.currency)}
                     </span>
                     <Badge variant="secondary" className="text-[10px]">
-                      {formatStatus(p.status)}
+                      {tStatus(t, p.status)}
                     </Badge>
                   </div>
                 </Link>
