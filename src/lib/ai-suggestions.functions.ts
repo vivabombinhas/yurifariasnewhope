@@ -83,17 +83,22 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const apiKey = process.env.LOVABLE_API_KEY;
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY");
+    console.log("[analyze] start productId=", data.productId, "userId=", userId);
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
 
     const { data: photos, error: phErr } = await supabase
       .from("product_photos")
       .select("storage_path, position, is_cover")
       .eq("product_id", data.productId)
       .order("position");
-    if (phErr) throw phErr;
+    if (phErr) {
+      console.error("[analyze] photos query error", phErr);
+      throw new Error(`Cannot load product photos: ${phErr.message}`);
+    }
     if (!photos || photos.length === 0) {
       throw new Error("This product has no photos. Add at least one photo before analyzing.");
     }
+    console.log("[analyze] photo count=", photos.length);
 
     const { data: signed, error: sErr } = await supabase.storage
       .from("product-photos")
@@ -101,13 +106,17 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
         photos.slice(0, 6).map((p) => p.storage_path),
         60 * 30,
       );
-    if (sErr) throw sErr;
+    if (sErr) {
+      console.error("[analyze] signed url error", sErr);
+      throw new Error(`Could not generate photo URLs: ${sErr.message}`);
+    }
     const imageUrls = (signed ?? [])
       .map((s) => s.signedUrl)
       .filter((u): u is string => !!u);
-    if (!imageUrls.length) throw new Error("Could not load product photos.");
+    if (!imageUrls.length) throw new Error("Could not load product photos (empty signed URLs).");
+    console.log("[analyze] signed urls=", imageUrls.length);
 
-    const model = "google/gemini-3-flash-preview";
+    const model = "google/gemini-2.5-flash";
     const body = {
       model,
       messages: [
@@ -136,39 +145,60 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
       },
     };
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Lovable-API-Key": apiKey,
-      },
-      body: JSON.stringify(body),
-    });
+    let res: Response;
+    try {
+      res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Lovable-API-Key": apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (e: any) {
+      console.error("[analyze] gateway fetch failed", e);
+      throw new Error(`AI gateway unreachable: ${e?.message ?? e}`);
+    }
     if (!res.ok) {
       const txt = await res.text();
+      console.error("[analyze] gateway error", res.status, txt);
       if (res.status === 429) throw new Error("AI rate limit reached. Please try again shortly.");
       if (res.status === 402) throw new Error("AI credits exhausted. Add credits in Workspace → Usage.");
       throw new Error(`AI gateway error ${res.status}: ${txt.slice(0, 300)}`);
     }
     const raw = await res.json();
-    const content: string = raw?.choices?.[0]?.message?.content ?? "";
+    let content: string = raw?.choices?.[0]?.message?.content ?? "";
+    if (!content) {
+      console.error("[analyze] empty content from gateway", JSON.stringify(raw).slice(0, 500));
+      throw new Error("AI returned an empty response.");
+    }
+    // Strip markdown code fences if present
+    const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenced) content = fenced[1];
+    content = content.trim();
+
     let suggestion: AiSuggestion;
     try {
       suggestion = JSON.parse(content);
-    } catch {
-      throw new Error("AI returned invalid JSON.");
+    } catch (e) {
+      console.error("[analyze] invalid JSON content=", content.slice(0, 500));
+      throw new Error("AI returned invalid JSON. Please retry.");
     }
-    if (!Array.isArray(suggestion.verification_needed)) {
-      suggestion.verification_needed = [];
-    }
+    if (!Array.isArray(suggestion.verification_needed)) suggestion.verification_needed = [];
+    if (!Array.isArray(suggestion.tags)) suggestion.tags = [];
 
-    await supabase.from("ai_suggestions").insert({
+    const { error: insErr } = await supabase.from("ai_suggestions").insert({
       product_id: data.productId,
       model,
       raw,
       suggestion,
       created_by: userId,
     });
+    if (insErr) {
+      console.error("[analyze] insert ai_suggestions failed", insErr);
+      // Don't fail the whole call — still return the suggestion to the user
+    }
 
+    console.log("[analyze] success");
     return suggestion;
   });
