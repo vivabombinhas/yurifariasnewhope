@@ -365,9 +365,10 @@ function PhotosSection({
 }
 
 function CopyActions({ product }: { product: any }) {
+  const t = useT();
   function copy(text: string, label: string) {
     navigator.clipboard.writeText(text);
-    toast.success(`Copied ${label}`);
+    toast.success(`${t("common.copied")} ${label}`);
   }
   const full = [
     product.title,
@@ -381,29 +382,29 @@ function CopyActions({ product }: { product: any }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Quick actions</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{t("detail.quickActions")}</CardTitle></CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => copy(product.title ?? "", "title")}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Title
+          <Button size="sm" variant="outline" onClick={() => copy(product.title ?? "", t("detail.copyTitle"))}>
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyTitle")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => copy(product.description ?? "", "description")}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Description
+          <Button size="sm" variant="outline" onClick={() => copy(product.description ?? "", t("detail.copyDescription"))}>
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyDescription")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => copy(full, "full listing")}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Full listing
+          <Button size="sm" variant="outline" onClick={() => copy(full, t("detail.copyFullListing"))}>
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyFullListing")}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => copy(formatPrice(product.price_cents, product.currency), "price")}
+            onClick={() => copy(formatPrice(product.price_cents, product.currency), t("common.price"))}
           >
-            <Copy className="h-3.5 w-3.5 mr-1" /> Price
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("common.price")}
           </Button>
           {MARKETPLACES.map((m) => (
             <Button key={m.id} size="sm" variant="outline" asChild>
               <a href={m.sellUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open {m.label}
+                <ExternalLink className="h-3.5 w-3.5 mr-1" /> {m.label}
               </a>
             </Button>
           ))}
@@ -413,8 +414,11 @@ function CopyActions({ product }: { product: any }) {
   );
 }
 
+
+
 function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const qc = useQueryClient();
+  const tr = useT();
   const [title, setTitle] = useState(product.title ?? "");
   const [description, setDescription] = useState(product.description ?? "");
   const [brand, setBrand] = useState(product.brand?.name ?? "");
@@ -473,7 +477,7 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Saved");
+      toast.success(tr("detail.saved"));
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["history", product.id] });
       onSaved();
