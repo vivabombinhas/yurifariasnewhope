@@ -180,6 +180,9 @@ function ProductDetail() {
       <AiSuggestionPanel
         product={p}
         hasPhotos={(photos.data ?? []).length > 0}
+        unsupportedCount={
+          (photos.data ?? []).filter((ph) => !isAiSupportedPath(ph.storage_path)).length
+        }
         onApplied={() => product.refetch()}
       />
 
