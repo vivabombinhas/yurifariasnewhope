@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PRODUCT_STATUSES, formatStatus } from "@/lib/marketplaces";
+import { PRODUCT_STATUSES } from "@/lib/marketplaces";
 import { PackagePlus } from "lucide-react";
+import { useT, tStatus } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
 
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/")({
 });
 
 function Dashboard() {
+  const t = useT();
   const { data: counts } = useQuery({
     queryKey: ["dashboard", "status-counts"],
     queryFn: async () => {
@@ -46,10 +48,10 @@ function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold">{t("dashboard.title")}</h1>
         <Button asChild>
           <Link to="/products/new">
-            <PackagePlus className="h-4 w-4 mr-2" /> New product
+            <PackagePlus className="h-4 w-4 mr-2" /> {t("dashboard.newProduct")}
           </Link>
         </Button>
       </div>
@@ -59,7 +61,7 @@ function Dashboard() {
           <Card key={s}>
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground">
-                {formatStatus(s)}
+                {tStatus(t, s)}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -71,7 +73,7 @@ function Dashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent items</CardTitle>
+          <CardTitle className="text-base">{t("dashboard.recent")}</CardTitle>
         </CardHeader>
         <CardContent>
           {recent?.length ? (
@@ -85,19 +87,19 @@ function Dashboard() {
                   >
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {p.title || "Untitled"}
+                        {p.title || t("common.untitled")}
                       </div>
                       <div className="text-xs text-muted-foreground">{p.sku}</div>
                     </div>
                     <span className="text-xs text-muted-foreground shrink-0">
-                      {formatStatus(p.status)}
+                      {tStatus(t, p.status)}
                     </span>
                   </Link>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">No items yet. Create your first one.</p>
+            <p className="text-sm text-muted-foreground">{t("dashboard.empty")}</p>
           )}
         </CardContent>
       </Card>
