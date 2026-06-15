@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useT } from "@/lib/i18n";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const t = useT();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -37,7 +39,7 @@ function AuthPage() {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Account created. You can sign in now.");
+        toast.success(t("auth.accountCreated"));
         setMode("signin");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -45,7 +47,7 @@ function AuthPage() {
         navigate({ to: "/" });
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Authentication failed");
+      toast.error(err.message ?? t("auth.failed"));
     } finally {
       setLoading(false);
     }
@@ -56,14 +58,14 @@ function AuthPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">
-            {mode === "signin" ? "Sign in" : "Create account"}
+            {mode === "signin" ? t("auth.signIn") : t("auth.createAccount")}
           </CardTitle>
-          <p className="text-sm text-muted-foreground">Internal inventory tool</p>
+          <p className="text-sm text-muted-foreground">{t("auth.tagline")}</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -74,7 +76,7 @@ function AuthPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -86,21 +88,19 @@ function AuthPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+              {loading ? t("auth.pleaseWait") : mode === "signin" ? t("auth.signIn") : t("auth.createAccount")}
             </Button>
             <button
               type="button"
               onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
               className="block w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
-              {mode === "signin"
-                ? "No account? Create one"
-                : "Already have an account? Sign in"}
+              {mode === "signin" ? t("auth.noAccount") : t("auth.haveAccount")}
             </button>
           </form>
           <p className="mt-6 text-center text-xs text-muted-foreground">
             <Link to="/" className="hover:underline">
-              ← Back
+              ← {t("common.back")}
             </Link>
           </p>
         </CardContent>

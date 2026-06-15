@@ -17,11 +17,11 @@ import {
 import {
   PRODUCT_CONDITIONS,
   PRODUCT_STATUSES,
-  formatStatus,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
 import { CheckCircle2, ImagePlus, Plus, X } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
 
@@ -44,6 +44,7 @@ type SavedInfo = {
 
 function NewProductPage() {
   const navigate = useNavigate();
+  const t = useT();
   const qc = useQueryClient();
   const [photos, setPhotos] = useState<File[]>([]);
   const [title, setTitle] = useState("");
@@ -151,7 +152,7 @@ function NewProductPage() {
         basic: { locationId, category, brand, condition },
       });
     },
-    onError: (e: any) => toast.error(e.message ?? "Failed to create product"),
+    onError: (e: any) => toast.error(e.message ?? t("auth.failed")),
   });
 
   function resetForm(keep: { location?: boolean; basic?: boolean }) {
@@ -191,7 +192,7 @@ function NewProductPage() {
           <CardContent className="pt-6 space-y-4 text-center">
             <CheckCircle2 className="h-12 w-12 mx-auto text-primary" />
             <div>
-              <h2 className="text-xl font-semibold">Product saved</h2>
+              <h2 className="text-xl font-semibold">{t("newProduct.saved")}</h2>
               <p className="text-sm text-muted-foreground">{saved.sku}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
@@ -200,7 +201,7 @@ function NewProductPage() {
                 className="h-12 text-base"
                 asChild
               >
-                <Link to="/products/$id" params={{ id: saved.id }}>View product</Link>
+                <Link to="/products/$id" params={{ id: saved.id }}>{t("newProduct.view")}</Link>
               </Button>
               <Button
                 size="lg"
@@ -208,7 +209,7 @@ function NewProductPage() {
                 className="h-12 text-base"
                 onClick={() => resetForm({ location: true })}
               >
-                Add another item
+                {t("newProduct.addAnother")}
               </Button>
               <Button
                 size="lg"
@@ -216,11 +217,11 @@ function NewProductPage() {
                 className="h-12 text-base"
                 onClick={() => resetForm({ basic: true })}
               >
-                Duplicate basic info
+                {t("newProduct.duplicate")}
               </Button>
             </div>
             <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/products" })}>
-              Back to products
+              {t("newProduct.backToProducts")}
             </Button>
           </CardContent>
         </Card>
@@ -230,15 +231,15 @@ function NewProductPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <h1 className="text-2xl font-semibold">New product</h1>
+      <h1 className="text-2xl font-semibold">{t("newProduct.title")}</h1>
 
       <Card>
         <CardContent className="pt-6 space-y-3">
-          <Label className="text-base">Photos</Label>
+          <Label className="text-base">{t("common.photos")}</Label>
           <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10">
             <ImagePlus className="h-6 w-6" />
-            <span className="text-sm font-medium">Tap to add photos</span>
-            <span className="text-xs text-muted-foreground">Camera or library</span>
+            <span className="text-sm font-medium">{t("newProduct.tapToAdd")}</span>
+            <span className="text-xs text-muted-foreground">{t("newProduct.cameraOrLibrary")}</span>
             <input
               type="file"
               accept="image/*"
@@ -285,11 +286,11 @@ function NewProductPage() {
         className="space-y-4"
       >
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
+          <Label htmlFor="title">{t("common.title")}</Label>
           <Input id="title" className="h-12 text-base" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="desc">Description</Label>
+          <Label htmlFor="desc">{t("common.description")}</Label>
           <Textarea
             id="desc"
             value={description}
@@ -301,46 +302,46 @@ function NewProductPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="brand">Brand</Label>
+            <Label htmlFor="brand">{t("common.brand")}</Label>
             <Input
               id="brand"
               className="h-12 text-base"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
               list="brands-list"
-              placeholder="Type or pick"
+              placeholder={t("newProduct.typeOrPick")}
             />
             <datalist id="brands-list">
               {brandList.data?.map((b) => <option key={b.id} value={b.name} />)}
             </datalist>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="category">{t("common.category")}</Label>
             <Input
               id="category"
               className="h-12 text-base"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               list="cats-list"
-              placeholder="Type or pick"
+              placeholder={t("newProduct.typeOrPick")}
             />
             <datalist id="cats-list">
               {categoryList.data?.map((c) => <option key={c.id} value={c.name} />)}
             </datalist>
           </div>
           <div className="space-y-2">
-            <Label>Condition</Label>
+            <Label>{t("common.condition")}</Label>
             <Select value={condition} onValueChange={setCondition}>
-              <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectTrigger className="h-12 text-base"><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {PRODUCT_CONDITIONS.map((c) => (
-                  <SelectItem key={c} value={c}>{formatStatus(c)}</SelectItem>
+                  <SelectItem key={c} value={c}>{tCondition(t, c)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="price">Price (USD)</Label>
+            <Label htmlFor="price">{t("common.priceUsd")}</Label>
             <Input
               id="price"
               className="h-12 text-base"
@@ -353,10 +354,10 @@ function NewProductPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label>Location</Label>
+            <Label>{t("common.location")}</Label>
             <div className="flex gap-2">
               <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger className="h-12 text-base flex-1"><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectTrigger className="h-12 text-base flex-1"><SelectValue placeholder={t("newProduct.selectLocation")} /></SelectTrigger>
                 <SelectContent>
                   {locations.data?.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
@@ -372,12 +373,12 @@ function NewProductPage() {
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label>{t("common.status")}</Label>
             <Select value={status} onValueChange={setStatus}>
               <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PRODUCT_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
+                  <SelectItem key={s} value={s}>{tStatus(t, s)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -386,10 +387,10 @@ function NewProductPage() {
 
         <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
           <Button type="button" variant="outline" className="h-12 text-base" onClick={() => navigate({ to: "/products" })}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" disabled={create.isPending} className="h-12 text-base flex-1">
-            {create.isPending ? "Saving…" : "Save product"}
+            {create.isPending ? t("common.saving") : t("newProduct.saveProduct")}
           </Button>
         </div>
       </form>

@@ -21,12 +21,12 @@ import {
   PRODUCT_CONDITIONS,
   PRODUCT_STATUSES,
   formatPrice,
-  formatStatus,
   type MarketplaceId,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
+import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
 
@@ -34,15 +34,21 @@ export const Route = createFileRoute("/_authenticated/products/$id")({
   head: () => ({ meta: [{ title: "Product — Inventory" }] }),
   component: ProductDetail,
   errorComponent: RouteError,
-  notFoundComponent: () => (
-    <p className="text-sm text-muted-foreground p-6 text-center">Product not found.</p>
-  ),
+  notFoundComponent: () => <ProductNotFound />,
 });
+
+function ProductNotFound() {
+  const t = useT();
+  return (
+    <p className="text-sm text-muted-foreground p-6 text-center">{t("detail.notFound")}</p>
+  );
+}
 
 function ProductDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const t = useT();
 
   const product = useQuery({
     queryKey: ["product", id],
@@ -91,9 +97,9 @@ function ProductDetail() {
     },
   });
 
-  if (product.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  if (product.isLoading) return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
   if (product.error || !product.data)
-    return <p className="text-sm text-destructive">Product not found.</p>;
+    return <p className="text-sm text-destructive">{t("detail.notFound")}</p>;
 
   const p = product.data as any;
 
@@ -101,33 +107,33 @@ function ProductDetail() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/products"><ArrowLeft className="h-4 w-4 mr-1" /> Back</Link>
+          <Link to="/products"><ArrowLeft className="h-4 w-4 mr-1" /> {t("common.back")}</Link>
         </Button>
         <Button
           variant="outline"
           size="sm"
           onClick={async () => {
-            if (!confirm("Delete this product and all its photos?")) return;
+            if (!confirm(t("detail.deleteConfirm"))) return;
             await supabase.from("products").delete().eq("id", id);
-            toast.success("Deleted");
+            toast.success(t("detail.deleted"));
             qc.invalidateQueries({ queryKey: ["products"] });
             navigate({ to: "/products" });
           }}
         >
-          <Trash2 className="h-4 w-4 mr-1" /> Delete
+          <Trash2 className="h-4 w-4 mr-1" /> {t("common.delete")}
         </Button>
       </div>
 
       <header className="space-y-3">
-        <h1 className="text-2xl font-semibold break-words">{p.title || "Untitled"}</h1>
+        <h1 className="text-2xl font-semibold break-words">{p.title || t("common.untitled")}</h1>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">SKU</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.sku")}</div>
             <button
               type="button"
               onClick={() => {
                 navigator.clipboard.writeText(p.sku ?? "");
-                toast.success("SKU copied");
+                toast.success(t("detail.skuCopied"));
               }}
               className="mt-1 text-base font-semibold font-mono hover:underline"
             >
@@ -135,15 +141,15 @@ function ProductDetail() {
             </button>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Location</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.location")}</div>
             <div className="mt-1 text-base font-semibold break-words">
               {p.location?.label ?? "—"}
             </div>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.status")}</div>
             <div className="mt-1">
-              <Badge variant="secondary" className="text-sm">{formatStatus(p.status)}</Badge>
+              <Badge variant="secondary" className="text-sm">{tStatus(t, p.status)}</Badge>
             </div>
           </div>
         </div>
@@ -161,10 +167,10 @@ function ProductDetail() {
               `SKU: ${p.sku}`,
             ].join("\n");
             navigator.clipboard.writeText(full);
-            toast.success("Full listing copied");
+            toast.success(t("detail.fullCopied"));
           }}
         >
-          <Copy className="h-4 w-4 mr-2" /> Copy full listing
+          <Copy className="h-4 w-4 mr-2" /> {t("detail.copyFullListing")}
         </Button>
       </header>
 
@@ -183,22 +189,22 @@ function ProductDetail() {
       <ListingsSection productId={id} rows={listings.data ?? []} onChange={() => listings.refetch()} />
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Status history</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("detail.statusHistory")}</CardTitle></CardHeader>
         <CardContent>
           {history.data?.length ? (
             <ul className="space-y-1 text-sm">
               {history.data.map((h: any) => (
                 <li key={h.id} className="flex justify-between text-muted-foreground">
                   <span>
-                    {h.from_status ? `${formatStatus(h.from_status)} → ` : ""}
-                    <span className="text-foreground">{formatStatus(h.to_status)}</span>
+                    {h.from_status ? `${tStatus(t, h.from_status)} → ` : ""}
+                    <span className="text-foreground">{tStatus(t, h.to_status)}</span>
                   </span>
                   <span className="text-xs">{new Date(h.changed_at).toLocaleString()}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">No history.</p>
+            <p className="text-sm text-muted-foreground">{t("detail.noHistory")}</p>
           )}
         </CardContent>
       </Card>
@@ -359,9 +365,10 @@ function PhotosSection({
 }
 
 function CopyActions({ product }: { product: any }) {
+  const t = useT();
   function copy(text: string, label: string) {
     navigator.clipboard.writeText(text);
-    toast.success(`Copied ${label}`);
+    toast.success(`${t("common.copied")} ${label}`);
   }
   const full = [
     product.title,
@@ -375,29 +382,29 @@ function CopyActions({ product }: { product: any }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Quick actions</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{t("detail.quickActions")}</CardTitle></CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => copy(product.title ?? "", "title")}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Title
+          <Button size="sm" variant="outline" onClick={() => copy(product.title ?? "", t("detail.copyTitle"))}>
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyTitle")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => copy(product.description ?? "", "description")}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Description
+          <Button size="sm" variant="outline" onClick={() => copy(product.description ?? "", t("detail.copyDescription"))}>
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyDescription")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => copy(full, "full listing")}>
-            <Copy className="h-3.5 w-3.5 mr-1" /> Full listing
+          <Button size="sm" variant="outline" onClick={() => copy(full, t("detail.copyFullListing"))}>
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyFullListing")}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => copy(formatPrice(product.price_cents, product.currency), "price")}
+            onClick={() => copy(formatPrice(product.price_cents, product.currency), t("common.price"))}
           >
-            <Copy className="h-3.5 w-3.5 mr-1" /> Price
+            <Copy className="h-3.5 w-3.5 mr-1" /> {t("common.price")}
           </Button>
           {MARKETPLACES.map((m) => (
             <Button key={m.id} size="sm" variant="outline" asChild>
               <a href={m.sellUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open {m.label}
+                <ExternalLink className="h-3.5 w-3.5 mr-1" /> {m.label}
               </a>
             </Button>
           ))}
@@ -407,8 +414,11 @@ function CopyActions({ product }: { product: any }) {
   );
 }
 
+
+
 function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const qc = useQueryClient();
+  const tr = useT();
   const [title, setTitle] = useState(product.title ?? "");
   const [description, setDescription] = useState(product.description ?? "");
   const [brand, setBrand] = useState(product.brand?.name ?? "");
@@ -467,7 +477,7 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success("Saved");
+      toast.success(tr("detail.saved"));
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["history", product.id] });
       onSaved();
@@ -477,54 +487,54 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{tr("detail.details")}</CardTitle></CardHeader>
       <CardContent>
         <form
           onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label>Title</Label>
+            <Label>{tr("common.title")}</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{tr("common.description")}</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Brand</Label>
+              <Label>{tr("common.brand")}</Label>
               <Input value={brand} onChange={(e) => setBrand(e.target.value)} list="brands-list-edit" />
               <datalist id="brands-list-edit">
                 {brandList.data?.map((b) => <option key={b.id} value={b.name} />)}
               </datalist>
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>{tr("common.category")}</Label>
               <Input value={category} onChange={(e) => setCategory(e.target.value)} list="cats-list-edit" />
               <datalist id="cats-list-edit">
                 {categoryList.data?.map((c) => <option key={c.id} value={c.name} />)}
               </datalist>
             </div>
             <div className="space-y-2">
-              <Label>Condition</Label>
+              <Label>{tr("common.condition")}</Label>
               <Select value={condition} onValueChange={setCondition}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={tr("common.select")} /></SelectTrigger>
                 <SelectContent>
                   {PRODUCT_CONDITIONS.map((c) => (
-                    <SelectItem key={c} value={c}>{formatStatus(c)}</SelectItem>
+                    <SelectItem key={c} value={c}>{tCondition(tr, c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Price (USD)</Label>
+              <Label>{tr("common.priceUsd")}</Label>
               <Input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Location</Label>
+              <Label>{tr("common.location")}</Label>
               <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={tr("newProduct.selectLocation")} /></SelectTrigger>
                 <SelectContent>
                   {locations.data?.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
@@ -533,19 +543,19 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label>{tr("common.status")}</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PRODUCT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
+                    <SelectItem key={s} value={s}>{tStatus(tr, s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <Button type="submit" disabled={save.isPending}>
-            {save.isPending ? "Saving…" : "Save changes"}
+            {save.isPending ? tr("common.saving") : tr("detail.saveChanges")}
           </Button>
         </form>
       </CardContent>
@@ -562,6 +572,7 @@ function ListingsSection({
   rows: Array<any>;
   onChange: () => void;
 }) {
+  const t = useT();
   async function upsert(marketplace: MarketplaceId, patch: any) {
     const existing = rows.find((r) => r.marketplace === marketplace);
     if (existing) {
@@ -583,7 +594,7 @@ function ListingsSection({
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Marketplace tracking</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{t("detail.marketplaceTracking")}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         {MARKETPLACES.map((m) => {
           const row = rows.find((r) => r.marketplace === m.id);
@@ -597,12 +608,12 @@ function ListingsSection({
                 <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {LISTING_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
+                    <SelectItem key={s} value={s}>{tStatus(t, s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Input
-                placeholder="Listing URL"
+                placeholder={t("detail.listingUrl")}
                 defaultValue={row?.listing_url ?? ""}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
