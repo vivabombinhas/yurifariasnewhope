@@ -189,22 +189,22 @@ function ProductDetail() {
       <ListingsSection productId={id} rows={listings.data ?? []} onChange={() => listings.refetch()} />
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Status history</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t("detail.statusHistory")}</CardTitle></CardHeader>
         <CardContent>
           {history.data?.length ? (
             <ul className="space-y-1 text-sm">
               {history.data.map((h: any) => (
                 <li key={h.id} className="flex justify-between text-muted-foreground">
                   <span>
-                    {h.from_status ? `${formatStatus(h.from_status)} → ` : ""}
-                    <span className="text-foreground">{formatStatus(h.to_status)}</span>
+                    {h.from_status ? `${tStatus(t, h.from_status)} → ` : ""}
+                    <span className="text-foreground">{tStatus(t, h.to_status)}</span>
                   </span>
                   <span className="text-xs">{new Date(h.changed_at).toLocaleString()}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">No history.</p>
+            <p className="text-sm text-muted-foreground">{t("detail.noHistory")}</p>
           )}
         </CardContent>
       </Card>
