@@ -245,7 +245,7 @@ function PhotosSection({
     const nextPos = (photos[photos.length - 1]?.position ?? -1) + 1;
     try {
       for (let i = 0; i < files.length; i++) {
-        const file = files[i];
+        const file = await prepareImageForUpload(files[i]);
         const path = `${productId}/${crypto.randomUUID()}-${file.name}`;
         const { error } = await supabase.storage
           .from("product-photos")
