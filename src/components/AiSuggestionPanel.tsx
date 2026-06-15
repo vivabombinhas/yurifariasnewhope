@@ -34,13 +34,22 @@ export function AiSuggestionPanel({
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
 
   const run = useMutation({
-    mutationFn: async () => analyze({ data: { productId: product.id } }),
+    mutationFn: async () => {
+      console.log("[AI panel] analyzing product", product.id);
+      return analyze({ data: { productId: product.id } });
+    },
     onSuccess: (s) => {
+      console.log("[AI panel] success", s);
       setSuggestion(s);
       toast.success("Suggestion ready — review and apply.");
     },
-    onError: (e: any) => toast.error(e.message ?? "AI failed"),
+    onError: (e: any) => {
+      console.error("[AI panel] failed", e);
+      toast.error(e?.message ?? "AI failed");
+    },
   });
+
+  const errorMsg = run.isError ? (run.error as any)?.message ?? "AI failed" : null;
 
   return (
     <Card>
@@ -51,6 +60,7 @@ export function AiSuggestionPanel({
         <Button
           size="sm"
           onClick={() => {
+            console.log("[AI panel] click", { hasPhotos, pending: run.isPending });
             if (!hasPhotos) {
               toast.error("Add at least one photo before analyzing.");
               return;
@@ -64,6 +74,12 @@ export function AiSuggestionPanel({
         </Button>
       </CardHeader>
       <CardContent>
+        {errorMsg && (
+          <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="font-medium mb-1">AI analysis failed</div>
+            <div className="break-words">{errorMsg}</div>
+          </div>
+        )}
         {!hasPhotos ? (
           <p className="text-sm text-muted-foreground">
             Add at least one photo to enable AI analysis.
