@@ -82,6 +82,13 @@ export function AiSuggestionPanel({
             <div className="break-words">{errorMsg}</div>
           </div>
         )}
+        {unsupportedCount > 0 && (
+          <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+            {unsupportedCount === 1
+              ? "1 photo is in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload it as JPEG or PNG."
+              : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG or PNG.`}
+          </div>
+        )}
         {!hasPhotos ? (
           <p className="text-sm text-muted-foreground">
             Add at least one photo to enable AI analysis.
