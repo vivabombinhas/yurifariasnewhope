@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PRODUCT_CONDITIONS, formatStatus } from "@/lib/marketplaces";
+import { PRODUCT_CONDITIONS } from "@/lib/marketplaces";
+import { useT, tCondition } from "@/lib/i18n";
 import { toast } from "sonner";
 import {
   ChevronDown,
@@ -44,6 +45,7 @@ function todayRangeISO() {
 function IntakePage() {
   const qc = useQueryClient();
   const analyze = useServerFn(analyzeProductWithAI);
+  const t = useT();
 
   const [photos, setPhotos] = useState<File[]>([]);
   const [locationId, setLocationId] = useState<string>("");
@@ -148,7 +150,7 @@ function IntakePage() {
 
   async function runAnalyze() {
     if (photos.length === 0) {
-      toast.error("Add at least one photo first.");
+      toast.error(t("intake.addPhotoFirst"));
       return;
     }
     setAnalyzing(true);
@@ -164,7 +166,7 @@ function IntakePage() {
       }
       const s = await analyze({ data: { productId: id! } });
       applySuggestion(s);
-      toast.success("AI ready — review and save.");
+      toast.success(t("intake.aiReady"));
     } catch (e: any) {
       toast.error(e.message ?? "AI failed");
     } finally {
@@ -265,21 +267,21 @@ function IntakePage() {
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-semibold">
             <Zap className="h-5 w-5 text-primary" />
-            Fast Intake
+            {t("intake.title")}
           </h1>
           <p className="text-xs text-muted-foreground">
-            Photos → location → AI → save & next.
+            {t("intake.subtitle")}
           </p>
         </div>
         <Card className="shrink-0">
           <CardContent className="px-4 py-2 text-center">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Today
+              {t("intake.today")}
             </p>
             <p className="text-2xl font-bold leading-none">
               {todayCount.data ?? 0}
             </p>
-            <p className="text-[10px] text-muted-foreground">items</p>
+            <p className="text-[10px] text-muted-foreground">{t("intake.items")}</p>
           </CardContent>
         </Card>
       </div>
@@ -287,11 +289,11 @@ function IntakePage() {
       {/* 1. Photos */}
       <Card>
         <CardContent className="pt-6 space-y-3">
-          <Label className="text-base">1. Photos</Label>
+          <Label className="text-base">{t("intake.stepPhotos")}</Label>
           <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10">
             <ImagePlus className="h-7 w-7" />
-            <span className="text-sm font-medium">Tap to add photos</span>
-            <span className="text-xs text-muted-foreground">Camera or library</span>
+            <span className="text-sm font-medium">{t("newProduct.tapToAdd")}</span>
+            <span className="text-xs text-muted-foreground">{t("newProduct.cameraOrLibrary")}</span>
             <input
               type="file"
               accept="image/*"
@@ -335,7 +337,7 @@ function IntakePage() {
           )}
           {draftProductId && (
             <p className="text-[11px] text-muted-foreground">
-              Photos already uploaded for {draftSku}.
+              {t("intake.photosUploaded")} {draftSku}.
             </p>
           )}
         </CardContent>
@@ -344,10 +346,10 @@ function IntakePage() {
       {/* 2. Location */}
       <Card>
         <CardContent className="pt-6 space-y-2">
-          <Label className="text-base">2. Location</Label>
+          <Label className="text-base">{t("intake.stepLocation")}</Label>
           <Select value={locationId} onValueChange={setLocationId}>
             <SelectTrigger className="h-12 text-base">
-              <SelectValue placeholder="Select location" />
+              <SelectValue placeholder={t("newProduct.selectLocation")} />
             </SelectTrigger>
             <SelectContent>
               {locations.data?.map((l) => (
@@ -359,9 +361,9 @@ function IntakePage() {
           </Select>
           {!locations.data?.length && (
             <p className="text-xs text-muted-foreground">
-              No locations yet —{" "}
+              {t("intake.noLocations")}{" "}
               <Link to="/locations" className="underline">
-                create one
+                {t("intake.createOne")}
               </Link>
               .
             </p>
@@ -373,9 +375,9 @@ function IntakePage() {
       <Card>
         <CardContent className="pt-6 space-y-2">
           <Label className="text-base flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" /> 3. Analyze with AI
+            <Sparkles className="h-4 w-4 text-primary" /> {t("intake.stepAnalyze")}
             <span className="text-xs font-normal text-muted-foreground">
-              (optional)
+              {t("common.optional")}
             </span>
           </Label>
           <Button
@@ -385,11 +387,11 @@ function IntakePage() {
             disabled={analyzing || photos.length === 0}
           >
             <Wand2 className="h-4 w-4 mr-2" />
-            {analyzing ? "Analyzing…" : "Analyze with AI"}
+            {analyzing ? t("intake.analyzing") : t("intake.analyze")}
           </Button>
           {verification.length > 0 && (
             <p className="text-[11px] text-muted-foreground">
-              Verify: {verification.join(", ")}
+              {t("intake.verify")}: {verification.join(", ")}
             </p>
           )}
         </CardContent>
@@ -398,10 +400,10 @@ function IntakePage() {
       {/* 4. Review */}
       <Card>
         <CardContent className="pt-6 space-y-3">
-          <Label className="text-base">4. Review</Label>
+          <Label className="text-base">{t("intake.stepReview")}</Label>
 
           <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">{t("common.title")}</Label>
             <Input
               id="title"
               className="h-12 text-base"
@@ -412,7 +414,7 @@ function IntakePage() {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="price">Price (USD)</Label>
+              <Label htmlFor="price">{t("common.priceUsd")}</Label>
               <Input
                 id="price"
                 className="h-12 text-base"
@@ -425,15 +427,15 @@ function IntakePage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Condition</Label>
+              <Label>{t("common.condition")}</Label>
               <Select value={condition} onValueChange={setCondition}>
                 <SelectTrigger className="h-12 text-base">
-                  <SelectValue placeholder="Select" />
+                  <SelectValue placeholder={t("common.select")} />
                 </SelectTrigger>
                 <SelectContent>
                   {PRODUCT_CONDITIONS.map((c) => (
                     <SelectItem key={c} value={c}>
-                      {formatStatus(c)}
+                      {tCondition(t, c)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -450,11 +452,11 @@ function IntakePage() {
           >
             {showMore ? (
               <>
-                <ChevronUp className="h-4 w-4 mr-1" /> Hide advanced
+                <ChevronUp className="h-4 w-4 mr-1" /> {t("intake.hideAdvanced")}
               </>
             ) : (
               <>
-                <ChevronDown className="h-4 w-4 mr-1" /> Show more
+                <ChevronDown className="h-4 w-4 mr-1" /> {t("intake.showMore")}
               </>
             )}
           </Button>
@@ -462,7 +464,7 @@ function IntakePage() {
           {showMore && (
             <div className="space-y-3 pt-1">
               <div className="space-y-2">
-                <Label htmlFor="brand">Brand</Label>
+                <Label htmlFor="brand">{t("common.brand")}</Label>
                 <Input
                   id="brand"
                   className="h-12 text-base"
@@ -471,7 +473,7 @@ function IntakePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label htmlFor="category">{t("common.category")}</Label>
                 <Input
                   id="category"
                   className="h-12 text-base"
@@ -480,7 +482,7 @@ function IntakePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="desc">Description</Label>
+                <Label htmlFor="desc">{t("common.description")}</Label>
                 <Textarea
                   id="desc"
                   rows={4}
@@ -504,7 +506,7 @@ function IntakePage() {
             disabled={!canSave || saving}
             onClick={() => save.mutate()}
           >
-            {saving ? "Saving…" : "Save & Next"}
+            {saving ? t("common.saving") : t("intake.saveNext")}
           </Button>
         </div>
       </div>
