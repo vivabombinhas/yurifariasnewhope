@@ -46,7 +46,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             return (
               <Link
                 key={item.to}
-                to={item.to}
+                to={item.to as any}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                   isActive(item.to, item.exact)
@@ -105,7 +105,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           return (
             <Link
               key={item.to}
-              to={item.to}
+              to={item.to as any}
               className={cn(
                 "flex flex-col items-center justify-center gap-1 py-2 text-xs",
                 active ? "text-primary" : "text-muted-foreground",
