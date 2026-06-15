@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Boxes, LayoutDashboard, MapPin, Package, PackagePlus, LogOut } from "lucide-react";
+import { Boxes, LayoutDashboard, MapPin, Package, PackagePlus, LogOut, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/products", label: "Products", icon: Package },
+  { to: "/intake", label: "Intake", icon: Zap },
   { to: "/products/new", label: "New", icon: PackagePlus },
   { to: "/locations", label: "Locations", icon: MapPin },
 ];
@@ -73,7 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="px-4 py-4 md:px-8 md:py-6 max-w-6xl mx-auto">{children}</main>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed inset-x-0 bottom-0 z-10 grid grid-cols-4 border-t bg-background">
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t bg-background">
         {NAV.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.to, item.exact);
