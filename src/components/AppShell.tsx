@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 
-const NAV = [
+const NAV: Array<{
+  to: string;
+  labelKey: string;
+  icon: typeof LayoutDashboard;
+  exact?: boolean;
+}> = [
   { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, exact: true },
   { to: "/products", labelKey: "nav.products", icon: Package },
   { to: "/intake", labelKey: "nav.intake", icon: Zap },
   { to: "/products/new", labelKey: "nav.new", icon: PackagePlus },
   { to: "/locations", labelKey: "nav.locations", icon: MapPin },
-] as const;
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
