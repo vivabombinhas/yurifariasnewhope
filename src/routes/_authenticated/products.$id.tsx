@@ -572,6 +572,7 @@ function ListingsSection({
   rows: Array<any>;
   onChange: () => void;
 }) {
+  const t = useT();
   async function upsert(marketplace: MarketplaceId, patch: any) {
     const existing = rows.find((r) => r.marketplace === marketplace);
     if (existing) {
@@ -593,7 +594,7 @@ function ListingsSection({
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Marketplace tracking</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{t("detail.marketplaceTracking")}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         {MARKETPLACES.map((m) => {
           const row = rows.find((r) => r.marketplace === m.id);
@@ -607,12 +608,12 @@ function ListingsSection({
                 <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {LISTING_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
+                    <SelectItem key={s} value={s}>{tStatus(t, s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Input
-                placeholder="Listing URL"
+                placeholder={t("detail.listingUrl")}
                 defaultValue={row?.listing_url ?? ""}
                 onBlur={(e) => {
                   const v = e.target.value.trim();
