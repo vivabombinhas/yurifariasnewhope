@@ -23,10 +23,12 @@ import { Copy, Sparkles, Wand2 } from "lucide-react";
 export function AiSuggestionPanel({
   product,
   hasPhotos,
+  unsupportedCount = 0,
   onApplied,
 }: {
   product: any;
   hasPhotos: boolean;
+  unsupportedCount?: number;
   onApplied: () => void;
 }) {
   const qc = useQueryClient();
