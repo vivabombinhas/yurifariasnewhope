@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { prepareImageForUpload } from "@/lib/image-convert";
 import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
