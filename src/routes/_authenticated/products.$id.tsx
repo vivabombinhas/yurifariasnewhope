@@ -487,54 +487,54 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Details</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{tr("detail.details")}</CardTitle></CardHeader>
       <CardContent>
         <form
           onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
           className="space-y-4"
         >
           <div className="space-y-2">
-            <Label>Title</Label>
+            <Label>{tr("common.title")}</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{tr("common.description")}</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Brand</Label>
+              <Label>{tr("common.brand")}</Label>
               <Input value={brand} onChange={(e) => setBrand(e.target.value)} list="brands-list-edit" />
               <datalist id="brands-list-edit">
                 {brandList.data?.map((b) => <option key={b.id} value={b.name} />)}
               </datalist>
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
+              <Label>{tr("common.category")}</Label>
               <Input value={category} onChange={(e) => setCategory(e.target.value)} list="cats-list-edit" />
               <datalist id="cats-list-edit">
                 {categoryList.data?.map((c) => <option key={c.id} value={c.name} />)}
               </datalist>
             </div>
             <div className="space-y-2">
-              <Label>Condition</Label>
+              <Label>{tr("common.condition")}</Label>
               <Select value={condition} onValueChange={setCondition}>
-                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={tr("common.select")} /></SelectTrigger>
                 <SelectContent>
                   {PRODUCT_CONDITIONS.map((c) => (
-                    <SelectItem key={c} value={c}>{formatStatus(c)}</SelectItem>
+                    <SelectItem key={c} value={c}>{tCondition(tr, c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Price (USD)</Label>
+              <Label>{tr("common.priceUsd")}</Label>
               <Input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Location</Label>
+              <Label>{tr("common.location")}</Label>
               <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger><SelectValue placeholder="Select location" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={tr("newProduct.selectLocation")} /></SelectTrigger>
                 <SelectContent>
                   {locations.data?.map((l) => (
                     <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
@@ -543,19 +543,19 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label>{tr("common.status")}</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {PRODUCT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{formatStatus(s)}</SelectItem>
+                    <SelectItem key={s} value={s}>{tStatus(tr, s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <Button type="submit" disabled={save.isPending}>
-            {save.isPending ? "Saving…" : "Save changes"}
+            {save.isPending ? tr("common.saving") : tr("detail.saveChanges")}
           </Button>
         </form>
       </CardContent>
