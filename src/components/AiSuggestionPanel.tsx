@@ -421,11 +421,138 @@ function SuggestionEditor({
         </div>
       )}
 
+      {(s.possible_brand || s.possible_model || s.visual_clues?.length || s.search_keywords?.length || s.recommended_research_queries?.length || s.price_confidence === "manual_required" || s.potentially_valuable) && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+          <div className="font-medium text-foreground flex items-center gap-1">
+            <Search className="h-3.5 w-3.5" /> Research clues (hypotheses — verify manually)
+          </div>
+          {(s.possible_brand || s.possible_model) && (
+            <div>
+              <span className="text-muted-foreground">Possibly: </span>
+              {[s.possible_brand, s.possible_model].filter(Boolean).join(" — ")}
+            </div>
+          )}
+          {s.visual_clues?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {s.visual_clues.map((c, i) => (
+                <Badge key={i} variant="secondary" className="text-[10px]">{c}</Badge>
+              ))}
+            </div>
+          )}
+          {s.search_keywords?.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Search keywords</div>
+              <div className="flex flex-wrap gap-1">
+                {s.search_keywords.map((k, i) => (
+                  <Badge key={i} variant="outline" className="text-[10px]">{k}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {s.recommended_research_queries?.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Recommended research queries</div>
+              <ul className="list-disc pl-5 space-y-0.5">
+                {s.recommended_research_queries.map((q, i) => (
+                  <li key={i} className="text-sm">{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Badge variant="outline" className="text-[10px]">
+              Price confidence: {s.price_confidence}
+            </Badge>
+            {s.potentially_valuable && (
+              <Badge variant="destructive" className="text-[10px] flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Potentially valuable — research before pricing
+              </Badge>
+            )}
+            {s.price_confidence === "manual_required" && (
+              <Badge variant="destructive" className="text-[10px]">
+                Manual pricing recommended
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <Button onClick={apply} disabled={saving}>
           {saving ? "Applying…" : "Apply to product"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function ResearchBlock({ result }: { result: AiResearchResult }) {
+  return (
+    <div className="mb-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+      <div className="font-medium text-foreground flex items-center gap-1">
+        <Search className="h-4 w-4" /> Research clues (hypotheses — verify manually)
+      </div>
+      {(result.possible_brand || result.possible_model) && (
+        <div>
+          <span className="text-muted-foreground">Possibly: </span>
+          {[result.possible_brand, result.possible_model].filter(Boolean).join(" — ")}
+        </div>
+      )}
+      {result.potentially_valuable && (
+        <div className="flex items-center gap-2 rounded bg-destructive/10 text-destructive p-2">
+          <AlertTriangle className="h-4 w-4" />
+          <div>
+            <div className="font-medium">Potentially valuable item</div>
+            {result.value_alert && <div className="text-xs">{result.value_alert}</div>}
+          </div>
+        </div>
+      )}
+      {result.visual_clues.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Visual clues</div>
+          <div className="flex flex-wrap gap-1">
+            {result.visual_clues.map((c, i) => (
+              <Badge key={i} variant="secondary" className="text-[10px]">{c}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {result.search_keywords.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Search keywords</div>
+          <div className="flex flex-wrap gap-1">
+            {result.search_keywords.map((k, i) => (
+              <Badge key={i} variant="outline" className="text-[10px]">{k}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {result.recommended_research_queries.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Recommended research queries</div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {result.recommended_research_queries.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.verification_questions.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Verify in person</div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {result.verification_questions.map((q, i) => (
+              <li key={i}>⚠ {q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.manual_research_recommendation && (
+        <div className="text-xs text-muted-foreground border-t pt-2">
+          <span className="font-medium text-foreground">Recommendation: </span>
+          {result.manual_research_recommendation}
+        </div>
+      )}
     </div>
   );
 }
