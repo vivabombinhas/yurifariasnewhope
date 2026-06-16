@@ -14,7 +14,6 @@ const NAV: Array<{
   { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, exact: true },
   { to: "/products", labelKey: "nav.products", icon: Package },
   { to: "/intake", labelKey: "nav.intake", icon: Zap },
-  { to: "/products/new", labelKey: "nav.new", icon: PackagePlus },
   { to: "/locations", labelKey: "nav.locations", icon: MapPin },
 ];
 
