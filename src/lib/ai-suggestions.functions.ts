@@ -91,8 +91,10 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const apiKey = process.env.LOVABLE_API_KEY;
+    const startedAt = Date.now();
     console.log("[analyze] start productId=", data.productId, "userId=", userId);
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
+    try {
+      if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
 
     const { data: photos, error: phErr } = await supabase
       .from("product_photos")
@@ -107,6 +109,13 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
       throw new Error("This product has no photos. Add at least one photo before analyzing.");
     }
     console.log("[analyze] photo count=", photos.length);
+    const unsupportedPhotos = photos.filter((p) => !isAiSupportedStoragePath(p.storage_path));
+    if (unsupportedPhotos.length > 0) {
+      console.warn("[analyze] unsupported stored photos", unsupportedPhotos.map((p) => p.storage_path));
+      throw new Error(
+        "This image format is not supported for AI analysis. Please re-upload the photo as JPEG, PNG, WebP, or GIF.",
+      );
+    }
 
     const { data: signed, error: sErr } = await supabase.storage
       .from("product-photos")
