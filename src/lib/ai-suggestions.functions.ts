@@ -77,6 +77,14 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+const AI_TIMEOUT_MS = 45_000;
+const AI_SUPPORTED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+
+function isAiSupportedStoragePath(path: string): boolean {
+  const ext = path.toLowerCase().split("?")[0].split("#")[0].split(".").pop() ?? "";
+  return AI_SUPPORTED_EXTENSIONS.has(ext);
+}
+
 export const analyzeProductWithAI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Input.parse(input))
