@@ -417,3 +417,28 @@ export const runResearchAgent = createServerFn({ method: "POST" })
     console.log("[research-agent] success durationMs=", Date.now() - startedAt, "hypotheses=", hypotheses.length);
     return report;
   });
+
+/**
+ * Apply ONLY the safe (brand-unverified) title to a product.
+ * Never writes brand/model — those require explicit human confirmation elsewhere.
+ */
+export const applySafeTitleToProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        productId: z.string().uuid(),
+        safe_listing_title: z.string().min(1).max(160),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("products")
+      .update({ title: data.safe_listing_title })
+      .eq("id", data.productId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
