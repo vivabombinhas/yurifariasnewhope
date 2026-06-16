@@ -51,14 +51,20 @@ function replaceExt(name: string, ext: string): string {
  * Throws a helpful error if the browser can't decode the source (common for HEIC).
  */
 export async function prepareImageForUpload(file: File): Promise<File> {
-  if (isAiSupportedFile(file)) {
-    if (file.type) return file;
+  if (isBlockedImageFile(file)) {
+    throw new Error(getUnsupportedImageMessage(file.name));
+  }
+
+  if (isAiSupportedMime(file.type)) {
+    if (isAiSupportedPath(file.name)) return file;
+    const ext = file.type.toLowerCase() === "image/jpeg" ? "jpg" : file.type.toLowerCase().replace("image/", "");
+    return new File([file], replaceExt(file.name, ext), { type: file.type, lastModified: file.lastModified });
+  }
+
+  if (isAiSupportedPath(file.name)) {
     const ext = getFileExtension(file.name);
     const type = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
     return new File([file], file.name, { type, lastModified: file.lastModified });
-  }
-  if (isBlockedImageFile(file)) {
-    throw new Error(getUnsupportedImageMessage(file.name));
   }
 
   const ext = getFileExtension(file.name);
