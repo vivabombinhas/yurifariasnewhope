@@ -3,7 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { prepareImageForUpload } from "@/lib/image-convert";
+import { getUnsupportedImageMessage, prepareImageForUpload } from "@/lib/image-convert";
+import { withTimeout } from "@/lib/async-timeout";
 import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -80,10 +81,18 @@ function IntakePage() {
     },
   });
 
-  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
-    setPhotos((cur) => [...cur, ...files]);
     e.target.value = "";
+    if (!files.length) return;
+    try {
+      console.log("[intake] preparing selected photos", files.map((f) => ({ name: f.name, type: f.type })));
+      const prepared = await Promise.all(files.map((file) => prepareImageForUpload(file)));
+      setPhotos((cur) => [...cur, ...prepared]);
+    } catch (e: any) {
+      console.error("[intake] photo preparation failed", e);
+      toast.error(e?.message ?? getUnsupportedImageMessage());
+    }
   }
   function removePhoto(i: number) {
     setPhotos((cur) => cur.filter((_, idx) => idx !== i));
@@ -108,6 +117,8 @@ function IntakePage() {
   }
 
   async function createDraftWithPhotos(): Promise<{ id: string; sku: string }> {
+    console.log("[intake] saving draft before AI", { photoCount: photos.length });
+    const preparedPhotos = await Promise.all(photos.map((photo) => prepareImageForUpload(photo)));
     const { data: product, error } = await supabase
       .from("products")
       .insert({
@@ -121,19 +132,29 @@ function IntakePage() {
       .single();
     if (error) throw error;
 
-    for (let i = 0; i < photos.length; i++) {
-      const file = await prepareImageForUpload(photos[i]);
-      const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
-      const { error: upErr } = await supabase.storage
-        .from("product-photos")
-        .upload(path, file, { contentType: file.type });
-      if (upErr) throw upErr;
-      await supabase.from("product_photos").insert({
-        product_id: product.id,
-        storage_path: path,
-        position: i,
-        is_cover: i === 0,
-      });
+    const uploadedPaths: string[] = [];
+    try {
+      for (let i = 0; i < preparedPhotos.length; i++) {
+        const file = preparedPhotos[i];
+        const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
+        const { error: upErr } = await supabase.storage
+          .from("product-photos")
+          .upload(path, file, { contentType: file.type });
+        if (upErr) throw upErr;
+        uploadedPaths.push(path);
+        const { error: photoErr } = await supabase.from("product_photos").insert({
+          product_id: product.id,
+          storage_path: path,
+          position: i,
+          is_cover: i === 0,
+        });
+        if (photoErr) throw photoErr;
+      }
+    } catch (e) {
+      console.error("[intake] draft photo upload failed; cleaning up draft", e);
+      if (uploadedPaths.length) await supabase.storage.from("product-photos").remove(uploadedPaths);
+      await supabase.from("products").delete().eq("id", product.id);
+      throw e;
     }
     return product;
   }
