@@ -120,16 +120,27 @@ export function AiSuggestionPanel({
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" /> AI listing suggestion
         </CardTitle>
-        <Button
-          size="sm"
-          onClick={startAnalyze}
-          disabled={run.isPending || !hasPhotos}
-          aria-busy={run.isPending}
-        >
-          <Wand2 className="h-4 w-4 mr-1" />
-          {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
-        </Button>
-
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={startResearch}
+            disabled={runResearch.isPending || !hasPhotos}
+            aria-busy={runResearch.isPending}
+          >
+            <Search className="h-4 w-4 mr-1" />
+            {runResearch.isPending ? "Researching…" : "Improve with Research"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={startAnalyze}
+            disabled={run.isPending || !hasPhotos}
+            aria-busy={run.isPending}
+          >
+            <Wand2 className="h-4 w-4 mr-1" />
+            {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {errorMsg && (
@@ -145,13 +156,15 @@ export function AiSuggestionPanel({
               : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG, PNG, WebP, or GIF.`}
           </div>
         )}
+        {researchResult && <ResearchBlock result={researchResult} />}
         {!hasPhotos ? (
           <p className="text-sm text-muted-foreground">
             Add at least one photo to enable AI analysis.
           </p>
         ) : !suggestion ? (
           <p className="text-sm text-muted-foreground">
-            Click <b>Analyze with AI</b> to generate an editable listing suggestion.
+            Click <b>Analyze with AI</b> for a listing draft, or <b>Improve with Research</b>
+            {" "}to surface identification clues and search queries before pricing.
             Nothing is saved to the product until you click <b>Apply to product</b>.
           </p>
         ) : (
