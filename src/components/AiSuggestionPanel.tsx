@@ -2,7 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
+import {
+  analyzeProductWithAI,
+  researchProductWithAI,
+  type AiSuggestion,
+  type AiResearchResult,
+} from "@/lib/ai-suggestions.functions";
 import { withTimeout } from "@/lib/async-timeout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { PRODUCT_CONDITIONS, formatPrice, formatStatus } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { Copy, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, Copy, Search, Sparkles, Wand2 } from "lucide-react";
 
 export function AiSuggestionPanel({
   product,
@@ -34,7 +39,9 @@ export function AiSuggestionPanel({
 }) {
   const qc = useQueryClient();
   const analyze = useServerFn(analyzeProductWithAI);
+  const research = useServerFn(researchProductWithAI);
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
+  const [researchResult, setResearchResult] = useState<AiResearchResult | null>(null);
 
   const run = useMutation({
     mutationFn: async () => {
@@ -56,6 +63,26 @@ export function AiSuggestionPanel({
     },
   });
 
+  const runResearch = useMutation({
+    mutationFn: async () => {
+      console.log("[AI panel] research product", product.id);
+      return withTimeout(
+        research({ data: { productId: product.id } }),
+        55_000,
+        "AI research timed out. Please try again.",
+      );
+    },
+    onSuccess: (r) => {
+      console.log("[AI panel] research success", r);
+      setResearchResult(r);
+      toast.success("Research clues ready — verify manually before pricing.");
+    },
+    onError: (e: any) => {
+      console.error("[AI panel] research failed", e);
+      toast.error(e?.message ?? "Research failed");
+    },
+  });
+
   const startAnalyze = () => {
     if (run.isPending) {
       console.log("[AI panel] click ignored — already analyzing");
@@ -72,6 +99,18 @@ export function AiSuggestionPanel({
     run.mutate();
   };
 
+  const startResearch = () => {
+    if (runResearch.isPending) return;
+    if (!hasPhotos) {
+      toast.error("Add at least one photo before researching.");
+      return;
+    }
+    if (unsupportedCount > 0) {
+      toast.error("This image format is not supported for AI analysis. Please re-upload the photo.");
+      return;
+    }
+    runResearch.mutate();
+  };
 
   const errorMsg = run.isError ? (run.error as any)?.message ?? "AI failed" : null;
 
@@ -81,16 +120,27 @@ export function AiSuggestionPanel({
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" /> AI listing suggestion
         </CardTitle>
-        <Button
-          size="sm"
-          onClick={startAnalyze}
-          disabled={run.isPending || !hasPhotos}
-          aria-busy={run.isPending}
-        >
-          <Wand2 className="h-4 w-4 mr-1" />
-          {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
-        </Button>
-
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={startResearch}
+            disabled={runResearch.isPending || !hasPhotos}
+            aria-busy={runResearch.isPending}
+          >
+            <Search className="h-4 w-4 mr-1" />
+            {runResearch.isPending ? "Researching…" : "Improve with Research"}
+          </Button>
+          <Button
+            size="sm"
+            onClick={startAnalyze}
+            disabled={run.isPending || !hasPhotos}
+            aria-busy={run.isPending}
+          >
+            <Wand2 className="h-4 w-4 mr-1" />
+            {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         {errorMsg && (
@@ -106,13 +156,15 @@ export function AiSuggestionPanel({
               : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG, PNG, WebP, or GIF.`}
           </div>
         )}
+        {researchResult && <ResearchBlock result={researchResult} />}
         {!hasPhotos ? (
           <p className="text-sm text-muted-foreground">
             Add at least one photo to enable AI analysis.
           </p>
         ) : !suggestion ? (
           <p className="text-sm text-muted-foreground">
-            Click <b>Analyze with AI</b> to generate an editable listing suggestion.
+            Click <b>Analyze with AI</b> for a listing draft, or <b>Improve with Research</b>
+            {" "}to surface identification clues and search queries before pricing.
             Nothing is saved to the product until you click <b>Apply to product</b>.
           </p>
         ) : (
@@ -369,11 +421,138 @@ function SuggestionEditor({
         </div>
       )}
 
+      {(s.possible_brand || s.possible_model || s.visual_clues?.length || s.search_keywords?.length || s.recommended_research_queries?.length || s.price_confidence === "manual_required" || s.potentially_valuable) && (
+        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+          <div className="font-medium text-foreground flex items-center gap-1">
+            <Search className="h-3.5 w-3.5" /> Research clues (hypotheses — verify manually)
+          </div>
+          {(s.possible_brand || s.possible_model) && (
+            <div>
+              <span className="text-muted-foreground">Possibly: </span>
+              {[s.possible_brand, s.possible_model].filter(Boolean).join(" — ")}
+            </div>
+          )}
+          {s.visual_clues?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {s.visual_clues.map((c, i) => (
+                <Badge key={i} variant="secondary" className="text-[10px]">{c}</Badge>
+              ))}
+            </div>
+          )}
+          {s.search_keywords?.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Search keywords</div>
+              <div className="flex flex-wrap gap-1">
+                {s.search_keywords.map((k, i) => (
+                  <Badge key={i} variant="outline" className="text-[10px]">{k}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {s.recommended_research_queries?.length > 0 && (
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">Recommended research queries</div>
+              <ul className="list-disc pl-5 space-y-0.5">
+                {s.recommended_research_queries.map((q, i) => (
+                  <li key={i} className="text-sm">{q}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Badge variant="outline" className="text-[10px]">
+              Price confidence: {s.price_confidence}
+            </Badge>
+            {s.potentially_valuable && (
+              <Badge variant="destructive" className="text-[10px] flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Potentially valuable — research before pricing
+              </Badge>
+            )}
+            {s.price_confidence === "manual_required" && (
+              <Badge variant="destructive" className="text-[10px]">
+                Manual pricing recommended
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <Button onClick={apply} disabled={saving}>
           {saving ? "Applying…" : "Apply to product"}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function ResearchBlock({ result }: { result: AiResearchResult }) {
+  return (
+    <div className="mb-4 rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
+      <div className="font-medium text-foreground flex items-center gap-1">
+        <Search className="h-4 w-4" /> Research clues (hypotheses — verify manually)
+      </div>
+      {(result.possible_brand || result.possible_model) && (
+        <div>
+          <span className="text-muted-foreground">Possibly: </span>
+          {[result.possible_brand, result.possible_model].filter(Boolean).join(" — ")}
+        </div>
+      )}
+      {result.potentially_valuable && (
+        <div className="flex items-center gap-2 rounded bg-destructive/10 text-destructive p-2">
+          <AlertTriangle className="h-4 w-4" />
+          <div>
+            <div className="font-medium">Potentially valuable item</div>
+            {result.value_alert && <div className="text-xs">{result.value_alert}</div>}
+          </div>
+        </div>
+      )}
+      {result.visual_clues.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Visual clues</div>
+          <div className="flex flex-wrap gap-1">
+            {result.visual_clues.map((c, i) => (
+              <Badge key={i} variant="secondary" className="text-[10px]">{c}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {result.search_keywords.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Search keywords</div>
+          <div className="flex flex-wrap gap-1">
+            {result.search_keywords.map((k, i) => (
+              <Badge key={i} variant="outline" className="text-[10px]">{k}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      {result.recommended_research_queries.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Recommended research queries</div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {result.recommended_research_queries.map((q, i) => (
+              <li key={i}>{q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.verification_questions.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Verify in person</div>
+          <ul className="list-disc pl-5 space-y-0.5">
+            {result.verification_questions.map((q, i) => (
+              <li key={i}>⚠ {q}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {result.manual_research_recommendation && (
+        <div className="text-xs text-muted-foreground border-t pt-2">
+          <span className="font-medium text-foreground">Recommendation: </span>
+          {result.manual_research_recommendation}
+        </div>
+      )}
     </div>
   );
 }
