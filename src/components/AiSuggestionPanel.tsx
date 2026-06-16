@@ -56,6 +56,23 @@ export function AiSuggestionPanel({
     },
   });
 
+  const startAnalyze = () => {
+    if (run.isPending) {
+      console.log("[AI panel] click ignored — already analyzing");
+      return;
+    }
+    if (!hasPhotos) {
+      toast.error("Add at least one photo before analyzing.");
+      return;
+    }
+    if (unsupportedCount > 0) {
+      toast.error("This image format is not supported for AI analysis. Please re-upload the photo as JPEG, PNG, WebP, or GIF.");
+      return;
+    }
+    run.mutate();
+  };
+
+
   const errorMsg = run.isError ? (run.error as any)?.message ?? "AI failed" : null;
 
   return (
