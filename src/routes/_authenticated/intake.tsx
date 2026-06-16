@@ -223,9 +223,13 @@ function IntakePage() {
         throw new Error("Add at least one photo.");
       }
       setSaving(true);
+      console.log("[intake] save started", { draftProductId, photoCount: photos.length });
       const brand_id = await ensureRow("brands", brand);
       const category_id = await ensureRow("categories", category);
       const price_cents = price ? Math.round(parseFloat(price) * 100) : null;
+      const preparedPhotos = draftProductId
+        ? []
+        : await Promise.all(photos.map((photo) => prepareImageForUpload(photo)));
 
       if (draftProductId) {
         const { error } = await supabase
@@ -260,19 +264,29 @@ function IntakePage() {
           .single();
         if (error) throw error;
 
-        for (let i = 0; i < photos.length; i++) {
-          const file = await prepareImageForUpload(photos[i]);
-          const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
-          const { error: upErr } = await supabase.storage
-            .from("product-photos")
-            .upload(path, file, { contentType: file.type });
-          if (upErr) throw upErr;
-          await supabase.from("product_photos").insert({
-            product_id: product.id,
-            storage_path: path,
-            position: i,
-            is_cover: i === 0,
-          });
+        const uploadedPaths: string[] = [];
+        try {
+          for (let i = 0; i < preparedPhotos.length; i++) {
+            const file = preparedPhotos[i];
+            const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
+            const { error: upErr } = await supabase.storage
+              .from("product-photos")
+              .upload(path, file, { contentType: file.type });
+            if (upErr) throw upErr;
+            uploadedPaths.push(path);
+            const { error: photoErr } = await supabase.from("product_photos").insert({
+              product_id: product.id,
+              storage_path: path,
+              position: i,
+              is_cover: i === 0,
+            });
+            if (photoErr) throw photoErr;
+          }
+        } catch (e) {
+          console.error("[intake] save photo upload failed; cleaning up product", e);
+          if (uploadedPaths.length) await supabase.storage.from("product-photos").remove(uploadedPaths);
+          await supabase.from("products").delete().eq("id", product.id);
+          throw e;
         }
         return product;
       }
