@@ -92,6 +92,7 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const apiKey = process.env.LOVABLE_API_KEY;
     const startedAt = Date.now();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     console.log("[analyze] start productId=", data.productId, "userId=", userId);
     try {
       if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
@@ -164,7 +165,7 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
 
     let res: Response;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
     try {
       res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -231,7 +232,7 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
       }
       throw e;
     } finally {
-      if (typeof timeoutId !== "undefined") clearTimeout(timeoutId);
+      if (timeoutId) clearTimeout(timeoutId);
       console.log("[analyze] finished productId=", data.productId, "durationMs=", Date.now() - startedAt);
     }
   });
