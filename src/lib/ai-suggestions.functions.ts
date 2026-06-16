@@ -163,6 +163,8 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
     };
 
     let res: Response;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
     try {
       res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -171,10 +173,16 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
           "Lovable-API-Key": apiKey,
         },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
     } catch (e: any) {
       console.error("[analyze] gateway fetch failed", e);
+      if (e?.name === "AbortError") {
+        throw new Error("AI analysis timed out. Please try again with fewer photos or smaller images.");
+      }
       throw new Error(`AI gateway unreachable: ${e?.message ?? e}`);
+    } finally {
+      clearTimeout(timeoutId);
     }
     if (!res.ok) {
       const txt = await res.text();
@@ -216,6 +224,12 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
       // Don't fail the whole call — still return the suggestion to the user
     }
 
-    console.log("[analyze] success");
+    console.log("[analyze] success durationMs=", Date.now() - startedAt);
     return suggestion;
+    } catch (e: any) {
+      console.error("[analyze] failed durationMs=", Date.now() - startedAt, e);
+      throw e;
+    } finally {
+      console.log("[analyze] finished productId=", data.productId, "durationMs=", Date.now() - startedAt);
+    }
   });
