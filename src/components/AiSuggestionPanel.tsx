@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
+import { withTimeout } from "@/lib/async-timeout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,11 @@ export function AiSuggestionPanel({
   const run = useMutation({
     mutationFn: async () => {
       console.log("[AI panel] analyzing product", product.id);
-      return analyze({ data: { productId: product.id } });
+      return withTimeout(
+        analyze({ data: { productId: product.id } }),
+        55_000,
+        "AI analysis timed out. Please try again with fewer photos or smaller images.",
+      );
     },
     onSuccess: (s) => {
       console.log("[AI panel] success", s);
@@ -62,14 +67,18 @@ export function AiSuggestionPanel({
         <Button
           size="sm"
           onClick={() => {
-            console.log("[AI panel] click", { hasPhotos, pending: run.isPending });
+            console.log("[AI panel] click", { hasPhotos, unsupportedCount, pending: run.isPending });
             if (!hasPhotos) {
               toast.error("Add at least one photo before analyzing.");
               return;
             }
+            if (unsupportedCount > 0) {
+              toast.error("This image format is not supported for AI analysis. Please re-upload the photo as JPEG, PNG, WebP, or GIF.");
+              return;
+            }
             run.mutate();
           }}
-          disabled={run.isPending || !hasPhotos}
+          disabled={run.isPending || !hasPhotos || unsupportedCount > 0}
         >
           <Wand2 className="h-4 w-4 mr-1" />
           {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
