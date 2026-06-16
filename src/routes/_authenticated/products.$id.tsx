@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { prepareImageForUpload, isAiSupportedPath } from "@/lib/image-convert";
+import { getUnsupportedImageMessage, prepareImageForUpload, isAiSupportedPath } from "@/lib/image-convert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -248,6 +248,7 @@ function PhotosSection({
     if (!files.length) return;
     const nextPos = (photos[photos.length - 1]?.position ?? -1) + 1;
     try {
+      console.log("[product detail] preparing upload photos", files.map((f) => ({ name: f.name, type: f.type })));
       for (let i = 0; i < files.length; i++) {
         const file = await prepareImageForUpload(files[i]);
         const path = `${productId}/${crypto.randomUUID()}-${file.name}`;
@@ -264,7 +265,8 @@ function PhotosSection({
       }
       onChange();
     } catch (e: any) {
-      toast.error(e.message);
+      console.error("[product detail] photo upload failed", e);
+      toast.error(e?.message ?? getUnsupportedImageMessage());
     }
   }
 
