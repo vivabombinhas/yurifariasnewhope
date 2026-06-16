@@ -120,7 +120,40 @@ export function AiSuggestionPanel({
         <CardTitle className="text-base flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" /> AI listing suggestion
         </CardTitle>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={async () => {
+              if (!suggestion && !researchResult) {
+                toast.error("No AI output yet — run Analyze or Research first.");
+                return;
+              }
+              const payload = JSON.stringify(
+                {
+                  product_id: product.id,
+                  suggestion,
+                  research: researchResult,
+                  copied_at: new Date().toISOString(),
+                },
+                null,
+                2,
+              );
+              try {
+                await navigator.clipboard.writeText(payload);
+                console.log("[AI panel] raw JSON copied", payload);
+                toast.success("Raw AI JSON copied to clipboard");
+              } catch (e) {
+                console.error("[AI panel] copy failed", e);
+                toast.error("Failed to copy — check console for JSON");
+              }
+            }}
+            disabled={!suggestion && !researchResult}
+            title="Copy the latest AI suggestion + research JSON for prompt debugging"
+          >
+            <Copy className="h-4 w-4 mr-1" />
+            Copy raw AI JSON
+          </Button>
           <Button
             size="sm"
             variant="outline"
