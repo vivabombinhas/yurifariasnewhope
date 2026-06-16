@@ -2,7 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
+import {
+  analyzeProductWithAI,
+  researchProductWithAI,
+  type AiSuggestion,
+  type AiResearchResult,
+} from "@/lib/ai-suggestions.functions";
 import { withTimeout } from "@/lib/async-timeout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { PRODUCT_CONDITIONS, formatPrice, formatStatus } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { Copy, Sparkles, Wand2 } from "lucide-react";
+import { AlertTriangle, Copy, Search, Sparkles, Wand2 } from "lucide-react";
 
 export function AiSuggestionPanel({
   product,
