@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
+import { withTimeout } from "@/lib/async-timeout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,11 @@ export function AiSuggestionPanel({
   const run = useMutation({
     mutationFn: async () => {
       console.log("[AI panel] analyzing product", product.id);
-      return analyze({ data: { productId: product.id } });
+      return withTimeout(
+        analyze({ data: { productId: product.id } }),
+        55_000,
+        "AI analysis timed out. Please try again with fewer photos or smaller images.",
+      );
     },
     onSuccess: (s) => {
       console.log("[AI panel] success", s);
@@ -62,9 +67,13 @@ export function AiSuggestionPanel({
         <Button
           size="sm"
           onClick={() => {
-            console.log("[AI panel] click", { hasPhotos, pending: run.isPending });
+            console.log("[AI panel] click", { hasPhotos, unsupportedCount, pending: run.isPending });
             if (!hasPhotos) {
               toast.error("Add at least one photo before analyzing.");
+              return;
+            }
+            if (unsupportedCount > 0) {
+              toast.error("This image format is not supported for AI analysis. Please re-upload the photo as JPEG, PNG, WebP, or GIF.");
               return;
             }
             run.mutate();
@@ -85,8 +94,8 @@ export function AiSuggestionPanel({
         {unsupportedCount > 0 && (
           <div className="mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
             {unsupportedCount === 1
-              ? "1 photo is in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload it as JPEG or PNG."
-              : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG or PNG.`}
+              ? "1 photo is in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload it as JPEG, PNG, WebP, or GIF."
+              : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG, PNG, WebP, or GIF.`}
           </div>
         )}
         {!hasPhotos ? (

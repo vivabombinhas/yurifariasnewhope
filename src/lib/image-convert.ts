@@ -1,8 +1,12 @@
-// Convert images to AI-supported formats before upload.
+// Keep uploads compatible with AI analysis.
 // Supported by AI gateway: JPEG, PNG, WebP, GIF.
-// Anything else (AVIF, HEIC, HEIF, BMP, TIFF, …) is converted to JPEG via canvas.
+// AVIF can often be converted in-browser; HEIC/HEIF is not reliably decodable,
+// so it is blocked before upload with a clear message.
 
 const AI_SUPPORTED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const BLOCKED_EXTENSIONS = new Set(["heic", "heif"]);
+const CONVERTIBLE_EXTENSIONS = new Set(["avif"]);
+const CONVERSION_TIMEOUT_MS = 12_000;
 
 export function isAiSupportedMime(mime: string | undefined | null): boolean {
   return !!mime && AI_SUPPORTED.has(mime.toLowerCase());
@@ -11,6 +15,29 @@ export function isAiSupportedMime(mime: string | undefined | null): boolean {
 export function isAiSupportedPath(path: string): boolean {
   const ext = path.toLowerCase().split("?")[0].split("#")[0].split(".").pop() ?? "";
   return ["jpg", "jpeg", "png", "webp", "gif"].includes(ext);
+}
+
+export function getFileExtension(name: string): string {
+  return name.toLowerCase().split("?")[0].split("#")[0].split(".").pop() ?? "";
+}
+
+export function getUnsupportedImageMessage(fileName?: string): string {
+  const suffix = fileName ? ` (${fileName})` : "";
+  return `This image format is not supported for AI analysis${suffix}. Please upload JPEG, PNG, WebP, or GIF.`;
+}
+
+export function isBlockedImageFile(file: File): boolean {
+  const type = file.type.toLowerCase();
+  const ext = getFileExtension(file.name);
+  return type === "image/heic" || type === "image/heif" || BLOCKED_EXTENSIONS.has(ext);
+}
+
+export function isAiSupportedFile(file: File): boolean {
+  return isAiSupportedMime(file.type) || isAiSupportedPath(file.name);
+}
+
+export function hasUnsupportedStoredPhotos(paths: string[]): boolean {
+  return paths.some((path) => !isAiSupportedPath(path));
 }
 
 function replaceExt(name: string, ext: string): string {
@@ -24,20 +51,44 @@ function replaceExt(name: string, ext: string): string {
  * Throws a helpful error if the browser can't decode the source (common for HEIC).
  */
 export async function prepareImageForUpload(file: File): Promise<File> {
-  if (isAiSupportedMime(file.type)) return file;
+  if (isBlockedImageFile(file)) {
+    throw new Error(getUnsupportedImageMessage(file.name));
+  }
+
+  if (isAiSupportedMime(file.type)) {
+    if (isAiSupportedPath(file.name)) return file;
+    const ext = file.type.toLowerCase() === "image/jpeg" ? "jpg" : file.type.toLowerCase().replace("image/", "");
+    return new File([file], replaceExt(file.name, ext), { type: file.type, lastModified: file.lastModified });
+  }
+
+  if (isAiSupportedPath(file.name)) {
+    const ext = getFileExtension(file.name);
+    const type = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+    return new File([file], file.name, { type, lastModified: file.lastModified });
+  }
+
+  const ext = getFileExtension(file.name);
+  if (!CONVERTIBLE_EXTENSIONS.has(ext) && file.type.toLowerCase() !== "image/avif") {
+    throw new Error(getUnsupportedImageMessage(file.name));
+  }
 
   // Try to decode via <img>. Modern Chrome/Safari decode AVIF; HEIC usually fails.
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
-      el.onload = () => resolve(el);
-      el.onerror = () =>
-        reject(
-          new Error(
-            `This image format (${file.type || "unknown"}) is not supported. Please re-upload as JPEG or PNG.`,
-          ),
-        );
+      const timeout = setTimeout(
+        () => reject(new Error(getUnsupportedImageMessage(file.name))),
+        CONVERSION_TIMEOUT_MS,
+      );
+      el.onload = () => {
+        clearTimeout(timeout);
+        resolve(el);
+      };
+      el.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error(getUnsupportedImageMessage(file.name)));
+      };
       el.src = url;
     });
 

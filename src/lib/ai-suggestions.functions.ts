@@ -77,14 +77,25 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+const AI_TIMEOUT_MS = 45_000;
+const AI_SUPPORTED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+
+function isAiSupportedStoragePath(path: string): boolean {
+  const ext = path.toLowerCase().split("?")[0].split("#")[0].split(".").pop() ?? "";
+  return AI_SUPPORTED_EXTENSIONS.has(ext);
+}
+
 export const analyzeProductWithAI = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => Input.parse(input))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const apiKey = process.env.LOVABLE_API_KEY;
+    const startedAt = Date.now();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     console.log("[analyze] start productId=", data.productId, "userId=", userId);
-    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
+    try {
+      if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
 
     const { data: photos, error: phErr } = await supabase
       .from("product_photos")
@@ -99,6 +110,13 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
       throw new Error("This product has no photos. Add at least one photo before analyzing.");
     }
     console.log("[analyze] photo count=", photos.length);
+    const unsupportedPhotos = photos.filter((p) => !isAiSupportedStoragePath(p.storage_path));
+    if (unsupportedPhotos.length > 0) {
+      console.warn("[analyze] unsupported stored photos", unsupportedPhotos.map((p) => p.storage_path));
+      throw new Error(
+        "This image format is not supported for AI analysis. Please re-upload the photo as JPEG, PNG, WebP, or GIF.",
+      );
+    }
 
     const { data: signed, error: sErr } = await supabase.storage
       .from("product-photos")
@@ -146,6 +164,8 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
     };
 
     let res: Response;
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
     try {
       res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -154,9 +174,13 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
           "Lovable-API-Key": apiKey,
         },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
     } catch (e: any) {
       console.error("[analyze] gateway fetch failed", e);
+      if (e?.name === "AbortError") {
+        throw new Error("AI analysis timed out. Please try again with fewer photos or smaller images.");
+      }
       throw new Error(`AI gateway unreachable: ${e?.message ?? e}`);
     }
     if (!res.ok) {
@@ -199,6 +223,16 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
       // Don't fail the whole call — still return the suggestion to the user
     }
 
-    console.log("[analyze] success");
+    console.log("[analyze] success durationMs=", Date.now() - startedAt);
     return suggestion;
+    } catch (e: any) {
+      console.error("[analyze] failed durationMs=", Date.now() - startedAt, e);
+      if (e?.name === "AbortError") {
+        throw new Error("AI analysis timed out. Please try again with fewer photos or smaller images.");
+      }
+      throw e;
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+      console.log("[analyze] finished productId=", data.productId, "durationMs=", Date.now() - startedAt);
+    }
   });
