@@ -406,6 +406,12 @@ export const runResearchAgent = createServerFn({ method: "POST" })
           "Hypotheses only. Do not claim authenticity, rarity, or limited edition without physical verification.",
       ),
       ready_for_external_lookup: !!parsed.ready_for_external_lookup && hypotheses.length > 0,
+      recommended_next_actions: (Array.isArray(parsed.recommended_next_actions)
+        ? parsed.recommended_next_actions.map((s: any) => String(s)).filter(Boolean)
+        : []
+      ).slice(0, 8),
+      safe_listing_title: String(parsed.safe_listing_title ?? "").slice(0, 160),
+      research_informed_title: String(parsed.research_informed_title ?? "").slice(0, 200),
     };
 
     console.log("[research-agent] success durationMs=", Date.now() - startedAt, "hypotheses=", hypotheses.length);
