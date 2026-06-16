@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,19 +8,30 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Brain,
+  Check,
   Copy,
   ExternalLink,
   Loader2,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import {
   runResearchAgent,
+  applySafeTitleToProduct,
   type ResearchAgentReport,
   type ResearchHypothesis,
   type ExternalSearchTarget,
 } from "@/lib/research-agent.functions";
 import { withTimeout } from "@/lib/async-timeout";
 import type { AiSuggestion, AiResearchResult } from "@/lib/ai-suggestions.functions";
+
+const DEFAULT_NEXT_ACTIONS = [
+  "Research before pricing",
+  "Check inner tag/SKU",
+  "Use Google Lens",
+  "Do not list as Nike/Jordan until verified",
+];
+
 
 const SOURCE_LABEL: Record<ExternalSearchTarget["source"], string> = {
   ebay_sold: "eBay sold",
@@ -156,6 +167,7 @@ export function ResearchAgentPanel({
         {report && (
           <ReportView
             report={report}
+            productId={productId}
             onCopy={() => copy(JSON.stringify(report, null, 2), "Report JSON copied")}
           />
         )}
@@ -166,24 +178,49 @@ export function ResearchAgentPanel({
 
 function ReportView({
   report,
+  productId,
   onCopy,
 }: {
   report: ResearchAgentReport;
+  productId: string;
   onCopy: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [top, ...rest] = report.hypotheses;
+  const noPrice =
+    !top || (top.estimated_price_range_usd.low == null && top.estimated_price_range_usd.high == null);
+
+  const applyFn = useServerFn(applySafeTitleToProduct);
+  const qc = useQueryClient();
+  const applyMut = useMutation({
+    mutationFn: () =>
+      applyFn({ data: { productId, safe_listing_title: report.safe_listing_title } }),
+    onSuccess: () => {
+      toast.success("Safe (brand-unverified) title applied to product.");
+      void qc.invalidateQueries({ queryKey: ["product", productId] });
+      void qc.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Failed to apply safe title"),
+  });
+
+  const nextActions =
+    report.recommended_next_actions.length > 0 ? report.recommended_next_actions : DEFAULT_NEXT_ACTIONS;
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs flex items-start gap-2">
-        <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
-        <div>
-          <div className="font-medium text-foreground">Hypotheses only — verify manually</div>
-          <div className="text-muted-foreground">
-            Nothing here is applied to the product. Pricing is never set automatically.
-          </div>
+      {/* 1. Recommended next action */}
+      <div className="rounded-md border border-primary/40 bg-primary/5 p-3 space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-primary flex items-center gap-1">
+          <Sparkles className="h-3.5 w-3.5" /> Recommended next action
         </div>
+        <ul className="space-y-1 text-sm">
+          {nextActions.map((a, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+              <span>{a}</span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {!top ? (
@@ -192,46 +229,98 @@ function ReportView({
         </p>
       ) : (
         <>
-          <div className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Top hypothesis
+          {/* 2. Top hypothesis — compact */}
+          <div className="rounded-md border bg-card p-3 space-y-1.5">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Top hypothesis</div>
+            <div className="flex items-start justify-between gap-2 flex-wrap">
+              <div className="min-w-0">
+                <div className="font-medium break-words">{top.label || "Unnamed hypothesis"}</div>
+                <div className="text-xs text-muted-foreground">
+                  {[top.possible_brand, top.possible_model, top.category_hint]
+                    .filter(Boolean)
+                    .join(" • ") || "—"}
+                </div>
+              </div>
+              <ConfidenceBar value={top.confidence} band={top.confidence_band} />
             </div>
-            <HypothesisCard h={top} />
+            <Badge variant="destructive" className="text-[10px]">
+              {noPrice ? "Manual pricing required" : `Manual pricing required • est. ${priceText(top)}`}
+            </Badge>
           </div>
 
-          {top.verification_checklist.length === 0 && report.global_verification_checklist.length > 0 && (
-            <Section title="Manual verification checklist">
-              <ul className="list-disc pl-5 text-sm space-y-0.5">
-                {report.global_verification_checklist.map((v, i) => (
-                  <li key={i}>⚠ {v}</li>
-                ))}
-              </ul>
-            </Section>
+          {/* 3 + 4. Title actions */}
+          {(report.safe_listing_title || report.research_informed_title) && (
+            <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-sm">
+              {report.safe_listing_title && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Safe title (brand unverified)
+                  </div>
+                  <div className="break-words">{report.safe_listing_title}</div>
+                </div>
+              )}
+              {report.research_informed_title && (
+                <div>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Research-informed title (verify before publishing)
+                  </div>
+                  <div className="break-words text-muted-foreground">
+                    {report.research_informed_title}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
+          {/* Primary actions */}
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="ghost" onClick={onCopy}>
-              <Copy className="h-4 w-4 mr-1" /> Copy report JSON
+            <Button
+              size="sm"
+              onClick={() => applyMut.mutate()}
+              disabled={applyMut.isPending || !report.safe_listing_title}
+              title="Applies ONLY the brand-unverified title. Brand/model are never written automatically."
+            >
+              {applyMut.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-1" />
+              )}
+              Apply safe title to product
             </Button>
-            {(rest.length > 0 ||
-              report.global_sale_keywords.length > 0 ||
-              report.global_search_queries.length > 0 ||
-              report.global_verification_checklist.length > 0 ||
-              report.cross_source_strategy) && (
-              <Button size="sm" variant="outline" onClick={() => setShowAll((s) => !s)}>
-                {showAll
-                  ? "Hide details"
-                  : rest.length > 0
-                  ? `Show all hypotheses (${rest.length} more)`
-                  : "Show details"}
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                copy(report.research_informed_title, "Research-informed title copied")
+              }
+              disabled={!report.research_informed_title}
+            >
+              <Copy className="h-4 w-4 mr-1" /> Copy research-informed title
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAll((s) => !s)}>
+              {showAll ? "Hide details" : "Show details"}
+            </Button>
           </div>
 
+          {/* Collapsed details */}
           {showAll && (
             <div className="space-y-4 border-t pt-4">
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs flex items-start gap-2">
+                <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+                <div>
+                  <div className="font-medium text-foreground">Hypotheses only — verify manually</div>
+                  <div className="text-muted-foreground">
+                    Brand/model is never applied automatically. Pricing is never set automatically.
+                  </div>
+                </div>
+              </div>
+
+              <Section title="Top hypothesis (full)">
+                <HypothesisCard h={top} />
+              </Section>
+
               {rest.length > 0 && (
-                <Section title="Other hypotheses">
+                <Section title={`Other hypotheses (${rest.length})`}>
                   <div className="space-y-3">
                     {rest.map((h) => (
                       <HypothesisCard key={h.rank} h={h} />
@@ -251,7 +340,9 @@ function ReportView({
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => copy(report.global_sale_keywords.join(", "), "Keywords copied")}
+                      onClick={() =>
+                        copy(report.global_sale_keywords.join(", "), "Keywords copied")
+                      }
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
@@ -274,7 +365,7 @@ function ReportView({
                 </Section>
               )}
 
-              {report.global_verification_checklist.length > 0 && top.verification_checklist.length > 0 && (
+              {report.global_verification_checklist.length > 0 && (
                 <Section title="Global verification checklist">
                   <ul className="list-disc pl-5 text-sm space-y-0.5">
                     {report.global_verification_checklist.map((v, i) => (
@@ -290,9 +381,14 @@ function ReportView({
                 </Section>
               )}
 
-              <p className="text-[10px] text-muted-foreground">
-                Generated {new Date(report.generated_at).toLocaleString()}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="ghost" onClick={onCopy}>
+                  <Copy className="h-4 w-4 mr-1" /> Copy report JSON
+                </Button>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  Generated {new Date(report.generated_at).toLocaleString()}
+                </span>
+              </div>
             </div>
           )}
         </>
@@ -300,6 +396,7 @@ function ReportView({
     </div>
   );
 }
+
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

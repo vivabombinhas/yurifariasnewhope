@@ -68,7 +68,11 @@ export type ResearchAgentReport = {
   cross_source_strategy: string;       // narrative: how to use these sources together
   safety_notes: string;                // hedging / authenticity warnings
   ready_for_external_lookup: boolean;  // true if hypotheses + queries are usable by a future executor
+  recommended_next_actions: string[];  // ordered next steps for the operator
+  safe_listing_title: string;          // generic, brand-unverified title — safe to publish
+  research_informed_title: string;     // hedged title that mentions possible brand/model — requires human confirmation
 };
+
 
 const Input = z.object({
   productId: z.string().uuid(),
@@ -105,8 +109,12 @@ RULES:
 - cross_source_strategy explains in 2-4 sentences how to combine these sources (e.g. "Use Google Lens first, then narrow on eBay sold, then confirm pricing on StockX/GOAT for sneakers").
 - safety_notes restates honesty rules: never claim authenticity, rare, limited, or deadstock without physical confirmation.
 - ready_for_external_lookup = true when queries and targets are concrete enough for a future executor to call.
+- recommended_next_actions: 3-6 short imperative steps for the human operator, ordered by priority. Always include "Research before pricing", a physical-tag/SKU check, a reverse-image step (e.g. Google Lens), and an explicit warning not to list under any premium brand (e.g. Nike, Jordan, Supreme, Louis Vuitton) until verified — tailored to the top hypothesis.
+- safe_listing_title: a generic, brand-UNVERIFIED title that describes the item by visible attributes only (color, material, silhouette, category). NEVER include brand or model. Suffix with "— Brand Unverified".
+- research_informed_title: a hedged title that may mention the top hypothesis brand/model using words like "Possible" or "Style", and ends with "— Verify Brand/Model". This is a research aid, NOT for direct publishing.
 
 Return STRICT JSON matching the schema. No prose, no markdown.`;
+
 
 const HYPOTHESIS_SCHEMA = {
   type: "object",
@@ -189,6 +197,9 @@ const REPORT_SCHEMA = {
     cross_source_strategy: { type: "string" },
     safety_notes: { type: "string" },
     ready_for_external_lookup: { type: "boolean" },
+    recommended_next_actions: { type: "array", items: { type: "string" } },
+    safe_listing_title: { type: "string" },
+    research_informed_title: { type: "string" },
   },
   required: [
     "hypotheses",
@@ -198,6 +209,9 @@ const REPORT_SCHEMA = {
     "cross_source_strategy",
     "safety_notes",
     "ready_for_external_lookup",
+    "recommended_next_actions",
+    "safe_listing_title",
+    "research_informed_title",
   ],
   additionalProperties: false,
 };
@@ -392,8 +406,39 @@ export const runResearchAgent = createServerFn({ method: "POST" })
           "Hypotheses only. Do not claim authenticity, rarity, or limited edition without physical verification.",
       ),
       ready_for_external_lookup: !!parsed.ready_for_external_lookup && hypotheses.length > 0,
+      recommended_next_actions: (Array.isArray(parsed.recommended_next_actions)
+        ? parsed.recommended_next_actions.map((s: any) => String(s)).filter(Boolean)
+        : []
+      ).slice(0, 8),
+      safe_listing_title: String(parsed.safe_listing_title ?? "").slice(0, 160),
+      research_informed_title: String(parsed.research_informed_title ?? "").slice(0, 200),
     };
 
     console.log("[research-agent] success durationMs=", Date.now() - startedAt, "hypotheses=", hypotheses.length);
     return report;
   });
+
+/**
+ * Apply ONLY the safe (brand-unverified) title to a product.
+ * Never writes brand/model — those require explicit human confirmation elsewhere.
+ */
+export const applySafeTitleToProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        productId: z.string().uuid(),
+        safe_listing_title: z.string().min(1).max(160),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { error } = await supabase
+      .from("products")
+      .update({ title: data.safe_listing_title })
+      .eq("id", data.productId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
