@@ -100,6 +100,8 @@ const en: Dict = {
   // Intake
   "intake.title": "Fast Intake",
   "intake.subtitle": "Photos → location → AI → save & next.",
+  "intake.recommended": "Recommended workflow",
+  "intake.recommendedFlow": "Photos → AI → Review → Save",
   "intake.today": "Today",
   "intake.items": "items",
   "intake.stepPhotos": "1. Photos",
@@ -256,6 +258,8 @@ const es: Dict = {
 
   "intake.title": "Ingreso Rápido",
   "intake.subtitle": "Fotos → ubicación → IA → guardar y siguiente.",
+  "intake.recommended": "Flujo recomendado",
+  "intake.recommendedFlow": "Fotos → IA → Revisar → Guardar",
   "intake.today": "Hoy",
   "intake.items": "artículos",
   "intake.stepPhotos": "1. Fotos",
@@ -406,6 +410,8 @@ const ptBR: Dict = {
 
   "intake.title": "Entrada Rápida",
   "intake.subtitle": "Fotos → local → IA → salvar e próximo.",
+  "intake.recommended": "Fluxo recomendado",
+  "intake.recommendedFlow": "Fotos → IA → Revisar → Salvar",
   "intake.today": "Hoje",
   "intake.items": "itens",
   "intake.stepPhotos": "1. Fotos",

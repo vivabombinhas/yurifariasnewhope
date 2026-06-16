@@ -347,6 +347,11 @@ function IntakePage() {
         </Card>
       </div>
 
+      <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+        <div className="font-medium text-foreground">{t("intake.recommended")}</div>
+        <div className="text-muted-foreground">{t("intake.recommendedFlow")}</div>
+      </div>
+
       {/* 1. Photos */}
       <Card>
         <CardContent className="pt-6 space-y-3">

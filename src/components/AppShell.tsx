@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Boxes, LayoutDashboard, MapPin, Package, PackagePlus, LogOut, Settings, Zap } from "lucide-react";
+import { Boxes, LayoutDashboard, MapPin, Package, LogOut, Settings, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,6 @@ const NAV: Array<{
   { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, exact: true },
   { to: "/products", labelKey: "nav.products", icon: Package },
   { to: "/intake", labelKey: "nav.intake", icon: Zap },
-  { to: "/products/new", labelKey: "nav.new", icon: PackagePlus },
   { to: "/locations", labelKey: "nav.locations", icon: MapPin },
 ];
 
