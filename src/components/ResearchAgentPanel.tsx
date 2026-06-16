@@ -116,36 +116,24 @@ export function ResearchAgentPanel({
             foundation
           </Badge>
         </CardTitle>
-        <div className="flex gap-2">
-          {report && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => copy(JSON.stringify(report, null, 2), "Report JSON copied")}
-              title="Copy the full research report JSON"
-            >
-              <Copy className="h-4 w-4 mr-1" /> Copy report JSON
-            </Button>
+        <Button
+          size="sm"
+          onClick={() => !m.isPending && canRun && m.mutate()}
+          disabled={m.isPending || !canRun}
+          aria-busy={m.isPending}
+          title={
+            canRun
+              ? "Generate structured identification hypotheses"
+              : "Run AI analysis first to enable Research Agent"
+          }
+        >
+          {m.isPending ? (
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <Brain className="h-4 w-4 mr-1" />
           )}
-          <Button
-            size="sm"
-            onClick={() => !m.isPending && canRun && m.mutate()}
-            disabled={m.isPending || !canRun}
-            aria-busy={m.isPending}
-            title={
-              canRun
-                ? "Generate structured identification hypotheses"
-                : "Run Analyze with AI (and optionally Improve with Research) first"
-            }
-          >
-            {m.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Brain className="h-4 w-4 mr-1" />
-            )}
-            {m.isPending ? "Researching…" : report ? "Re-run agent" : "Run Research Agent"}
-          </Button>
-        </div>
+          {m.isPending ? "Researching…" : report ? "Re-run agent" : "Run Research Agent"}
+        </Button>
       </CardHeader>
       <CardContent>
         {!canRun && (
