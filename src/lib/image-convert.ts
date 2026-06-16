@@ -66,8 +66,6 @@ export async function prepareImageForUpload(file: File): Promise<File> {
         () => reject(new Error(getUnsupportedImageMessage(file.name))),
         CONVERSION_TIMEOUT_MS,
       );
-      el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error(getUnsupportedImageMessage(file.name)));
       el.onload = () => {
         clearTimeout(timeout);
         resolve(el);
