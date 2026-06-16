@@ -78,7 +78,7 @@ export function AiSuggestionPanel({
             }
             run.mutate();
           }}
-          disabled={run.isPending || !hasPhotos || unsupportedCount > 0}
+          disabled={run.isPending || !hasPhotos}
         >
           <Wand2 className="h-4 w-4 mr-1" />
           {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
