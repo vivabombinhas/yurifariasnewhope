@@ -39,7 +39,9 @@ export function AiSuggestionPanel({
 }) {
   const qc = useQueryClient();
   const analyze = useServerFn(analyzeProductWithAI);
+  const research = useServerFn(researchProductWithAI);
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
+  const [researchResult, setResearchResult] = useState<AiResearchResult | null>(null);
 
   const run = useMutation({
     mutationFn: async () => {
@@ -61,6 +63,26 @@ export function AiSuggestionPanel({
     },
   });
 
+  const runResearch = useMutation({
+    mutationFn: async () => {
+      console.log("[AI panel] research product", product.id);
+      return withTimeout(
+        research({ data: { productId: product.id } }),
+        55_000,
+        "AI research timed out. Please try again.",
+      );
+    },
+    onSuccess: (r) => {
+      console.log("[AI panel] research success", r);
+      setResearchResult(r);
+      toast.success("Research clues ready — verify manually before pricing.");
+    },
+    onError: (e: any) => {
+      console.error("[AI panel] research failed", e);
+      toast.error(e?.message ?? "Research failed");
+    },
+  });
+
   const startAnalyze = () => {
     if (run.isPending) {
       console.log("[AI panel] click ignored — already analyzing");
@@ -77,6 +99,18 @@ export function AiSuggestionPanel({
     run.mutate();
   };
 
+  const startResearch = () => {
+    if (runResearch.isPending) return;
+    if (!hasPhotos) {
+      toast.error("Add at least one photo before researching.");
+      return;
+    }
+    if (unsupportedCount > 0) {
+      toast.error("This image format is not supported for AI analysis. Please re-upload the photo.");
+      return;
+    }
+    runResearch.mutate();
+  };
 
   const errorMsg = run.isError ? (run.error as any)?.message ?? "AI failed" : null;
 
