@@ -32,6 +32,10 @@ export function isBlockedImageFile(file: File): boolean {
   return type === "image/heic" || type === "image/heif" || BLOCKED_EXTENSIONS.has(ext);
 }
 
+export function isAiSupportedFile(file: File): boolean {
+  return isAiSupportedMime(file.type) || isAiSupportedPath(file.name);
+}
+
 export function hasUnsupportedStoredPhotos(paths: string[]): boolean {
   return paths.some((path) => !isAiSupportedPath(path));
 }
@@ -47,7 +51,12 @@ function replaceExt(name: string, ext: string): string {
  * Throws a helpful error if the browser can't decode the source (common for HEIC).
  */
 export async function prepareImageForUpload(file: File): Promise<File> {
-  if (isAiSupportedMime(file.type)) return file;
+  if (isAiSupportedFile(file)) {
+    if (file.type) return file;
+    const ext = getFileExtension(file.name);
+    const type = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+    return new File([file], file.name, { type, lastModified: file.lastModified });
+  }
   if (isBlockedImageFile(file)) {
     throw new Error(getUnsupportedImageMessage(file.name));
   }
