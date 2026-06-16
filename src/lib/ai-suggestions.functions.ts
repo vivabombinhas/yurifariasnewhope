@@ -181,8 +181,6 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
         throw new Error("AI analysis timed out. Please try again with fewer photos or smaller images.");
       }
       throw new Error(`AI gateway unreachable: ${e?.message ?? e}`);
-    } finally {
-      clearTimeout(timeoutId);
     }
     if (!res.ok) {
       const txt = await res.text();
@@ -228,8 +226,12 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
     return suggestion;
     } catch (e: any) {
       console.error("[analyze] failed durationMs=", Date.now() - startedAt, e);
+      if (e?.name === "AbortError") {
+        throw new Error("AI analysis timed out. Please try again with fewer photos or smaller images.");
+      }
       throw e;
     } finally {
+      if (typeof timeoutId !== "undefined") clearTimeout(timeoutId);
       console.log("[analyze] finished productId=", data.productId, "durationMs=", Date.now() - startedAt);
     }
   });
