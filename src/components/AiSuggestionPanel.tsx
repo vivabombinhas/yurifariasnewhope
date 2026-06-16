@@ -25,6 +25,7 @@ import {
 import { PRODUCT_CONDITIONS, formatPrice, formatStatus } from "@/lib/marketplaces";
 import { toast } from "sonner";
 import { AlertTriangle, Copy, Search, Sparkles, Wand2 } from "lucide-react";
+import { ResearchAgentPanel } from "@/components/ResearchAgentPanel";
 
 export function AiSuggestionPanel({
   product,
@@ -115,6 +116,7 @@ export function AiSuggestionPanel({
   const errorMsg = run.isError ? (run.error as any)?.message ?? "AI failed" : null;
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base flex items-center gap-2">
@@ -213,6 +215,12 @@ export function AiSuggestionPanel({
         )}
       </CardContent>
     </Card>
+    <ResearchAgentPanel
+      productId={product.id}
+      suggestion={suggestion}
+      research={researchResult}
+    />
+    </div>
   );
 }
 
