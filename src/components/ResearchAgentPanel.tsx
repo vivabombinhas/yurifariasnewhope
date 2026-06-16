@@ -116,51 +116,36 @@ export function ResearchAgentPanel({
             foundation
           </Badge>
         </CardTitle>
-        <div className="flex gap-2">
-          {report && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => copy(JSON.stringify(report, null, 2), "Report JSON copied")}
-              title="Copy the full research report JSON"
-            >
-              <Copy className="h-4 w-4 mr-1" /> Copy report JSON
-            </Button>
+        <Button
+          size="sm"
+          onClick={() => !m.isPending && canRun && m.mutate()}
+          disabled={m.isPending || !canRun}
+          aria-busy={m.isPending}
+          title={
+            canRun
+              ? "Generate structured identification hypotheses"
+              : "Run AI analysis first to enable Research Agent"
+          }
+        >
+          {m.isPending ? (
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <Brain className="h-4 w-4 mr-1" />
           )}
-          <Button
-            size="sm"
-            onClick={() => !m.isPending && canRun && m.mutate()}
-            disabled={m.isPending || !canRun}
-            aria-busy={m.isPending}
-            title={
-              canRun
-                ? "Generate structured identification hypotheses"
-                : "Run Analyze with AI (and optionally Improve with Research) first"
-            }
-          >
-            {m.isPending ? (
-              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-            ) : (
-              <Brain className="h-4 w-4 mr-1" />
-            )}
-            {m.isPending ? "Researching…" : report ? "Re-run agent" : "Run Research Agent"}
-          </Button>
-        </div>
+          {m.isPending ? "Researching…" : report ? "Re-run agent" : "Run Research Agent"}
+        </Button>
       </CardHeader>
       <CardContent>
         {!canRun && (
           <p className="text-sm text-muted-foreground">
-            Run <b>Analyze with AI</b> (and optionally <b>Improve with Research</b>) above
-            to enable the Research Agent.
+            Run AI analysis first to enable Research Agent.
           </p>
         )}
         {canRun && !report && !m.isPending && (
           <p className="text-sm text-muted-foreground">
-            The Research Agent generates up to 5 ranked identification hypotheses,
-            confidence scores, estimated price ranges, sale keywords, ready-to-paste
-            research queries, and a physical verification checklist. It does not yet
-            call eBay / Google / Lens / StockX / GOAT — it prepares the queries and
-            deep links for a future executor.
+            Generates ranked identification hypotheses, confidence, estimated price range,
+            sale keywords, research queries and a manual verification checklist.
+            Nothing is applied to the product automatically.
           </p>
         )}
         {m.isError && (
@@ -168,91 +153,150 @@ export function ResearchAgentPanel({
             {(m.error as any)?.message ?? "Research Agent failed"}
           </div>
         )}
-        {report && <ReportView report={report} />}
+        {report && (
+          <ReportView
+            report={report}
+            onCopy={() => copy(JSON.stringify(report, null, 2), "Report JSON copied")}
+          />
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function ReportView({ report }: { report: ResearchAgentReport }) {
+function ReportView({
+  report,
+  onCopy,
+}: {
+  report: ResearchAgentReport;
+  onCopy: () => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const [top, ...rest] = report.hypotheses;
+
   return (
     <div className="space-y-4">
       <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs flex items-start gap-2">
         <ShieldAlert className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
         <div>
           <div className="font-medium text-foreground">Hypotheses only — verify manually</div>
-          <div className="text-muted-foreground">{report.safety_notes}</div>
+          <div className="text-muted-foreground">
+            Nothing here is applied to the product. Pricing is never set automatically.
+          </div>
         </div>
       </div>
 
-      {report.hypotheses.length === 0 ? (
+      {!top ? (
         <p className="text-sm text-muted-foreground">
           No hypotheses produced. Try adding more photos or running Improve with Research first.
         </p>
       ) : (
-        <div className="space-y-3">
-          {report.hypotheses.map((h) => (
-            <HypothesisCard key={h.rank} h={h} />
-          ))}
-        </div>
-      )}
-
-      {report.global_sale_keywords.length > 0 && (
-        <Section title="Sale keywords (resale-optimized)">
-          <div className="flex flex-wrap gap-1">
-            {report.global_sale_keywords.map((k, i) => (
-              <Badge key={i} variant="secondary" className="text-[10px]">
-                {k}
-              </Badge>
-            ))}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => copy(report.global_sale_keywords.join(", "), "Keywords copied")}
-            >
-              <Copy className="h-3 w-3" />
-            </Button>
+        <>
+          <div className="space-y-1">
+            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Top hypothesis
+            </div>
+            <HypothesisCard h={top} />
           </div>
-        </Section>
-      )}
 
-      {report.global_search_queries.length > 0 && (
-        <Section title="Cross-hypothesis research queries">
-          <ul className="space-y-1">
-            {report.global_search_queries.map((q, i) => (
-              <li key={i} className="flex items-center justify-between gap-2 text-sm">
-                <span className="break-words">{q}</span>
-                <Button size="sm" variant="ghost" onClick={() => copy(q, "Query copied")}>
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
+          {top.verification_checklist.length === 0 && report.global_verification_checklist.length > 0 && (
+            <Section title="Manual verification checklist">
+              <ul className="list-disc pl-5 text-sm space-y-0.5">
+                {report.global_verification_checklist.map((v, i) => (
+                  <li key={i}>⚠ {v}</li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
-      {report.global_verification_checklist.length > 0 && (
-        <Section title="Verification checklist (physical checks)">
-          <ul className="list-disc pl-5 text-sm space-y-0.5">
-            {report.global_verification_checklist.map((v, i) => (
-              <li key={i}>⚠ {v}</li>
-            ))}
-          </ul>
-        </Section>
-      )}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="ghost" onClick={onCopy}>
+              <Copy className="h-4 w-4 mr-1" /> Copy report JSON
+            </Button>
+            {(rest.length > 0 ||
+              report.global_sale_keywords.length > 0 ||
+              report.global_search_queries.length > 0 ||
+              report.global_verification_checklist.length > 0 ||
+              report.cross_source_strategy) && (
+              <Button size="sm" variant="outline" onClick={() => setShowAll((s) => !s)}>
+                {showAll
+                  ? "Hide details"
+                  : rest.length > 0
+                  ? `Show all hypotheses (${rest.length} more)`
+                  : "Show details"}
+              </Button>
+            )}
+          </div>
 
-      {report.cross_source_strategy && (
-        <Section title="Cross-source strategy">
-          <p className="text-sm text-muted-foreground">{report.cross_source_strategy}</p>
-        </Section>
-      )}
+          {showAll && (
+            <div className="space-y-4 border-t pt-4">
+              {rest.length > 0 && (
+                <Section title="Other hypotheses">
+                  <div className="space-y-3">
+                    {rest.map((h) => (
+                      <HypothesisCard key={h.rank} h={h} />
+                    ))}
+                  </div>
+                </Section>
+              )}
 
-      <p className="text-[10px] text-muted-foreground">
-        Generated {new Date(report.generated_at).toLocaleString()} •{" "}
-        {report.ready_for_external_lookup
-          ? "ready for future external executor"
-          : "not ready — refine input"}
-      </p>
+              {report.global_sale_keywords.length > 0 && (
+                <Section title="Sale keywords (resale-optimized)">
+                  <div className="flex flex-wrap gap-1 items-center">
+                    {report.global_sale_keywords.map((k, i) => (
+                      <Badge key={i} variant="secondary" className="text-[10px]">
+                        {k}
+                      </Badge>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copy(report.global_sale_keywords.join(", "), "Keywords copied")}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </Section>
+              )}
+
+              {report.global_search_queries.length > 0 && (
+                <Section title="Cross-hypothesis research queries">
+                  <ul className="space-y-1">
+                    {report.global_search_queries.map((q, i) => (
+                      <li key={i} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="break-words">{q}</span>
+                        <Button size="sm" variant="ghost" onClick={() => copy(q, "Query copied")}>
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {report.global_verification_checklist.length > 0 && top.verification_checklist.length > 0 && (
+                <Section title="Global verification checklist">
+                  <ul className="list-disc pl-5 text-sm space-y-0.5">
+                    {report.global_verification_checklist.map((v, i) => (
+                      <li key={i}>⚠ {v}</li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {report.cross_source_strategy && (
+                <Section title="Cross-source strategy">
+                  <p className="text-sm text-muted-foreground">{report.cross_source_strategy}</p>
+                </Section>
+              )}
+
+              <p className="text-[10px] text-muted-foreground">
+                Generated {new Date(report.generated_at).toLocaleString()}
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
