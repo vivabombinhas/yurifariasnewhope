@@ -171,6 +171,10 @@ function IntakePage() {
   }
 
   async function runAnalyze() {
+    if (analyzing) {
+      console.log("[intake] analyze ignored — already running");
+      return;
+    }
     if (photos.length === 0) {
       toast.error(t("intake.addPhotoFirst"));
       return;
