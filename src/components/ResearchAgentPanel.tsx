@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,19 +8,30 @@ import { toast } from "sonner";
 import {
   AlertTriangle,
   Brain,
+  Check,
   Copy,
   ExternalLink,
   Loader2,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import {
   runResearchAgent,
+  applySafeTitleToProduct,
   type ResearchAgentReport,
   type ResearchHypothesis,
   type ExternalSearchTarget,
 } from "@/lib/research-agent.functions";
 import { withTimeout } from "@/lib/async-timeout";
 import type { AiSuggestion, AiResearchResult } from "@/lib/ai-suggestions.functions";
+
+const DEFAULT_NEXT_ACTIONS = [
+  "Research before pricing",
+  "Check inner tag/SKU",
+  "Use Google Lens",
+  "Do not list as Nike/Jordan until verified",
+];
+
 
 const SOURCE_LABEL: Record<ExternalSearchTarget["source"], string> = {
   ebay_sold: "eBay sold",
