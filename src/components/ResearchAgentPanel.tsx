@@ -229,6 +229,17 @@ function ReportView({
         </p>
       ) : (
         <>
+          {/* Hypothesis-only banner */}
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs flex items-start gap-2">
+            <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-600" />
+            <div className="min-w-0">
+              <span className="font-medium text-foreground">Hypothesis only</span>
+              <span className="text-muted-foreground">
+                {" "}— no external sources executed yet. Style code, model and price are unverified.
+              </span>
+            </div>
+          </div>
+
           {/* 2. Top hypothesis — compact */}
           <div className="rounded-md border bg-card p-3 space-y-1.5">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Top hypothesis</div>
@@ -243,12 +254,82 @@ function ReportView({
               </div>
               <ConfidenceBar value={top.confidence} band={top.confidence_band} />
             </div>
-            <Badge variant="destructive" className="text-[10px]">
-              {noPrice ? "Manual pricing required" : `Manual pricing required • est. ${priceText(top)}`}
-            </Badge>
           </div>
 
-          {/* 3 + 4. Title actions */}
+          {/* Price guidance status */}
+          <div className="rounded-md border bg-muted/30 p-3 space-y-1">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              Price guidance status
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="destructive" className="text-[10px]">Manual pricing required</Badge>
+              {!noPrice && (
+                <span className="text-xs text-muted-foreground">
+                  Hypothetical range: {priceText(top)}
+                </span>
+              )}
+              {noPrice && (
+                <span className="text-xs text-muted-foreground">No safe estimate available.</span>
+              )}
+            </div>
+          </div>
+
+          {/* What to verify */}
+          {top.verification_checklist.length > 0 && (
+            <div className="rounded-md border bg-card p-3 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                What to verify
+              </div>
+              <ul className="text-sm space-y-1">
+                {top.verification_checklist.slice(0, 4).map((v, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Check className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                    <span className="break-words">{v}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Suggested search queries */}
+          {top.external_search_targets.length > 0 && (
+            <div className="rounded-md border bg-card p-3 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Suggested search queries
+              </div>
+              <ul className="space-y-1">
+                {top.external_search_targets.slice(0, 3).map((t, i) => (
+                  <li
+                    key={i}
+                    className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1 text-xs"
+                  >
+                    <div className="min-w-0 flex items-center gap-1 flex-wrap">
+                      <Badge variant="outline" className="text-[10px]">
+                        {SOURCE_LABEL[t.source]}
+                      </Badge>
+                      <span className="break-all">{t.query || "(no query)"}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => copy(t.query, "Query copied")}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                      <a
+                        href={t.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent"
+                        title={`Open in ${SOURCE_LABEL[t.source]}`}
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Safe + research-informed titles */}
           {(report.safe_listing_title || report.research_informed_title) && (
             <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-sm">
               {report.safe_listing_title && (
@@ -271,6 +352,7 @@ function ReportView({
               )}
             </div>
           )}
+
 
           {/* Primary actions */}
           <div className="flex flex-wrap gap-2">
