@@ -167,6 +167,7 @@ export function ResearchAgentPanel({
         {report && (
           <ReportView
             report={report}
+            productId={productId}
             onCopy={() => copy(JSON.stringify(report, null, 2), "Report JSON copied")}
           />
         )}
