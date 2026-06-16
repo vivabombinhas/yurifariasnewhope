@@ -176,22 +176,43 @@ function IntakePage() {
       return;
     }
     setAnalyzing(true);
+    let createdForAnalyze: { id: string; sku: string } | null = null;
     try {
+      console.log("[intake] analyze clicked", { photoCount: photos.length, draftProductId });
       let id = draftProductId;
       let sku = draftSku;
       if (!id) {
         const p = await createDraftWithPhotos();
+        createdForAnalyze = p;
         id = p.id;
         sku = p.sku;
         setDraftProductId(id);
         setDraftSku(sku);
       }
-      const s = await analyze({ data: { productId: id! } });
+      console.log("[intake] starting AI analysis", { productId: id });
+      const s = await withTimeout(
+        analyze({ data: { productId: id! } }),
+        55_000,
+        "AI analysis timed out. You can still save this item manually.",
+      );
       applySuggestion(s);
       toast.success(t("intake.aiReady"));
     } catch (e: any) {
-      toast.error(e.message ?? "AI failed");
+      console.error("[intake] AI analysis failed", e);
+      if (createdForAnalyze) {
+        const { data: rows } = await supabase
+          .from("product_photos")
+          .select("storage_path")
+          .eq("product_id", createdForAnalyze.id);
+        const paths = (rows ?? []).map((row) => row.storage_path);
+        if (paths.length) await supabase.storage.from("product-photos").remove(paths);
+        await supabase.from("products").delete().eq("id", createdForAnalyze.id);
+        setDraftProductId(null);
+        setDraftSku(null);
+      }
+      toast.error(e?.message ?? "AI failed. You can still save this item manually.");
     } finally {
+      console.log("[intake] analyze finished");
       setAnalyzing(false);
     }
   }
