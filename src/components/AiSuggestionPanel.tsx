@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   analyzeProductWithAI,
   researchProductWithAI,
+  improveListingWithAI,
   type AiSuggestion,
   type AiResearchResult,
 } from "@/lib/ai-suggestions.functions";
@@ -258,6 +259,39 @@ function SuggestionEditor({
 }) {
   const [s, setS] = useState<AiSuggestion>(initial);
   const [saving, setSaving] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const improveFn = useServerFn(improveListingWithAI);
+
+  async function improve() {
+    if (improving) return;
+    setImproving(true);
+    try {
+      const out = await withTimeout(
+        improveFn({
+          data: {
+            productId: product.id,
+            title: s.title,
+            description: s.description,
+            category: s.category,
+            condition: s.condition,
+          },
+        }),
+        55_000,
+        "Improve Listing timed out. Please try again.",
+      );
+      setS((cur) => ({
+        ...cur,
+        title: out.title || cur.title,
+        description: out.description || cur.description,
+      }));
+      toast.success("Listing improved — review before applying.");
+    } catch (e: any) {
+      console.error("[improve] failed", e);
+      toast.error(e?.message ?? "Improve failed");
+    } finally {
+      setImproving(false);
+    }
+  }
 
   function update<K extends keyof AiSuggestion>(k: K, v: AiSuggestion[K]) {
     setS((cur) => ({ ...cur, [k]: v }));
@@ -366,6 +400,19 @@ function SuggestionEditor({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={improve}
+          disabled={improving}
+          aria-busy={improving}
+          title="Rewrite title and description as a professional eBay-style listing"
+        >
+          <Sparkles className="h-4 w-4 mr-1" />
+          {improving ? "Improving…" : "Improve Listing"}
+        </Button>
+      </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Title</Label>
