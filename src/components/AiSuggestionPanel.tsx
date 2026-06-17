@@ -400,6 +400,19 @@ function SuggestionEditor({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={improve}
+          disabled={improving}
+          aria-busy={improving}
+          title="Rewrite title and description as a professional eBay-style listing"
+        >
+          <Sparkles className="h-4 w-4 mr-1" />
+          {improving ? "Improving…" : "Improve Listing"}
+        </Button>
+      </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Title</Label>
