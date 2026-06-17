@@ -258,6 +258,39 @@ function SuggestionEditor({
 }) {
   const [s, setS] = useState<AiSuggestion>(initial);
   const [saving, setSaving] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const improveFn = useServerFn(improveListingWithAI);
+
+  async function improve() {
+    if (improving) return;
+    setImproving(true);
+    try {
+      const out = await withTimeout(
+        improveFn({
+          data: {
+            productId: product.id,
+            title: s.title,
+            description: s.description,
+            category: s.category,
+            condition: s.condition,
+          },
+        }),
+        55_000,
+        "Improve Listing timed out. Please try again.",
+      );
+      setS((cur) => ({
+        ...cur,
+        title: out.title || cur.title,
+        description: out.description || cur.description,
+      }));
+      toast.success("Listing improved — review before applying.");
+    } catch (e: any) {
+      console.error("[improve] failed", e);
+      toast.error(e?.message ?? "Improve failed");
+    } finally {
+      setImproving(false);
+    }
+  }
 
   function update<K extends keyof AiSuggestion>(k: K, v: AiSuggestion[K]) {
     setS((cur) => ({ ...cur, [k]: v }));
