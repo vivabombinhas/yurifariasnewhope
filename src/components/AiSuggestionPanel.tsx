@@ -260,13 +260,16 @@ function SuggestionEditor({
   const [s, setS] = useState<AiSuggestion>(initial);
   const [saving, setSaving] = useState(false);
   const [improving, setImproving] = useState(false);
+  const [variations, setVariations] = useState<
+    { label: string; title: string; description: string }[]
+  >([]);
   const improveFn = useServerFn(improveListingWithAI);
 
   async function improve() {
     if (improving) return;
     setImproving(true);
     try {
-      const out = await withTimeout(
+      const out = (await withTimeout(
         improveFn({
           data: {
             productId: product.id,
@@ -278,19 +281,26 @@ function SuggestionEditor({
         }),
         55_000,
         "Improve Listing timed out. Please try again.",
-      );
-      setS((cur) => ({
-        ...cur,
-        title: out.title || cur.title,
-        description: out.description || cur.description,
-      }));
-      toast.success("Listing improved — review before applying.");
+      )) as { variations: { label: string; title: string; description: string }[] };
+      const vs = out.variations ?? [];
+      if (!vs.length) {
+        toast.error("AI returned no variations. Please retry.");
+        return;
+      }
+      setVariations(vs);
+      toast.success(`Got ${vs.length} variations — pick one before applying.`);
     } catch (e: any) {
       console.error("[improve] failed", e);
       toast.error(e?.message ?? "Improve failed");
     } finally {
       setImproving(false);
     }
+  }
+
+  function applyVariation(v: { title: string; description: string }) {
+    setS((cur) => ({ ...cur, title: v.title, description: v.description }));
+    setVariations([]);
+    toast.success("Variation selected — review checklist, then Apply.");
   }
 
   function update<K extends keyof AiSuggestion>(k: K, v: AiSuggestion[K]) {
