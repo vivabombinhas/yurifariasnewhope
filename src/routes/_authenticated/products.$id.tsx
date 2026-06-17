@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUnsupportedImageMessage, prepareImageForUpload, isAiSupportedPath } from "@/lib/image-convert";
 import { Input } from "@/components/ui/input";
