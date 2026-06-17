@@ -423,6 +423,51 @@ function SuggestionEditor({
           {improving ? "Improving…" : "Improve Listing"}
         </Button>
       </div>
+
+      {variations.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium">Pick a variation</div>
+            <Button size="sm" variant="ghost" onClick={() => setVariations([])}>
+              Dismiss
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {variations.map((v, i) => (
+              <div
+                key={i}
+                className="rounded-md border bg-background p-3 space-y-2 flex flex-col"
+              >
+                <Badge variant="secondary" className="self-start text-[10px]">
+                  {v.label}
+                </Badge>
+                <div className="text-sm font-medium leading-snug">{v.title}</div>
+                <div className="text-xs text-muted-foreground whitespace-pre-line line-clamp-6">
+                  {v.description}
+                </div>
+                <div className="mt-auto flex gap-1 pt-1">
+                  <Button size="sm" className="flex-1" onClick={() => applyVariation(v)}>
+                    Use this
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => copy(`${v.title}\n\n${v.description}`, v.label)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <QualityChecklist title={s.title} description={s.description} />
+        </div>
+      )}
+
+      {variations.length === 0 && (s.title || s.description) && (
+        <QualityChecklist title={s.title} description={s.description} />
+      )}
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Title</Label>
