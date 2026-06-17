@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   analyzeProductWithAI,
   researchProductWithAI,
+  improveListingWithAI,
   type AiSuggestion,
   type AiResearchResult,
 } from "@/lib/ai-suggestions.functions";
