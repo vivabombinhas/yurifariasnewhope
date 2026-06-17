@@ -121,7 +121,13 @@ VOICE:
 
 OUTPUT (focus only on these):
 - title: short, punchy, marketplace-style. <= 80 chars. Include brand ONLY if clearly visible/printed on the item. Otherwise lead with item type + key visible attributes (color, size cues, material, style). No "Brand Unverified" disclaimers.
-- description: 3-6 short, natural lines. Describe what the buyer sees and gets. End with: "Please review photos carefully before purchasing." HARD LIMIT: <= 900 characters total. Trim wording before exceeding the limit. Do NOT repeat the item_specifics here — those are shown separately.
+- description: a rich, persuasive listing body. TARGET 700-890 characters (never above 900). Structure as 3-5 short paragraphs separated by blank lines:
+  1) Opening hook: what the item is, key visible attributes (color, material, style, size cues), and why a buyer would want it.
+  2) Details paragraph: features, dimensions if visible, design details, era/style notes, intended use ("great for living room, gallery wall, gift…").
+  3) Condition paragraph: honest description of wear/flaws observed in photos (do NOT just write "used" — be specific: scratches, fading, small chip, etc.).
+  4) Shipping/handling paragraph: brief packaging plan and ships-from note.
+  5) Closing line: "Please review photos carefully before purchasing."
+  Write in natural, confident reseller English. Use full sentences, not bullet lists. Do NOT repeat item_specifics as a key:value list — weave attributes into prose. If you are under 600 chars, expand the details and condition paragraphs before stopping.
 - brand: ONLY if clearly visible. Otherwise "".
 - category: short generic marketplace category ("Sneakers", "Women's Jacket", "Vintage Lamp").
 - condition: one of new, like_new, very_good, good, acceptable, for_parts.
