@@ -57,6 +57,8 @@ function NewProductPage() {
   const [locationId, setLocationId] = useState<string>("");
   const [status, setStatus] = useState<string>("received");
   const [saved, setSaved] = useState<SavedInfo | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
 
   const locations = useQuery({
     queryKey: ["locations"],
