@@ -463,6 +463,12 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const [brand, setBrand] = useState(product.brand?.name ?? "");
   const [category, setCategory] = useState(product.category?.name ?? "");
   const [condition, setCondition] = useState<string>(product.condition ?? "");
+  const [conditionGrade, setConditionGrade] = useState<string>(product.condition_grade ?? "");
+  const [conditionNotes, setConditionNotes] = useState<string>(product.condition_notes ?? "");
+  const [shippingNotes, setShippingNotes] = useState<string>(product.shipping_notes ?? "");
+  const [itemSpecifics, setItemSpecifics] = useState<{ name: string; value: string }[]>(
+    Array.isArray(product.item_specifics) ? product.item_specifics : [],
+  );
   const [price, setPrice] = useState(
     product.price_cents != null ? (product.price_cents / 100).toFixed(2) : "",
   );
@@ -498,6 +504,9 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
 
   const save = useMutation({
     mutationFn: async () => {
+      if (description.length > 900) {
+        throw new Error("Description exceeds 900 characters.");
+      }
       const brand_id = await ensureRow("brands", brand, brandList.data);
       const category_id = await ensureRow("categories", category, categoryList.data);
       const { error } = await supabase
@@ -511,6 +520,12 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
           price_cents: price ? Math.round(parseFloat(price) * 100) : null,
           location_id: locationId || null,
           status: status as any,
+          condition_grade: conditionGrade.trim() || null,
+          condition_notes: conditionNotes.trim() || null,
+          shipping_notes: shippingNotes.trim() || null,
+          item_specifics: itemSpecifics.filter(
+            (s) => s.name.trim() && s.value.trim(),
+          ) as any,
         })
         .eq("id", product.id);
       if (error) throw error;
