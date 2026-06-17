@@ -165,7 +165,8 @@ export function AiSuggestionPanel({
             aria-busy={runResearch.isPending}
           >
             <Search className="h-4 w-4 mr-1" />
-            {runResearch.isPending ? "Researching…" : "Improve with Research"}
+            {runResearch.isPending ? "Researching…" : "Research this item"}
+
           </Button>
           <Button
             size="sm"
