@@ -552,8 +552,48 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>{tr("common.description")}</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+            <div className="flex items-center justify-between">
+              <Label>{tr("common.description")}</Label>
+              <span className={`text-[11px] ${description.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                {description.length} / 900
+              </span>
+            </div>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              maxLength={900}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Item specifics</Label>
+            <SpecificsList value={itemSpecifics} onChange={setItemSpecifics} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Condition grade</Label>
+              <Input
+                value={conditionGrade}
+                placeholder="e.g. Used – Acceptable"
+                onChange={(e) => setConditionGrade(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Condition notes</Label>
+              <Textarea
+                value={conditionNotes}
+                rows={2}
+                onChange={(e) => setConditionNotes(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Shipping notes</Label>
+              <Textarea
+                value={shippingNotes}
+                rows={2}
+                onChange={(e) => setShippingNotes(e.target.value)}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
