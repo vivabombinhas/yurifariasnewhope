@@ -50,6 +50,8 @@ function IntakePage() {
   const t = useT();
 
   const [photos, setPhotos] = useState<File[]>([]);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
   const [locationId, setLocationId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
