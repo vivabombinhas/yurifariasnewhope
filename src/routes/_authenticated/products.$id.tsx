@@ -734,3 +734,52 @@ function ListingsSection({
     </Card>
   );
 }
+
+function SpecificsList({
+  value,
+  onChange,
+}: {
+  value: { name: string; value: string }[];
+  onChange: (v: { name: string; value: string }[]) => void;
+}) {
+  const rows = value.length ? value : [{ name: "", value: "" }];
+  function update(i: number, patch: Partial<{ name: string; value: string }>) {
+    const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+    onChange(next);
+  }
+  function remove(i: number) {
+    onChange(rows.filter((_, idx) => idx !== i));
+  }
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={i} className="flex gap-2">
+          <Input
+            className="flex-1"
+            placeholder="Name (e.g. Color)"
+            value={r.name}
+            onChange={(e) => update(i, { name: e.target.value })}
+          />
+          <Input
+            className="flex-[2]"
+            placeholder="Value (e.g. White)"
+            value={r.value}
+            onChange={(e) => update(i, { value: e.target.value })}
+          />
+          <Button type="button" size="sm" variant="ghost" onClick={() => remove(i)} aria-label="Remove">
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onChange([...rows, { name: "", value: "" }])}
+      >
+        + Add specific
+      </Button>
+    </div>
+  );
+}
+
