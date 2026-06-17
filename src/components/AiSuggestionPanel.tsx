@@ -43,6 +43,7 @@ export function AiSuggestionPanel({
   const research = useServerFn(researchProductWithAI);
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
   const [researchResult, setResearchResult] = useState<AiResearchResult | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const run = useMutation({
     mutationFn: async () => {
