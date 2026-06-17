@@ -259,11 +259,27 @@ function NewProductPage() {
       <Card>
         <CardContent className="pt-6 space-y-3">
           <Label className="text-base">{t("common.photos")}</Label>
-          <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10">
-            <ImagePlus className="h-6 w-6" />
-            <span className="text-sm font-medium">{t("newProduct.tapToAdd")}</span>
-            <span className="text-xs text-muted-foreground">{t("newProduct.cameraOrLibrary")}</span>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10"
+              onClick={() => cameraRef.current?.click()}
+            >
+              <ImagePlus className="h-6 w-6" />
+              <span className="text-sm font-medium">{t("newProduct.takePhoto")}</span>
+              <span className="text-xs text-muted-foreground">{t("newProduct.camera")}</span>
+            </button>
+            <button
+              type="button"
+              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10"
+              onClick={() => libraryRef.current?.click()}
+            >
+              <ImagePlus className="h-6 w-6" />
+              <span className="text-sm font-medium">{t("newProduct.chooseFromLibrary")}</span>
+              <span className="text-xs text-muted-foreground">{t("newProduct.gallery")}</span>
+            </button>
             <input
+              ref={cameraRef}
               type="file"
               accept="image/*"
               multiple
@@ -271,7 +287,15 @@ function NewProductPage() {
               className="hidden"
               onChange={onPickFiles}
             />
-          </label>
+            <input
+              ref={libraryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={onPickFiles}
+            />
+          </div>
           {photos.length > 0 && (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {photos.map((file, i) => (
