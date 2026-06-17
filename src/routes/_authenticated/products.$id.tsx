@@ -362,7 +362,7 @@ function PhotosSection({
               onClick={() => cameraRef.current?.click()}
             >
               <ImagePlus className="h-4 w-4" />
-              <span className="text-[10px] leading-tight">Camera</span>
+              <span className="text-[10px] leading-tight">{t("common.camera")}</span>
             </button>
             <button
               type="button"
@@ -370,7 +370,7 @@ function PhotosSection({
               onClick={() => libraryRef.current?.click()}
             >
               <ImagePlus className="h-4 w-4" />
-              <span className="text-[10px] leading-tight">Library</span>
+              <span className="text-[10px] leading-tight">{t("common.gallery")}</span>
             </button>
             <input
               ref={cameraRef}
