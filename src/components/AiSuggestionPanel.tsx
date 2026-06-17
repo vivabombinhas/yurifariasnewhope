@@ -43,6 +43,7 @@ export function AiSuggestionPanel({
   const research = useServerFn(researchProductWithAI);
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
   const [researchResult, setResearchResult] = useState<AiResearchResult | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const run = useMutation({
     mutationFn: async () => {
@@ -126,57 +127,12 @@ export function AiSuggestionPanel({
         <div className="flex gap-2 flex-wrap">
           <Button
             size="sm"
-            variant="ghost"
-            onClick={async () => {
-              if (!suggestion && !researchResult) {
-                toast.error("No AI output yet — run Analyze or Research first.");
-                return;
-              }
-              const payload = JSON.stringify(
-                {
-                  product_id: product.id,
-                  suggestion,
-                  research: researchResult,
-                  copied_at: new Date().toISOString(),
-                },
-                null,
-                2,
-              );
-              try {
-                await navigator.clipboard.writeText(payload);
-                console.log("[AI panel] raw JSON copied", payload);
-                toast.success("Raw AI JSON copied to clipboard");
-              } catch (e) {
-                console.error("[AI panel] copy failed", e);
-                toast.error("Failed to copy — check console for JSON");
-              }
-            }}
-            disabled={!suggestion && !researchResult}
-            title="Copy the latest AI suggestion + research JSON for prompt debugging"
-          >
-            <Copy className="h-4 w-4 mr-1" />
-            Copy raw AI JSON
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={startResearch}
-            disabled={runResearch.isPending || !hasPhotos}
-            aria-busy={runResearch.isPending}
-          >
-            <Search className="h-4 w-4 mr-1" />
-            {runResearch.isPending ? "Researching…" : "Research this item"}
-
-          </Button>
-          <Button
-            size="sm"
             onClick={startAnalyze}
             disabled={run.isPending || !hasPhotos}
             aria-busy={run.isPending}
           >
             <Wand2 className="h-4 w-4 mr-1" />
             {run.isPending ? "Generating…" : suggestion ? "Regenerate listing" : "Generate listing"}
-
           </Button>
         </div>
       </CardHeader>
@@ -194,18 +150,15 @@ export function AiSuggestionPanel({
               : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG, PNG, WebP, or GIF.`}
           </div>
         )}
-        {researchResult && <ResearchBlock result={researchResult} />}
         {!hasPhotos ? (
           <p className="text-sm text-muted-foreground">
             Add at least one photo to enable AI analysis.
           </p>
         ) : !suggestion ? (
           <p className="text-sm text-muted-foreground">
-            Click <b>Generate listing</b> for a ready-to-publish marketplace draft.
-            Only use <b>Research this item</b> for hard-to-identify or potentially valuable items.
+            Click <b>Generate listing</b> to create a ready-to-publish marketplace draft.
             Nothing is saved until you click <b>Apply to product</b>.
           </p>
-
         ) : (
           <SuggestionEditor
             product={product}
@@ -219,11 +172,77 @@ export function AiSuggestionPanel({
         )}
       </CardContent>
     </Card>
-    <ResearchAgentPanel
-      productId={product.id}
-      suggestion={suggestion}
-      research={researchResult}
-    />
+
+    <div className="flex justify-end">
+      <Button
+        size="sm"
+        variant="ghost"
+        className="text-xs text-muted-foreground"
+        onClick={() => setShowAdvanced((v) => !v)}
+      >
+        {showAdvanced ? "Hide advanced research" : "Advanced research"}
+      </Button>
+    </div>
+
+    {showAdvanced && (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Search className="h-4 w-4 text-primary" /> Advanced research
+          </CardTitle>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={async () => {
+                if (!suggestion && !researchResult) {
+                  toast.error("No AI output yet — run Generate or Research first.");
+                  return;
+                }
+                const payload = JSON.stringify(
+                  {
+                    product_id: product.id,
+                    suggestion,
+                    research: researchResult,
+                    copied_at: new Date().toISOString(),
+                  },
+                  null,
+                  2,
+                );
+                try {
+                  await navigator.clipboard.writeText(payload);
+                  toast.success("Raw AI JSON copied to clipboard");
+                } catch {
+                  toast.error("Failed to copy — check console for JSON");
+                }
+              }}
+              disabled={!suggestion && !researchResult}
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Copy raw JSON
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={startResearch}
+              disabled={runResearch.isPending || !hasPhotos}
+              aria-busy={runResearch.isPending}
+            >
+              <Search className="h-4 w-4 mr-1" />
+              {runResearch.isPending ? "Researching…" : "Research this item"}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {researchResult && <ResearchBlock result={researchResult} />}
+          <ResearchAgentPanel
+            productId={product.id}
+            suggestion={suggestion}
+            research={researchResult}
+          />
+        </CardContent>
+      </Card>
+    )}
     </div>
   );
 }
@@ -446,9 +465,9 @@ function SuggestionEditor({
       )}
 
       {s.price_confidence === "manual_required" && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>This item looks potentially valuable. Use <b>Research this item</b> before pricing.</span>
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-300 flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span>Potentially valuable item — research before pricing.</span>
         </div>
       )}
 
