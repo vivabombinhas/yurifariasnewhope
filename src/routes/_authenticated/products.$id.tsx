@@ -354,10 +354,25 @@ function PhotosSection({
               </div>
             </div>
           ))}
-          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-muted-foreground hover:bg-muted/50">
-            <ImagePlus className="h-5 w-5" />
-            <span className="text-xs">Add</span>
+          <div className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-muted-foreground hover:bg-muted/50 p-1">
+            <button
+              type="button"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 w-full rounded hover:bg-muted/50"
+              onClick={() => cameraRef.current?.click()}
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span className="text-[10px] leading-tight">Camera</span>
+            </button>
+            <button
+              type="button"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 w-full rounded hover:bg-muted/50"
+              onClick={() => libraryRef.current?.click()}
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span className="text-[10px] leading-tight">Library</span>
+            </button>
             <input
+              ref={cameraRef}
               type="file"
               accept="image/*"
               multiple
@@ -365,7 +380,15 @@ function PhotosSection({
               className="hidden"
               onChange={onUpload}
             />
-          </label>
+            <input
+              ref={libraryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={onUpload}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
