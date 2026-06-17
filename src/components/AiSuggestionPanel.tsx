@@ -120,8 +120,9 @@ export function AiSuggestionPanel({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" /> AI listing suggestion
+          <Sparkles className="h-4 w-4 text-primary" /> Quick listing
         </CardTitle>
+
         <div className="flex gap-2 flex-wrap">
           <Button
             size="sm"
