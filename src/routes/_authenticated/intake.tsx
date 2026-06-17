@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUnsupportedImageMessage, prepareImageForUpload } from "@/lib/image-convert";
 import { withTimeout } from "@/lib/async-timeout";
@@ -356,20 +356,47 @@ function IntakePage() {
       <Card>
         <CardContent className="pt-6 space-y-3">
           <Label className="text-base">{t("intake.stepPhotos")}</Label>
-          <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10">
-            <ImagePlus className="h-7 w-7" />
-            <span className="text-sm font-medium">{t("newProduct.tapToAdd")}</span>
-            <span className="text-xs text-muted-foreground">{t("newProduct.cameraOrLibrary")}</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              capture="environment"
-              className="hidden"
-              onChange={onPickFiles}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-20 flex-col gap-1 border-2 border-dashed border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+              onClick={() => cameraRef.current?.click()}
               disabled={!!draftProductId}
-            />
-          </label>
+            >
+              <ImagePlus className="h-6 w-6" />
+              <span className="text-xs font-medium">{t("newProduct.takePhoto")}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-20 flex-col gap-1 border-2 border-dashed border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+              onClick={() => libraryRef.current?.click()}
+              disabled={!!draftProductId}
+            >
+              <ImagePlus className="h-6 w-6" />
+              <span className="text-xs font-medium">{t("newProduct.chooseFromLibrary")}</span>
+            </Button>
+          </div>
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            className="hidden"
+            onChange={onPickFiles}
+            disabled={!!draftProductId}
+          />
+          <input
+            ref={libraryRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={onPickFiles}
+            disabled={!!draftProductId}
+          />
           {photos.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {photos.map((file, i) => (
