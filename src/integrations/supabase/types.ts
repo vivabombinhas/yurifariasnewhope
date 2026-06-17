@@ -132,6 +132,45 @@ export type Database = {
         }
         Relationships: []
       }
+      marketplace_accounts: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          external_account_id: string | null
+          id: string
+          marketplace: Database["public"]["Enums"]["marketplace"]
+          metadata: Json
+          refresh_token: string
+          scopes: string[]
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          external_account_id?: string | null
+          id?: string
+          marketplace: Database["public"]["Enums"]["marketplace"]
+          metadata?: Json
+          refresh_token: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          external_account_id?: string | null
+          id?: string
+          marketplace?: Database["public"]["Enums"]["marketplace"]
+          metadata?: Json
+          refresh_token?: string
+          scopes?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       marketplace_listings: {
         Row: {
           created_at: string
