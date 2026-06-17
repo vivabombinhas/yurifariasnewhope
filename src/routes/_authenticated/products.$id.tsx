@@ -463,6 +463,12 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const [brand, setBrand] = useState(product.brand?.name ?? "");
   const [category, setCategory] = useState(product.category?.name ?? "");
   const [condition, setCondition] = useState<string>(product.condition ?? "");
+  const [conditionGrade, setConditionGrade] = useState<string>(product.condition_grade ?? "");
+  const [conditionNotes, setConditionNotes] = useState<string>(product.condition_notes ?? "");
+  const [shippingNotes, setShippingNotes] = useState<string>(product.shipping_notes ?? "");
+  const [itemSpecifics, setItemSpecifics] = useState<{ name: string; value: string }[]>(
+    Array.isArray(product.item_specifics) ? product.item_specifics : [],
+  );
   const [price, setPrice] = useState(
     product.price_cents != null ? (product.price_cents / 100).toFixed(2) : "",
   );
@@ -498,6 +504,9 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
 
   const save = useMutation({
     mutationFn: async () => {
+      if (description.length > 900) {
+        throw new Error("Description exceeds 900 characters.");
+      }
       const brand_id = await ensureRow("brands", brand, brandList.data);
       const category_id = await ensureRow("categories", category, categoryList.data);
       const { error } = await supabase
@@ -511,6 +520,12 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
           price_cents: price ? Math.round(parseFloat(price) * 100) : null,
           location_id: locationId || null,
           status: status as any,
+          condition_grade: conditionGrade.trim() || null,
+          condition_notes: conditionNotes.trim() || null,
+          shipping_notes: shippingNotes.trim() || null,
+          item_specifics: itemSpecifics.filter(
+            (s) => s.name.trim() && s.value.trim(),
+          ) as any,
         })
         .eq("id", product.id);
       if (error) throw error;
@@ -537,8 +552,48 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>{tr("common.description")}</Label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
+            <div className="flex items-center justify-between">
+              <Label>{tr("common.description")}</Label>
+              <span className={`text-[11px] ${description.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+                {description.length} / 900
+              </span>
+            </div>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              maxLength={900}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Item specifics</Label>
+            <SpecificsList value={itemSpecifics} onChange={setItemSpecifics} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Condition grade</Label>
+              <Input
+                value={conditionGrade}
+                placeholder="e.g. Used – Acceptable"
+                onChange={(e) => setConditionGrade(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Condition notes</Label>
+              <Textarea
+                value={conditionNotes}
+                rows={2}
+                onChange={(e) => setConditionNotes(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Shipping notes</Label>
+              <Textarea
+                value={shippingNotes}
+                rows={2}
+                onChange={(e) => setShippingNotes(e.target.value)}
+              />
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -679,3 +734,52 @@ function ListingsSection({
     </Card>
   );
 }
+
+function SpecificsList({
+  value,
+  onChange,
+}: {
+  value: { name: string; value: string }[];
+  onChange: (v: { name: string; value: string }[]) => void;
+}) {
+  const rows = value.length ? value : [{ name: "", value: "" }];
+  function update(i: number, patch: Partial<{ name: string; value: string }>) {
+    const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+    onChange(next);
+  }
+  function remove(i: number) {
+    onChange(rows.filter((_, idx) => idx !== i));
+  }
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={i} className="flex gap-2">
+          <Input
+            className="flex-1"
+            placeholder="Name (e.g. Color)"
+            value={r.name}
+            onChange={(e) => update(i, { name: e.target.value })}
+          />
+          <Input
+            className="flex-[2]"
+            placeholder="Value (e.g. White)"
+            value={r.value}
+            onChange={(e) => update(i, { value: e.target.value })}
+          />
+          <Button type="button" size="sm" variant="ghost" onClick={() => remove(i)} aria-label="Remove">
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onChange([...rows, { name: "", value: "" }])}
+      >
+        + Add specific
+      </Button>
+    </div>
+  );
+}
+

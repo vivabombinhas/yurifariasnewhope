@@ -382,11 +382,15 @@ function SuggestionEditor({
         .from("products")
         .update({
           title: s.title,
-          description: s.description,
+          description: (s.description ?? "").slice(0, 900),
           brand_id,
           category_id,
           condition: s.condition,
           price_cents: s.suggested_price_cents,
+          item_specifics: (s.item_specifics ?? []) as any,
+          condition_grade: s.condition_grade?.trim() || null,
+          condition_notes: s.condition_notes?.trim() || null,
+          shipping_notes: s.shipping_notes?.trim() || null,
         })
         .eq("id", product.id);
       if (error) throw error;
@@ -495,16 +499,62 @@ function SuggestionEditor({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Description</Label>
-          <Button size="sm" variant="ghost" onClick={() => copy(s.description, "description")}>
-            <Copy className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[11px] ${
+                s.description.length > 900 ? "text-destructive" : "text-muted-foreground"
+              }`}
+            >
+              {s.description.length} / 900
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => copy(s.description, "description")}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
         <Textarea
           value={s.description}
           rows={6}
+          maxLength={900}
           onChange={(e) => update("description", e.target.value)}
         />
       </div>
+
+      <div className="space-y-2">
+        <Label>Item specifics</Label>
+        <ItemSpecificsEditor
+          value={s.item_specifics}
+          onChange={(v) => update("item_specifics", v)}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Condition grade</Label>
+          <Input
+            value={s.condition_grade}
+            placeholder="e.g. Used – Acceptable"
+            onChange={(e) => update("condition_grade", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Condition notes</Label>
+          <Textarea
+            value={s.condition_notes}
+            rows={2}
+            onChange={(e) => update("condition_notes", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label>Shipping notes</Label>
+          <Textarea
+            value={s.shipping_notes}
+            rows={2}
+            onChange={(e) => update("shipping_notes", e.target.value)}
+          />
+        </div>
+      </div>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
@@ -722,3 +772,50 @@ function QualityChecklist({ title, description }: { title: string; description: 
     </div>
   );
 }
+
+function ItemSpecificsEditor({
+  value,
+  onChange,
+}: {
+  value: { name: string; value: string }[];
+  onChange: (v: { name: string; value: string }[]) => void;
+}) {
+  const rows = value.length ? value : [{ name: "", value: "" }];
+  function update(i: number, patch: Partial<{ name: string; value: string }>) {
+    const next = rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+    onChange(next.filter((r) => r.name.trim() || r.value.trim()));
+  }
+  function remove(i: number) {
+    onChange(rows.filter((_, idx) => idx !== i));
+  }
+  function add() {
+    onChange([...rows, { name: "", value: "" }]);
+  }
+  return (
+    <div className="space-y-2">
+      {rows.map((r, i) => (
+        <div key={i} className="flex gap-2">
+          <Input
+            className="flex-1"
+            placeholder="Name (e.g. Color)"
+            value={r.name}
+            onChange={(e) => update(i, { name: e.target.value })}
+          />
+          <Input
+            className="flex-[2]"
+            placeholder="Value (e.g. White)"
+            value={r.value}
+            onChange={(e) => update(i, { value: e.target.value })}
+          />
+          <Button type="button" size="sm" variant="ghost" onClick={() => remove(i)} aria-label="Remove">
+            <Copy className="h-3.5 w-3.5 rotate-45 opacity-0" />×
+          </Button>
+        </div>
+      ))}
+      <Button type="button" size="sm" variant="outline" onClick={add}>
+        + Add specific
+      </Button>
+    </div>
+  );
+}
+

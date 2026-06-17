@@ -84,6 +84,11 @@ export type AiSuggestion = {
   suggested_price_cents: number | null;
   confidence_notes: string;
   verification_needed: string[];
+  // Structured listing fields (used by per-marketplace renderer)
+  item_specifics: { name: string; value: string }[];
+  condition_grade: string;
+  condition_notes: string;
+  shipping_notes: string;
   // Research-enhanced fields (always present, may be empty)
   possible_brand: string;
   possible_model: string;
@@ -116,12 +121,18 @@ VOICE:
 
 OUTPUT (focus only on these):
 - title: short, punchy, marketplace-style. <= 80 chars. Include brand ONLY if clearly visible/printed on the item. Otherwise lead with item type + key visible attributes (color, size cues, material, style). No "Brand Unverified" disclaimers.
-- description: 3-6 short, natural lines. Describe what the buyer sees and gets. Mention condition honestly. End with: "Please review photos carefully before purchasing."
+- description: 3-6 short, natural lines. Describe what the buyer sees and gets. End with: "Please review photos carefully before purchasing." HARD LIMIT: <= 900 characters total. Trim wording before exceeding the limit. Do NOT repeat the item_specifics here — those are shown separately.
 - brand: ONLY if clearly visible. Otherwise "".
 - category: short generic marketplace category ("Sneakers", "Women's Jacket", "Vintage Lamp").
 - condition: one of new, like_new, very_good, good, acceptable, for_parts.
 - tags: 5-10 short lowercase marketplace keywords a buyer would actually search.
 - suggested_price_cents: integer USD cents OR null. Conservative US resale estimate for ordinary items. If the item looks potentially valuable (sneakers, designer, watches, trading cards, vintage electronics, collectibles, fine jewelry) AND brand/model is not clearly readable, set suggested_price_cents = null so the operator prices manually.
+
+STRUCTURED FIELDS (these power the per-marketplace renderer — do not duplicate them in description):
+- item_specifics: 5-12 {name, value} pairs of the most relevant attributes for the category (Brand, Type, Color, Material, Size, Style, Theme, Suitable For, Mounting, Frame Material, etc.). Use Title Case for names. Skip pairs you cannot observe — never invent.
+- condition_grade: short phrase like "Used – Acceptable", "Used – Very Good", "Like New", "New with tags".
+- condition_notes: 1-3 short sentences describing observed wear/damage honestly. Empty string if no notable wear.
+- shipping_notes: 1-2 short sentences with packaging plan ("Wrapped in bubble wrap, shipped in a sturdy box from US.") — generic but reassuring. Empty string if nothing meaningful to add.
 
 The remaining fields exist for schema compatibility — keep them MINIMAL in Quick Listing Mode:
 - confidence_notes: 1 short sentence or "".
@@ -141,7 +152,7 @@ const SCHEMA = {
   type: "object",
   properties: {
     title: { type: "string" },
-    description: { type: "string" },
+    description: { type: "string", maxLength: 900 },
     brand: { type: "string" },
     category: { type: "string" },
     condition: {
@@ -152,6 +163,21 @@ const SCHEMA = {
     suggested_price_cents: { type: ["integer", "null"] },
     confidence_notes: { type: "string" },
     verification_needed: { type: "array", items: { type: "string" } },
+    item_specifics: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          value: { type: "string" },
+        },
+        required: ["name", "value"],
+        additionalProperties: false,
+      },
+    },
+    condition_grade: { type: "string" },
+    condition_notes: { type: "string" },
+    shipping_notes: { type: "string" },
     possible_brand: { type: "string" },
     possible_model: { type: "string" },
     visual_clues: { type: "array", items: { type: "string" } },
@@ -173,6 +199,10 @@ const SCHEMA = {
     "suggested_price_cents",
     "confidence_notes",
     "verification_needed",
+    "item_specifics",
+    "condition_grade",
+    "condition_notes",
+    "shipping_notes",
     "possible_brand",
     "possible_model",
     "visual_clues",
@@ -370,8 +400,18 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
 
       const suggestion: AiSuggestion = {
         ...parsed,
+        description: (parsed.description ?? "").slice(0, 900),
         verification_needed: Array.isArray(parsed.verification_needed) ? parsed.verification_needed : [],
         tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+        item_specifics: Array.isArray(parsed.item_specifics)
+          ? parsed.item_specifics
+              .filter((s: any) => s && typeof s.name === "string" && typeof s.value === "string")
+              .map((s: any) => ({ name: s.name.trim(), value: s.value.trim() }))
+              .filter((s: any) => s.name && s.value)
+          : [],
+        condition_grade: parsed.condition_grade ?? "",
+        condition_notes: parsed.condition_notes ?? "",
+        shipping_notes: parsed.shipping_notes ?? "",
         visual_clues: Array.isArray(parsed.visual_clues) ? parsed.visual_clues : [],
         search_keywords: Array.isArray(parsed.search_keywords) ? parsed.search_keywords : [],
         recommended_research_queries: Array.isArray(parsed.recommended_research_queries)

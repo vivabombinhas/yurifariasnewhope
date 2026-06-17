@@ -36,11 +36,21 @@ export const publishToMarketplace = createServerFn({ method: "POST" })
     const { data: product, error: pErr } = await supabase
       .from("products")
       .select(
-        "id, sku, title, description, price_cents, currency, condition, brand:brands(name), category:categories(name)",
+        "id, sku, title, description, price_cents, currency, condition, condition_grade, condition_notes, shipping_notes, item_specifics, brand:brands(name), category:categories(name)",
       )
       .eq("id", data.productId)
       .single();
     if (pErr || !product) throw new Error(pErr?.message ?? "Product not found");
+
+    // Render listing in the marketplace's preferred format. Currently logged
+    // so we can verify the output before wiring real APIs.
+    const { renderListing } = await import("@/lib/marketplaces/render");
+    const rendered = renderListing(data.marketplace, product as any);
+    console.log("[publish] rendered", data.marketplace, {
+      title: rendered.title,
+      descriptionPreview: rendered.description.slice(0, 200),
+      aspects: rendered.aspects,
+    });
 
     const publisher = getPublisher(data.marketplace);
     const result = await publisher.publish(product as unknown as PublishableProduct);
