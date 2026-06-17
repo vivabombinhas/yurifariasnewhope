@@ -297,10 +297,24 @@ function SuggestionEditor({
     }
   }
 
-  function applyVariation(v: { title: string; description: string }) {
-    setS((cur) => ({ ...cur, title: v.title, description: v.description }));
+  function applyVariation(v: { label?: string; title: string; description: string }) {
+    console.log("[improve] applyVariation clicked", {
+      label: v.label,
+      newTitle: v.title,
+      newDescription: v.description,
+    });
+    setS((cur) => {
+      const next = { ...cur, title: v.title, description: v.description };
+      console.log("[improve] state transition", {
+        prevTitle: cur.title,
+        prevDescription: cur.description,
+        nextTitle: next.title,
+        nextDescription: next.description,
+      });
+      return next;
+    });
     setVariations([]);
-    toast.success("Variation selected — review checklist, then Apply.");
+    toast.success("Variation loaded into editor — review checklist, then Apply.");
   }
 
   function update<K extends keyof AiSuggestion>(k: K, v: AiSuggestion[K]) {
