@@ -441,3 +441,40 @@ export const researchProductWithAI = createServerFn({ method: "POST" })
       console.log("[research] finished productId=", data.productId, "durationMs=", Date.now() - startedAt);
     }
   });
+
+export const improveListingWithAI = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ImproveInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
+    const imageUrls = await loadSignedPhotoUrls(supabase, data.productId);
+
+    const userText = `Improve this draft listing. Keep facts from the draft; do not invent.
+
+CURRENT TITLE:
+${data.title || "(empty)"}
+
+CURRENT DESCRIPTION:
+${data.description || "(empty)"}
+
+CATEGORY: ${data.category || "(unspecified)"}
+CONDITION: ${data.condition || "(unspecified)"}
+
+Return improved title and description as JSON.`;
+
+    const { parsed } = await callGateway<AiImprovedListing>(
+      apiKey,
+      IMPROVE_SYSTEM_PROMPT,
+      IMPROVE_SCHEMA,
+      "improved_listing",
+      userText,
+      imageUrls,
+    );
+
+    return {
+      title: (parsed.title ?? "").trim(),
+      description: (parsed.description ?? "").trim(),
+    };
+  });
