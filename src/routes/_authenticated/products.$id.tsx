@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
+import { PublishPanel } from "@/components/PublishPanel";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
@@ -189,6 +190,12 @@ function ProductDetail() {
       <CopyActions product={p} />
 
       <EditForm product={p} onSaved={() => product.refetch()} />
+
+      <PublishPanel
+        productId={id}
+        rows={(listings.data ?? []) as any}
+        onChange={() => listings.refetch()}
+      />
 
       <ListingsSection productId={id} rows={listings.data ?? []} onChange={() => listings.refetch()} />
 
