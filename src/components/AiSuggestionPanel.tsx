@@ -382,11 +382,15 @@ function SuggestionEditor({
         .from("products")
         .update({
           title: s.title,
-          description: s.description,
+          description: (s.description ?? "").slice(0, 900),
           brand_id,
           category_id,
           condition: s.condition,
           price_cents: s.suggested_price_cents,
+          item_specifics: (s.item_specifics ?? []) as any,
+          condition_grade: s.condition_grade?.trim() || null,
+          condition_notes: s.condition_notes?.trim() || null,
+          shipping_notes: s.shipping_notes?.trim() || null,
         })
         .eq("id", product.id);
       if (error) throw error;
