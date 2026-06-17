@@ -499,16 +499,62 @@ function SuggestionEditor({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Description</Label>
-          <Button size="sm" variant="ghost" onClick={() => copy(s.description, "description")}>
-            <Copy className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[11px] ${
+                s.description.length > 900 ? "text-destructive" : "text-muted-foreground"
+              }`}
+            >
+              {s.description.length} / 900
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => copy(s.description, "description")}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
         <Textarea
           value={s.description}
           rows={6}
+          maxLength={900}
           onChange={(e) => update("description", e.target.value)}
         />
       </div>
+
+      <div className="space-y-2">
+        <Label>Item specifics</Label>
+        <ItemSpecificsEditor
+          value={s.item_specifics}
+          onChange={(v) => update("item_specifics", v)}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Condition grade</Label>
+          <Input
+            value={s.condition_grade}
+            placeholder="e.g. Used – Acceptable"
+            onChange={(e) => update("condition_grade", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Condition notes</Label>
+          <Textarea
+            value={s.condition_notes}
+            rows={2}
+            onChange={(e) => update("condition_notes", e.target.value)}
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label>Shipping notes</Label>
+          <Textarea
+            value={s.shipping_notes}
+            rows={2}
+            onChange={(e) => update("shipping_notes", e.target.value)}
+          />
+        </div>
+      </div>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
