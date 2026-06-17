@@ -135,36 +135,48 @@ export type Database = {
       marketplace_listings: {
         Row: {
           created_at: string
+          error_message: string | null
+          external_listing_id: string | null
           id: string
+          last_sync_at: string | null
           listed_at: string | null
           listing_url: string | null
           marketplace: Database["public"]["Enums"]["marketplace"]
           notes: string | null
           product_id: string
+          published_at: string | null
           sold_at: string | null
           status: Database["public"]["Enums"]["listing_status"]
           updated_at: string
         }
         Insert: {
           created_at?: string
+          error_message?: string | null
+          external_listing_id?: string | null
           id?: string
+          last_sync_at?: string | null
           listed_at?: string | null
           listing_url?: string | null
           marketplace: Database["public"]["Enums"]["marketplace"]
           notes?: string | null
           product_id: string
+          published_at?: string | null
           sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           updated_at?: string
         }
         Update: {
           created_at?: string
+          error_message?: string | null
+          external_listing_id?: string | null
           id?: string
+          last_sync_at?: string | null
           listed_at?: string | null
           listing_url?: string | null
           marketplace?: Database["public"]["Enums"]["marketplace"]
           notes?: string | null
           product_id?: string
+          published_at?: string | null
           sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
           updated_at?: string
