@@ -191,6 +191,12 @@ function ProductDetail() {
 
       <EditForm product={p} onSaved={() => product.refetch()} />
 
+      <PublishPanel
+        productId={id}
+        rows={(listings.data ?? []) as any}
+        onChange={() => listings.refetch()}
+      />
+
       <ListingsSection productId={id} rows={listings.data ?? []} onChange={() => listings.refetch()} />
 
       <Card>
