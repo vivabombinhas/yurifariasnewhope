@@ -400,8 +400,18 @@ export const analyzeProductWithAI = createServerFn({ method: "POST" })
 
       const suggestion: AiSuggestion = {
         ...parsed,
+        description: (parsed.description ?? "").slice(0, 900),
         verification_needed: Array.isArray(parsed.verification_needed) ? parsed.verification_needed : [],
         tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+        item_specifics: Array.isArray(parsed.item_specifics)
+          ? parsed.item_specifics
+              .filter((s: any) => s && typeof s.name === "string" && typeof s.value === "string")
+              .map((s: any) => ({ name: s.name.trim(), value: s.value.trim() }))
+              .filter((s: any) => s.name && s.value)
+          : [],
+        condition_grade: parsed.condition_grade ?? "",
+        condition_notes: parsed.condition_notes ?? "",
+        shipping_notes: parsed.shipping_notes ?? "",
         visual_clues: Array.isArray(parsed.visual_clues) ? parsed.visual_clues : [],
         search_keywords: Array.isArray(parsed.search_keywords) ? parsed.search_keywords : [],
         recommended_research_queries: Array.isArray(parsed.recommended_research_queries)
