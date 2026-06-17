@@ -226,6 +226,8 @@ function PhotosSection({
   onChange: () => void;
 }) {
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
