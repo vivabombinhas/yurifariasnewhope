@@ -326,12 +326,16 @@ export type Database = {
           brand_id: string | null
           category_id: string | null
           condition: Database["public"]["Enums"]["product_condition"] | null
+          condition_grade: string | null
+          condition_notes: string | null
           created_at: string
           currency: string
           description: string
           id: string
+          item_specifics: Json
           location_id: string | null
           price_cents: number | null
+          shipping_notes: string | null
           sku: string
           status: Database["public"]["Enums"]["product_status"]
           title: string
@@ -341,12 +345,16 @@ export type Database = {
           brand_id?: string | null
           category_id?: string | null
           condition?: Database["public"]["Enums"]["product_condition"] | null
+          condition_grade?: string | null
+          condition_notes?: string | null
           created_at?: string
           currency?: string
           description?: string
           id?: string
+          item_specifics?: Json
           location_id?: string | null
           price_cents?: number | null
+          shipping_notes?: string | null
           sku: string
           status?: Database["public"]["Enums"]["product_status"]
           title?: string
@@ -356,12 +364,16 @@ export type Database = {
           brand_id?: string | null
           category_id?: string | null
           condition?: Database["public"]["Enums"]["product_condition"] | null
+          condition_grade?: string | null
+          condition_notes?: string | null
           created_at?: string
           currency?: string
           description?: string
           id?: string
+          item_specifics?: Json
           location_id?: string | null
           price_cents?: number | null
+          shipping_notes?: string | null
           sku?: string
           status?: Database["public"]["Enums"]["product_status"]
           title?: string
