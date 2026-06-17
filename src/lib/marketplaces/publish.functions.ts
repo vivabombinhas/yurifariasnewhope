@@ -50,7 +50,7 @@ export const publishToMarketplace = createServerFn({ method: "POST" })
     const patch = {
       product_id: data.productId,
       marketplace: data.marketplace,
-      status: result.ok ? "active" : ("draft" as const),
+      status: (result.ok ? "active" : "draft") as "active" | "draft",
       external_listing_id: result.external_listing_id ?? null,
       listing_url: result.listing_url ?? null,
       published_at: result.ok ? now : null,
