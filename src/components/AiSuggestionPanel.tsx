@@ -127,57 +127,12 @@ export function AiSuggestionPanel({
         <div className="flex gap-2 flex-wrap">
           <Button
             size="sm"
-            variant="ghost"
-            onClick={async () => {
-              if (!suggestion && !researchResult) {
-                toast.error("No AI output yet — run Analyze or Research first.");
-                return;
-              }
-              const payload = JSON.stringify(
-                {
-                  product_id: product.id,
-                  suggestion,
-                  research: researchResult,
-                  copied_at: new Date().toISOString(),
-                },
-                null,
-                2,
-              );
-              try {
-                await navigator.clipboard.writeText(payload);
-                console.log("[AI panel] raw JSON copied", payload);
-                toast.success("Raw AI JSON copied to clipboard");
-              } catch (e) {
-                console.error("[AI panel] copy failed", e);
-                toast.error("Failed to copy — check console for JSON");
-              }
-            }}
-            disabled={!suggestion && !researchResult}
-            title="Copy the latest AI suggestion + research JSON for prompt debugging"
-          >
-            <Copy className="h-4 w-4 mr-1" />
-            Copy raw AI JSON
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={startResearch}
-            disabled={runResearch.isPending || !hasPhotos}
-            aria-busy={runResearch.isPending}
-          >
-            <Search className="h-4 w-4 mr-1" />
-            {runResearch.isPending ? "Researching…" : "Research this item"}
-
-          </Button>
-          <Button
-            size="sm"
             onClick={startAnalyze}
             disabled={run.isPending || !hasPhotos}
             aria-busy={run.isPending}
           >
             <Wand2 className="h-4 w-4 mr-1" />
             {run.isPending ? "Generating…" : suggestion ? "Regenerate listing" : "Generate listing"}
-
           </Button>
         </div>
       </CardHeader>
