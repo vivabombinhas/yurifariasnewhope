@@ -12,36 +12,58 @@ const ImproveInput = z.object({
   condition: z.string().default(""),
 });
 
-export type AiImprovedListing = {
+export type AiImprovedVariation = {
+  label: string;
   title: string;
   description: string;
 };
 
+export type AiImprovedListing = {
+  variations: AiImprovedVariation[];
+};
+
 const IMPROVE_SYSTEM_PROMPT = `You are an experienced US eBay/Marketplace seller. Your job is to take an operator's draft listing and rewrite it so it actually SELLS.
 
-GOAL: turn an ordinary draft into a professional listing that is clear, searchable, and converts.
+GOAL: produce 3 DISTINCT variations of the same listing so the operator can pick the best one.
 
-RULES:
+VARIATION STRATEGY (use these 3 angles, in this order):
+1. label "Keyword-focused" — maximize searchability. Front-load brand/model/type and the most-searched attributes.
+2. label "Buyer-benefit" — lead with what the buyer gets / why they'd want it. Still keyword-aware but more human.
+3. label "Concise" — shortest viable version. Tight title, 3-4 line description. No filler.
+
+RULES (apply to every variation):
 - Write like a confident, experienced reseller. Natural English. No corporate or robotic tone.
-- Prioritize clarity and conversion. Lead with what the buyer is searching for.
-- Title: punchy, scannable, keyword-rich. <= 80 chars. Front-load brand/model/type/key attributes (color, size, material, style). No ALL CAPS spam, no emojis.
-- Description: read like a real human seller wrote it. 4-7 short lines or short paragraphs. Highlight what the buyer gets, key features, condition honestly, and a soft call to action. End with: "Please review photos carefully before purchasing."
-- Do NOT exaggerate. Do NOT invent details that are not already in the draft or visible in the photos (no fabricated model numbers, years, materials, sizes).
-- Do NOT claim authenticity, "100% genuine", "authentic guaranteed", or similar.
+- Title: <= 80 chars. No ALL CAPS spam, no emojis.
+- Description: 3-7 short lines/paragraphs. End with: "Please review photos carefully before purchasing."
+- Do NOT exaggerate. Do NOT invent details not in the draft or clearly visible in photos (no fabricated model numbers, years, materials, sizes).
+- Do NOT claim authenticity ("100% genuine", "authentic guaranteed", etc.).
 - Do NOT claim "limited edition", "rare", "collectible", or "vintage" unless the draft already states it.
-- Avoid overly defensive / disclaimer-heavy language ("sold as-is no returns no refunds buyer beware..."). One short honest condition note is enough.
+- Avoid overly defensive / disclaimer-heavy language. One short honest condition note is enough.
 - Always write in English.
 - Preserve facts from the draft (brand, size, color, condition tier). Only rephrase and tighten.
 
-Return strictly the JSON schema. No prose, no markdown.`;
+Return strictly the JSON schema. Exactly 3 variations. No prose, no markdown.`;
 
 const IMPROVE_SCHEMA = {
   type: "object",
   properties: {
-    title: { type: "string" },
-    description: { type: "string" },
+    variations: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: "object",
+        properties: {
+          label: { type: "string" },
+          title: { type: "string" },
+          description: { type: "string" },
+        },
+        required: ["label", "title", "description"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["title", "description"],
+  required: ["variations"],
   additionalProperties: false,
 };
 
@@ -462,7 +484,7 @@ ${data.description || "(empty)"}
 CATEGORY: ${data.category || "(unspecified)"}
 CONDITION: ${data.condition || "(unspecified)"}
 
-Return improved title and description as JSON.`;
+Return exactly 3 distinct variations (Keyword-focused, Buyer-benefit, Concise) as JSON.`;
 
     const { parsed } = await callGateway<AiImprovedListing>(
       apiKey,
@@ -473,8 +495,13 @@ Return improved title and description as JSON.`;
       imageUrls,
     );
 
-    return {
-      title: (parsed.title ?? "").trim(),
-      description: (parsed.description ?? "").trim(),
-    };
+    const variations = (Array.isArray(parsed.variations) ? parsed.variations : [])
+      .slice(0, 3)
+      .map((v) => ({
+        label: (v.label ?? "").trim() || "Variation",
+        title: (v.title ?? "").trim(),
+        description: (v.description ?? "").trim(),
+      }));
+
+    return { variations };
   });

@@ -260,13 +260,16 @@ function SuggestionEditor({
   const [s, setS] = useState<AiSuggestion>(initial);
   const [saving, setSaving] = useState(false);
   const [improving, setImproving] = useState(false);
+  const [variations, setVariations] = useState<
+    { label: string; title: string; description: string }[]
+  >([]);
   const improveFn = useServerFn(improveListingWithAI);
 
   async function improve() {
     if (improving) return;
     setImproving(true);
     try {
-      const out = await withTimeout(
+      const out = (await withTimeout(
         improveFn({
           data: {
             productId: product.id,
@@ -278,19 +281,26 @@ function SuggestionEditor({
         }),
         55_000,
         "Improve Listing timed out. Please try again.",
-      );
-      setS((cur) => ({
-        ...cur,
-        title: out.title || cur.title,
-        description: out.description || cur.description,
-      }));
-      toast.success("Listing improved — review before applying.");
+      )) as { variations: { label: string; title: string; description: string }[] };
+      const vs = out.variations ?? [];
+      if (!vs.length) {
+        toast.error("AI returned no variations. Please retry.");
+        return;
+      }
+      setVariations(vs);
+      toast.success(`Got ${vs.length} variations — pick one before applying.`);
     } catch (e: any) {
       console.error("[improve] failed", e);
       toast.error(e?.message ?? "Improve failed");
     } finally {
       setImproving(false);
     }
+  }
+
+  function applyVariation(v: { title: string; description: string }) {
+    setS((cur) => ({ ...cur, title: v.title, description: v.description }));
+    setVariations([]);
+    toast.success("Variation selected — review checklist, then Apply.");
   }
 
   function update<K extends keyof AiSuggestion>(k: K, v: AiSuggestion[K]) {
@@ -413,6 +423,51 @@ function SuggestionEditor({
           {improving ? "Improving…" : "Improve Listing"}
         </Button>
       </div>
+
+      {variations.length > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium">Pick a variation</div>
+            <Button size="sm" variant="ghost" onClick={() => setVariations([])}>
+              Dismiss
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {variations.map((v, i) => (
+              <div
+                key={i}
+                className="rounded-md border bg-background p-3 space-y-2 flex flex-col"
+              >
+                <Badge variant="secondary" className="self-start text-[10px]">
+                  {v.label}
+                </Badge>
+                <div className="text-sm font-medium leading-snug">{v.title}</div>
+                <div className="text-xs text-muted-foreground whitespace-pre-line line-clamp-6">
+                  {v.description}
+                </div>
+                <div className="mt-auto flex gap-1 pt-1">
+                  <Button size="sm" className="flex-1" onClick={() => applyVariation(v)}>
+                    Use this
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => copy(`${v.title}\n\n${v.description}`, v.label)}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <QualityChecklist title={s.title} description={s.description} />
+        </div>
+      )}
+
+      {variations.length === 0 && (s.title || s.description) && (
+        <QualityChecklist title={s.title} description={s.description} />
+      )}
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Title</Label>
@@ -595,6 +650,61 @@ function ResearchBlock({ result }: { result: AiResearchResult }) {
           {result.manual_research_recommendation}
         </div>
       )}
+    </div>
+  );
+}
+
+function QualityChecklist({ title, description }: { title: string; description: string }) {
+  const text = `${title}\n${description}`.toLowerCase();
+  const checks = [
+    {
+      label: "Title is clear and under 80 characters",
+      pass: title.trim().length > 0 && title.length <= 80,
+    },
+    {
+      label: "Title front-loads searchable keywords (>= 3 words)",
+      pass: title.trim().split(/\s+/).filter(Boolean).length >= 3,
+    },
+    {
+      label: "Description has enough detail (>= 120 characters)",
+      pass: description.trim().length >= 120,
+    },
+    {
+      label: "No authenticity claims (authentic / 100% genuine / guaranteed real)",
+      pass: !/\b(100% ?(genuine|authentic)|authentic(ity)? (guaranteed|verified)|guaranteed (genuine|authentic|real)|certified authentic)\b/i.test(
+        text,
+      ),
+    },
+    {
+      label: "No unverified rarity claims (rare / limited edition / one of a kind)",
+      pass: !/\b(rare|limited edition|one[- ]of[- ]a[- ]kind|extremely rare|hard to find)\b/i.test(
+        text,
+      ),
+    },
+    {
+      label: "No hype / ALL-CAPS spam in title",
+      pass: !/\b(WOW|L@@K|MUST SEE|HOT|RARE|AMAZING|INCREDIBLE)\b/.test(title) &&
+        !/[A-Z]{6,}/.test(title),
+    },
+  ];
+  return (
+    <div className="rounded-md border bg-background p-3 text-sm space-y-2">
+      <div className="font-medium">Quality checklist</div>
+      <ul className="space-y-1">
+        {checks.map((c, i) => (
+          <li key={i} className="flex items-start gap-2 text-xs">
+            <span className={c.pass ? "text-green-600" : "text-amber-600"}>
+              {c.pass ? "✓" : "!"}
+            </span>
+            <span className={c.pass ? "text-muted-foreground" : "text-foreground"}>
+              {c.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-muted-foreground">
+        Quick local check — review manually before clicking <b>Apply to product</b>.
+      </p>
     </div>
   );
 }
