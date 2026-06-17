@@ -653,3 +653,58 @@ function ResearchBlock({ result }: { result: AiResearchResult }) {
     </div>
   );
 }
+
+function QualityChecklist({ title, description }: { title: string; description: string }) {
+  const text = `${title}\n${description}`.toLowerCase();
+  const checks = [
+    {
+      label: "Title is clear and under 80 characters",
+      pass: title.trim().length > 0 && title.length <= 80,
+    },
+    {
+      label: "Title front-loads searchable keywords (>= 3 words)",
+      pass: title.trim().split(/\s+/).filter(Boolean).length >= 3,
+    },
+    {
+      label: "Description has enough detail (>= 120 characters)",
+      pass: description.trim().length >= 120,
+    },
+    {
+      label: "No authenticity claims (authentic / 100% genuine / guaranteed real)",
+      pass: !/\b(100% ?(genuine|authentic)|authentic(ity)? (guaranteed|verified)|guaranteed (genuine|authentic|real)|certified authentic)\b/i.test(
+        text,
+      ),
+    },
+    {
+      label: "No unverified rarity claims (rare / limited edition / one of a kind)",
+      pass: !/\b(rare|limited edition|one[- ]of[- ]a[- ]kind|extremely rare|hard to find)\b/i.test(
+        text,
+      ),
+    },
+    {
+      label: "No hype / ALL-CAPS spam in title",
+      pass: !/\b(WOW|L@@K|MUST SEE|HOT|RARE|AMAZING|INCREDIBLE)\b/.test(title) &&
+        !/[A-Z]{6,}/.test(title),
+    },
+  ];
+  return (
+    <div className="rounded-md border bg-background p-3 text-sm space-y-2">
+      <div className="font-medium">Quality checklist</div>
+      <ul className="space-y-1">
+        {checks.map((c, i) => (
+          <li key={i} className="flex items-start gap-2 text-xs">
+            <span className={c.pass ? "text-green-600" : "text-amber-600"}>
+              {c.pass ? "✓" : "!"}
+            </span>
+            <span className={c.pass ? "text-muted-foreground" : "text-foreground"}>
+              {c.label}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-muted-foreground">
+        Quick local check — review manually before clicking <b>Apply to product</b>.
+      </p>
+    </div>
+  );
+}
