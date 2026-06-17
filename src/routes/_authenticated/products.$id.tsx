@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUnsupportedImageMessage, prepareImageForUpload, isAiSupportedPath } from "@/lib/image-convert";
 import { Input } from "@/components/ui/input";
@@ -226,6 +226,9 @@ function PhotosSection({
   onChange: () => void;
 }) {
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const libraryRef = useRef<HTMLInputElement>(null);
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -352,10 +355,25 @@ function PhotosSection({
               </div>
             </div>
           ))}
-          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-muted-foreground hover:bg-muted/50">
-            <ImagePlus className="h-5 w-5" />
-            <span className="text-xs">Add</span>
+          <div className="flex aspect-square flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed text-muted-foreground hover:bg-muted/50 p-1">
+            <button
+              type="button"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 w-full rounded hover:bg-muted/50"
+              onClick={() => cameraRef.current?.click()}
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span className="text-[10px] leading-tight">{t("common.camera")}</span>
+            </button>
+            <button
+              type="button"
+              className="flex flex-1 flex-col items-center justify-center gap-0.5 w-full rounded hover:bg-muted/50"
+              onClick={() => libraryRef.current?.click()}
+            >
+              <ImagePlus className="h-4 w-4" />
+              <span className="text-[10px] leading-tight">{t("common.gallery")}</span>
+            </button>
             <input
+              ref={cameraRef}
               type="file"
               accept="image/*"
               multiple
@@ -363,7 +381,15 @@ function PhotosSection({
               className="hidden"
               onChange={onUpload}
             />
-          </label>
+            <input
+              ref={libraryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={onUpload}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
