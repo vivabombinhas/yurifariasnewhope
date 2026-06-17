@@ -4,6 +4,48 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const Input = z.object({ productId: z.string().uuid() });
 
+const ImproveInput = z.object({
+  productId: z.string().uuid(),
+  title: z.string().default(""),
+  description: z.string().default(""),
+  category: z.string().default(""),
+  condition: z.string().default(""),
+});
+
+export type AiImprovedListing = {
+  title: string;
+  description: string;
+};
+
+const IMPROVE_SYSTEM_PROMPT = `You are an experienced US eBay/Marketplace seller. Your job is to take an operator's draft listing and rewrite it so it actually SELLS.
+
+GOAL: turn an ordinary draft into a professional listing that is clear, searchable, and converts.
+
+RULES:
+- Write like a confident, experienced reseller. Natural English. No corporate or robotic tone.
+- Prioritize clarity and conversion. Lead with what the buyer is searching for.
+- Title: punchy, scannable, keyword-rich. <= 80 chars. Front-load brand/model/type/key attributes (color, size, material, style). No ALL CAPS spam, no emojis.
+- Description: read like a real human seller wrote it. 4-7 short lines or short paragraphs. Highlight what the buyer gets, key features, condition honestly, and a soft call to action. End with: "Please review photos carefully before purchasing."
+- Do NOT exaggerate. Do NOT invent details that are not already in the draft or visible in the photos (no fabricated model numbers, years, materials, sizes).
+- Do NOT claim authenticity, "100% genuine", "authentic guaranteed", or similar.
+- Do NOT claim "limited edition", "rare", "collectible", or "vintage" unless the draft already states it.
+- Avoid overly defensive / disclaimer-heavy language ("sold as-is no returns no refunds buyer beware..."). One short honest condition note is enough.
+- Always write in English.
+- Preserve facts from the draft (brand, size, color, condition tier). Only rephrase and tighten.
+
+Return strictly the JSON schema. No prose, no markdown.`;
+
+const IMPROVE_SCHEMA = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    description: { type: "string" },
+  },
+  required: ["title", "description"],
+  additionalProperties: false,
+};
+
+
 export type AiSuggestion = {
   title: string;
   description: string;
