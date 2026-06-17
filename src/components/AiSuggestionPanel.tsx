@@ -120,8 +120,9 @@ export function AiSuggestionPanel({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" /> AI listing suggestion
+          <Sparkles className="h-4 w-4 text-primary" /> Quick listing
         </CardTitle>
+
         <div className="flex gap-2 flex-wrap">
           <Button
             size="sm"
@@ -164,7 +165,8 @@ export function AiSuggestionPanel({
             aria-busy={runResearch.isPending}
           >
             <Search className="h-4 w-4 mr-1" />
-            {runResearch.isPending ? "Researching…" : "Improve with Research"}
+            {runResearch.isPending ? "Researching…" : "Research this item"}
+
           </Button>
           <Button
             size="sm"
@@ -173,7 +175,8 @@ export function AiSuggestionPanel({
             aria-busy={run.isPending}
           >
             <Wand2 className="h-4 w-4 mr-1" />
-            {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
+            {run.isPending ? "Generating…" : suggestion ? "Regenerate listing" : "Generate listing"}
+
           </Button>
         </div>
       </CardHeader>
@@ -198,10 +201,11 @@ export function AiSuggestionPanel({
           </p>
         ) : !suggestion ? (
           <p className="text-sm text-muted-foreground">
-            Click <b>Analyze with AI</b> for a listing draft, or <b>Improve with Research</b>
-            {" "}to surface identification clues and search queries before pricing.
-            Nothing is saved to the product until you click <b>Apply to product</b>.
+            Click <b>Generate listing</b> for a ready-to-publish marketplace draft.
+            Only use <b>Research this item</b> for hard-to-identify or potentially valuable items.
+            Nothing is saved until you click <b>Apply to product</b>.
           </p>
+
         ) : (
           <SuggestionEditor
             product={product}
@@ -434,27 +438,6 @@ function SuggestionEditor({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Verification needed (operator must confirm in person)</Label>
-        <Input
-          value={(s.verification_needed ?? []).join(", ")}
-          placeholder="size, brand, authenticity, measurements…"
-          onChange={(e) =>
-            update(
-              "verification_needed",
-              e.target.value.split(",").map((t) => t.trim()).filter(Boolean),
-            )
-          }
-        />
-        <div className="flex flex-wrap gap-1">
-          {(s.verification_needed ?? []).map((t, i) => (
-            <Badge key={i} variant="outline" className="text-[10px]">
-              ⚠ {t}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
       {s.confidence_notes && (
         <div className="rounded-md border border-dashed bg-muted/40 p-3 text-sm text-muted-foreground">
           <span className="font-medium text-foreground">AI notes: </span>
@@ -462,61 +445,13 @@ function SuggestionEditor({
         </div>
       )}
 
-      {(s.possible_brand || s.possible_model || s.visual_clues?.length || s.search_keywords?.length || s.recommended_research_queries?.length || s.price_confidence === "manual_required" || s.potentially_valuable) && (
-        <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-sm space-y-2">
-          <div className="font-medium text-foreground flex items-center gap-1">
-            <Search className="h-3.5 w-3.5" /> Research clues (hypotheses — verify manually)
-          </div>
-          {(s.possible_brand || s.possible_model) && (
-            <div>
-              <span className="text-muted-foreground">Possibly: </span>
-              {[s.possible_brand, s.possible_model].filter(Boolean).join(" — ")}
-            </div>
-          )}
-          {s.visual_clues?.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {s.visual_clues.map((c, i) => (
-                <Badge key={i} variant="secondary" className="text-[10px]">{c}</Badge>
-              ))}
-            </div>
-          )}
-          {s.search_keywords?.length > 0 && (
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Search keywords</div>
-              <div className="flex flex-wrap gap-1">
-                {s.search_keywords.map((k, i) => (
-                  <Badge key={i} variant="outline" className="text-[10px]">{k}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
-          {s.recommended_research_queries?.length > 0 && (
-            <div>
-              <div className="text-xs text-muted-foreground mb-1">Recommended research queries</div>
-              <ul className="list-disc pl-5 space-y-0.5">
-                {s.recommended_research_queries.map((q, i) => (
-                  <li key={i} className="text-sm">{q}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Badge variant="outline" className="text-[10px]">
-              Price confidence: {s.price_confidence}
-            </Badge>
-            {s.potentially_valuable && (
-              <Badge variant="destructive" className="text-[10px] flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" /> Potentially valuable — research before pricing
-              </Badge>
-            )}
-            {s.price_confidence === "manual_required" && (
-              <Badge variant="destructive" className="text-[10px]">
-                Manual pricing recommended
-              </Badge>
-            )}
-          </div>
+      {s.price_confidence === "manual_required" && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>This item looks potentially valuable. Use <b>Research this item</b> before pricing.</span>
         </div>
       )}
+
 
       <div className="flex gap-2">
         <Button onClick={apply} disabled={saving}>
