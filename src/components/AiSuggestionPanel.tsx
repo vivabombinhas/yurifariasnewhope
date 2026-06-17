@@ -201,10 +201,11 @@ export function AiSuggestionPanel({
           </p>
         ) : !suggestion ? (
           <p className="text-sm text-muted-foreground">
-            Click <b>Analyze with AI</b> for a listing draft, or <b>Improve with Research</b>
-            {" "}to surface identification clues and search queries before pricing.
-            Nothing is saved to the product until you click <b>Apply to product</b>.
+            Click <b>Generate listing</b> for a ready-to-publish marketplace draft.
+            Only use <b>Research this item</b> for hard-to-identify or potentially valuable items.
+            Nothing is saved until you click <b>Apply to product</b>.
           </p>
+
         ) : (
           <SuggestionEditor
             product={product}
