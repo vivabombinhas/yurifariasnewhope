@@ -484,7 +484,7 @@ ${data.description || "(empty)"}
 CATEGORY: ${data.category || "(unspecified)"}
 CONDITION: ${data.condition || "(unspecified)"}
 
-Return improved title and description as JSON.`;
+Return exactly 3 distinct variations (Keyword-focused, Buyer-benefit, Concise) as JSON.`;
 
     const { parsed } = await callGateway<AiImprovedListing>(
       apiKey,
@@ -495,8 +495,13 @@ Return improved title and description as JSON.`;
       imageUrls,
     );
 
-    return {
-      title: (parsed.title ?? "").trim(),
-      description: (parsed.description ?? "").trim(),
-    };
+    const variations = (Array.isArray(parsed.variations) ? parsed.variations : [])
+      .slice(0, 3)
+      .map((v) => ({
+        label: (v.label ?? "").trim() || "Variation",
+        title: (v.title ?? "").trim(),
+        description: (v.description ?? "").trim(),
+      }));
+
+    return { variations };
   });
