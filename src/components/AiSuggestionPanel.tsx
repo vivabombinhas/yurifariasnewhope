@@ -175,7 +175,8 @@ export function AiSuggestionPanel({
             aria-busy={run.isPending}
           >
             <Wand2 className="h-4 w-4 mr-1" />
-            {run.isPending ? "Analyzing…" : suggestion ? "Re-analyze" : "Analyze with AI"}
+            {run.isPending ? "Generating…" : suggestion ? "Regenerate listing" : "Generate listing"}
+
           </Button>
         </div>
       </CardHeader>
