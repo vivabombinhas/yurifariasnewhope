@@ -14,16 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ListChecks, Save } from "lucide-react";
+import { ListChecks, Save, Sparkles } from "lucide-react";
 import {
   fetchEbayAspectsForCategory,
   saveEbayAspects,
   type EbayAspectDTO,
 } from "@/lib/marketplaces/ebay/taxonomy.functions";
+import { autofillEbayAspects } from "@/lib/marketplaces/ebay/autofill.functions";
 
 interface Props {
   product: {
     id: string;
+    title?: string | null;
     ebay_category_id?: string | null;
     ebay_category_name?: string | null;
     ebay_aspects?: Record<string, string[]> | null | unknown;
@@ -44,6 +46,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchEbayAspectsForCategory);
   const saveFn = useServerFn(saveEbayAspects);
+  const autofillFn = useServerFn(autofillEbayAspects);
 
   const categoryId = product.ebay_category_id ?? null;
 
@@ -122,6 +125,48 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     onError: (e: any) => toast.error(e?.message ?? "Failed to save aspects"),
   });
 
+  const autofillMut = useMutation({
+    mutationFn: async () => {
+      if (!categoryId) throw new Error("Pick a category first");
+      const allAspects = aspectsQ.data?.aspects ?? [];
+      if (!allAspects.length) throw new Error("Aspects not loaded yet");
+      return autofillFn({
+        data: {
+          productId: product.id,
+          categoryId,
+          categoryName: product.ebay_category_name ?? undefined,
+          aspects: allAspects.map((a) => ({
+            name: a.name,
+            required: a.required,
+            mode: a.mode,
+            cardinality: a.cardinality,
+            dataType: a.dataType,
+            values: a.values,
+          })),
+        },
+      });
+    },
+    onSuccess: (res) => {
+      const kept = res.suggestions ?? [];
+      if (!kept.length) {
+        toast.info("AI couldn't confidently fill any aspect — please fill manually.");
+        return;
+      }
+      setValues((prev) => {
+        const next = { ...prev };
+        for (const s of kept) {
+          // only fill if currently empty — never overwrite operator input
+          const cur = next[s.name] ?? [];
+          if (cur.some((v) => v.trim().length > 0)) continue;
+          next[s.name] = s.values;
+        }
+        return next;
+      });
+      toast.success(`AI filled ${kept.length} aspect(s) — review before saving.`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Autofill failed"),
+  });
+
 
   if (!categoryId) {
     return (
@@ -150,6 +195,18 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
         </CardTitle>
         <div className="flex items-center gap-2">
           <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => autofillMut.mutate()}
+            disabled={
+              autofillMut.isPending || aspectsQ.isLoading || !aspectsQ.data?.aspects.length
+            }
+            title="Use AI to fill aspects from product title/description. Only fills empty fields."
+          >
+            <Sparkles className="h-4 w-4 mr-1" />
+            {autofillMut.isPending ? "Filling…" : "Auto-fill with AI"}
+          </Button>
           <Button
             size="sm"
             onClick={() => saveMut.mutate()}

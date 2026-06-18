@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, Tag } from "lucide-react";
+import { AlertTriangle, Search, Tag } from "lucide-react";
 import {
   fetchEbayCategorySuggestions,
   saveEbayCategory,
@@ -21,6 +21,35 @@ interface Props {
     ebay_category_confidence?: number | null;
   };
   onSaved?: () => void;
+}
+
+// Heuristic: guess product "kind" from title and check the eBay category name mentions it.
+const KIND_KEYWORDS: Array<{ kind: string; words: string[]; categoryHints: string[] }> = [
+  { kind: "sneakers/shoes", words: ["sneaker", "shoe", "shoes", "boot", "boots", "jordan", "nike", "adidas", "yeezy", "air max", "running"], categoryHints: ["shoe", "footwear", "sneaker", "athletic"] },
+  { kind: "clothing", words: ["shirt", "tee", "hoodie", "jacket", "pants", "jeans", "dress", "coat", "sweater"], categoryHints: ["cloth", "shirt", "apparel", "outerwear", "pants", "dress"] },
+  { kind: "watch", words: ["watch", "rolex", "seiko", "casio", "g-shock"], categoryHints: ["watch"] },
+  { kind: "handbag/bag", words: ["handbag", "purse", "backpack", "bag", "tote", "wallet"], categoryHints: ["bag", "handbag", "wallet", "luggage"] },
+  { kind: "electronics", words: ["iphone", "samsung", "ipad", "laptop", "macbook", "playstation", "xbox", "nintendo", "camera", "lens", "headphone"], categoryHints: ["electronic", "phone", "computer", "console", "camera", "audio"] },
+  { kind: "jewelry", words: ["ring", "necklace", "bracelet", "earring", "gold", "silver", "diamond"], categoryHints: ["jewel", "ring", "necklace", "bracelet"] },
+  { kind: "toy/collectible", words: ["lego", "funko", "action figure", "pokemon", "card", "trading card"], categoryHints: ["toy", "collectible", "card", "game"] },
+];
+
+export function detectCategoryMismatch(
+  title: string | null | undefined,
+  categoryName: string | null | undefined,
+): { productKind: string } | null {
+  const t = (title ?? "").toLowerCase();
+  const c = (categoryName ?? "").toLowerCase();
+  if (!t || !c) return null;
+  for (const k of KIND_KEYWORDS) {
+    if (k.words.some((w) => t.includes(w))) {
+      if (!k.categoryHints.some((h) => c.includes(h))) {
+        return { productKind: k.kind };
+      }
+      return null; // matches OK
+    }
+  }
+  return null;
 }
 
 export function EbayCategoryPanel({ product, onSaved }: Props) {
@@ -93,6 +122,24 @@ export function EbayCategoryPanel({ product, onSaved }: Props) {
             <div className="text-muted-foreground italic mt-1">Not set</div>
           )}
         </div>
+
+        {(() => {
+          const mismatch = detectCategoryMismatch(product.title, product.ebay_category_name);
+          if (!mismatch) return null;
+          return (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium">This eBay category may not match this product.</div>
+                <div className="text-xs">
+                  Title looks like <b>{mismatch.productKind}</b> but selected category is{" "}
+                  <b>{product.ebay_category_name}</b>. Click <b>Find eBay Categories</b> to pick a better one.
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
 
         {suggestions && (
           <div>
