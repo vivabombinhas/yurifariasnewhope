@@ -10,8 +10,18 @@ export const EBAY_SCOPES = [
   "https://api.ebay.com/oauth/api_scope",
   "https://api.ebay.com/oauth/api_scope/sell.inventory",
   "https://api.ebay.com/oauth/api_scope/sell.account.readonly",
+  "https://api.ebay.com/oauth/api_scope/sell.account",
   "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly",
   "https://api.ebay.com/oauth/api_scope/commerce.identity.readonly",
+];
+
+/**
+ * Scopes considered REQUIRED for the app to fully function (write policies, etc).
+ * Used by the UI to detect stale connections that need reconnect.
+ */
+export const EBAY_REQUIRED_SCOPES = [
+  "https://api.ebay.com/oauth/api_scope/sell.inventory",
+  "https://api.ebay.com/oauth/api_scope/sell.account",
 ];
 
 export interface EbayConfig {

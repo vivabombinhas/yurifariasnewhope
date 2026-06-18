@@ -72,6 +72,15 @@ export function MarketplaceConnections() {
         ? "destructive"
         : "secondary";
 
+  const REQUIRED_SCOPES = [
+    "https://api.ebay.com/oauth/api_scope/sell.inventory",
+    "https://api.ebay.com/oauth/api_scope/sell.account",
+  ];
+  const missingScopes = data?.connected
+    ? REQUIRED_SCOPES.filter((s) => !(data.scopes ?? []).includes(s))
+    : [];
+  const needsReconnect = missingScopes.length > 0;
+
   return (
     <Card>
       <CardHeader>
@@ -107,20 +116,33 @@ export function MarketplaceConnections() {
                 )}
               </div>
             )}
+            {needsReconnect && (
+              <div className="text-xs text-destructive mt-2">
+                Reconnect eBay required — missing scope{missingScopes.length > 1 ? "s" : ""}:{" "}
+                {missingScopes.map((s) => s.split("/").pop()).join(", ")}
+              </div>
+            )}
             {status === "error" && data?.errorMessage && (
               <div className="text-xs text-destructive">{data.errorMessage}</div>
             )}
           </div>
           <div className="flex gap-2 shrink-0">
             {data?.connected ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onDisconnect}
-                disabled={busy}
-              >
-                Disconnect
-              </Button>
+              <>
+                {needsReconnect && (
+                  <Button size="sm" onClick={onConnect} disabled={busy}>
+                    Reconnect eBay
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onDisconnect}
+                  disabled={busy}
+                >
+                  Disconnect
+                </Button>
+              </>
             ) : (
               <Button size="sm" onClick={onConnect} disabled={busy}>
                 Connect eBay
