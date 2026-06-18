@@ -9,6 +9,8 @@ import {
   getEbaySellerSetup,
   createEbaySellerResource,
   syncEbayOfferWithSellerSetup,
+  getEbayOptedInPrograms,
+  optInEbayBusinessPolicies,
 } from "@/lib/marketplaces/ebay/seller-setup.functions";
 
 interface Props {
@@ -29,8 +31,33 @@ export function EbaySellerSetupPanel({ productId }: Props) {
   const getFn = useServerFn(getEbaySellerSetup);
   const createFn = useServerFn(createEbaySellerResource);
   const syncFn = useServerFn(syncEbayOfferWithSellerSetup);
+  const getOptInFn = useServerFn(getEbayOptedInPrograms);
+  const optInFn = useServerFn(optInEbayBusinessPolicies);
 
   const [errors, setErrors] = useState<Partial<Record<ResourceKey, string>>>({});
+  const [optInError, setOptInError] = useState<{ message: string; raw?: any } | null>(null);
+
+  const optInQuery = useQuery({
+    queryKey: ["ebay-opt-in-programs"],
+    queryFn: () => getOptInFn(),
+    staleTime: 30_000,
+  });
+
+  const optInMut = useMutation({
+    mutationFn: () => optInFn(),
+    onSuccess: (res) => {
+      if (res.ok) {
+        setOptInError(null);
+        qc.setQueryData(["ebay-opt-in-programs"], res);
+        qc.invalidateQueries({ queryKey: ["ebay-seller-setup"] });
+      } else {
+        setOptInError({ message: res.errorMessage, raw: (res as any).raw });
+      }
+    },
+    onError: (err: any) => {
+      setOptInError({ message: err?.message ?? "Request failed" });
+    },
+  });
 
   const query = useQuery({
     queryKey: ["ebay-seller-setup"],
@@ -99,6 +126,57 @@ export function EbaySellerSetupPanel({ productId }: Props) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {error && <p className="text-destructive break-words">{error}</p>}
+
+        {/* Business Policies opt-in */}
+        <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-start gap-2">
+              {optInQuery.data?.ok && optInQuery.data.optedIn ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+              )}
+              <div>
+                <div className="font-medium">Business Policies opt-in</div>
+                <div className="text-xs text-muted-foreground font-mono break-all">
+                  {optInQuery.isLoading
+                    ? "Checking…"
+                    : optInQuery.data?.ok
+                    ? optInQuery.data.optedIn
+                      ? `Opted in · ${optInQuery.data.programs.join(", ") || "SELLING_POLICY_MANAGEMENT"}`
+                      : `Not opted in · programs: ${optInQuery.data.programs.join(", ") || "(none)"}`
+                    : optInQuery.data && !optInQuery.data.ok
+                    ? optInQuery.data.errorMessage
+                    : "—"}
+                </div>
+              </div>
+            </div>
+            {optInQuery.data?.ok && !optInQuery.data.optedIn && (
+              <Button
+                size="sm"
+                variant="default"
+                disabled={optInMut.isPending}
+                onClick={() => optInMut.mutate()}
+              >
+                {optInMut.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Enable Business Policies
+              </Button>
+            )}
+          </div>
+          {optInError && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 px-2 py-1.5 text-xs text-destructive space-y-1">
+              <div className="break-words">{optInError.message}</div>
+              {optInError.raw !== undefined && (
+                <pre className="text-[10px] whitespace-pre-wrap break-all bg-background/50 p-1.5 rounded">
+                  {typeof optInError.raw === "string"
+                    ? optInError.raw
+                    : JSON.stringify(optInError.raw, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+
         {syncMut.data && !syncMut.data.ok && (
           <p className="text-destructive break-words">{syncMut.data.errorMessage}</p>
         )}

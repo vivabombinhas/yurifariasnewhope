@@ -71,3 +71,41 @@ export const syncEbayOfferWithSellerSetup = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: e?.message ?? String(e) };
     }
   });
+
+export const getEbayOptedInPrograms = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<
+    | { ok: true; optedIn: boolean; programs: string[]; raw: any }
+    | { ok: false; errorMessage: string }
+  > => {
+    try {
+      const { getOptedInPrograms } = await import("./seller-setup.server");
+      const r = await getOptedInPrograms();
+      return { ok: true, optedIn: r.optedIn, programs: r.programs, raw: r.raw };
+    } catch (e: any) {
+      return { ok: false, errorMessage: e?.message ?? String(e) };
+    }
+  });
+
+export const optInEbayBusinessPolicies = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async (): Promise<
+    | { ok: true; optedIn: boolean; programs: string[]; raw: any }
+    | { ok: false; errorMessage: string; raw?: any }
+  > => {
+    try {
+      const mod = await import("./seller-setup.server");
+      const result = await mod.optInToBusinessPolicies();
+      if (!result.ok) {
+        return {
+          ok: false,
+          errorMessage: `Opt-in failed (HTTP ${result.status})`,
+          raw: result.raw,
+        };
+      }
+      const status = await mod.getOptedInPrograms();
+      return { ok: true, optedIn: status.optedIn, programs: status.programs, raw: status.raw };
+    } catch (e: any) {
+      return { ok: false, errorMessage: e?.message ?? String(e) };
+    }
+  });
