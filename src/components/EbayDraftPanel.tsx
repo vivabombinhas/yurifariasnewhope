@@ -63,10 +63,21 @@ export function EbayDraftPanel({ productId }: Props) {
     (listing.data?.provider_metadata as { offerId?: string; sku?: string; env?: string }) ??
     null;
   const isDraft = listing.data?.status === "draft" && !!meta?.offerId;
+  const isActive = listing.data?.status === "active";
   const persistedListingError =
     !createMut.isPending && !createMut.data && !createMut.error
       ? listing.data?.error_message
       : null;
+
+  const handleCreate = () => {
+    if (isActive) {
+      const ok = window.confirm(
+        "This listing is already ACTIVE on eBay. Recreating the draft will overwrite the existing inventory item / offer. Continue?",
+      );
+      if (!ok) return;
+    }
+    createMut.mutate();
+  };
 
   return (
     <Card>
@@ -76,9 +87,11 @@ export function EbayDraftPanel({ productId }: Props) {
         </CardTitle>
         <div className="flex items-center gap-2">
           {isDraft && <Badge variant="secondary">Draft created</Badge>}
+          {isActive && <Badge variant="default">Active</Badge>}
           <Button
             size="sm"
-            onClick={() => createMut.mutate()}
+            variant={isActive ? "outline" : "default"}
+            onClick={handleCreate}
             disabled={!ready || createMut.isPending}
             title={!ready ? "Pass eBay Readiness checks first" : undefined}
           >
@@ -87,7 +100,7 @@ export function EbayDraftPanel({ productId }: Props) {
             ) : (
               <FileText className="h-4 w-4 mr-1" />
             )}
-            {isDraft ? "Recreate eBay Draft" : "Create eBay Draft"}
+            {isActive ? "Recreate Draft (overwrite active)" : isDraft ? "Recreate eBay Draft" : "Create eBay Draft"}
           </Button>
         </div>
       </CardHeader>
