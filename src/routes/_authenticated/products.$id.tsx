@@ -198,6 +198,8 @@ function ProductDetail() {
 
       <EbayAspectsPanel product={p as any} onSaved={() => product.refetch()} />
 
+      <EbayReadinessPanel productId={id} />
+
       <PublishPanel
         productId={id}
         rows={(listings.data ?? []) as any}
