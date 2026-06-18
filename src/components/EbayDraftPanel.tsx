@@ -112,7 +112,25 @@ export function EbayDraftPanel({ productId }: Props) {
             </p>
           </div>
         )}
-        {listing.data?.error_message && (
+        {createMut.isPending && (
+          <p className="text-muted-foreground">Creating draft…</p>
+        )}
+        {createMut.data?.ok && (
+          <p className="text-emerald-600 dark:text-emerald-400">
+            Draft created: <span className="font-mono">{createMut.data.offerId}</span>
+          </p>
+        )}
+        {createMut.data && !createMut.data.ok && (
+          <p className="text-destructive break-words">
+            Draft failed: {createMut.data.errorMessage}
+          </p>
+        )}
+        {createMut.error && (
+          <p className="text-destructive break-words">
+            Draft failed: {(createMut.error as any)?.message ?? String(createMut.error)}
+          </p>
+        )}
+        {listing.data?.error_message && !createMut.isPending && (
           <p className="text-destructive break-words">
             {listing.data.error_message}
           </p>
