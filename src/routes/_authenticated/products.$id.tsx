@@ -28,10 +28,7 @@ import { toast } from "sonner";
 import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 import { PublishPanel } from "@/components/PublishPanel";
-import { EbayCategoryPanel } from "@/components/EbayCategoryPanel";
-import { EbayAspectsPanel } from "@/components/EbayAspectsPanel";
-import { EbayReadinessPanel } from "@/components/EbayReadinessPanel";
-import { EbayDraftPanel } from "@/components/EbayDraftPanel";
+import { MarketplacePublishingPanel } from "@/components/MarketplacePublishingPanel";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
@@ -195,19 +192,18 @@ function ProductDetail() {
 
       <EditForm product={p} onSaved={() => product.refetch()} />
 
-      <EbayCategoryPanel product={p} onSaved={() => product.refetch()} />
-
-      <EbayAspectsPanel product={p as any} onSaved={() => product.refetch()} />
-
-      <EbayReadinessPanel productId={id} />
-
-      <EbayDraftPanel productId={id} />
+      <MarketplacePublishingPanel
+        productId={id}
+        product={p}
+        onSaved={() => product.refetch()}
+      />
 
       <PublishPanel
         productId={id}
         rows={(listings.data ?? []) as any}
         onChange={() => listings.refetch()}
       />
+
 
       <ListingsSection productId={id} rows={listings.data ?? []} onChange={() => listings.refetch()} />
 
