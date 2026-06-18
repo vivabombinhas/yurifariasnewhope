@@ -29,7 +29,7 @@ export function EbaySellerSetupPanel({ productId }: Props) {
 
   const query = useQuery({
     queryKey: ["ebay-seller-setup"],
-    queryFn: () => getFn({ data: {} }),
+    queryFn: () => getFn(),
     staleTime: 30_000,
   });
 
