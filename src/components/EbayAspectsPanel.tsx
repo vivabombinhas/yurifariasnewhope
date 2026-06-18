@@ -152,18 +152,25 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
         toast.info("AI couldn't confidently fill any aspect — please fill manually.");
         return;
       }
+      let applied = 0;
       setValues((prev) => {
         const next = { ...prev };
         for (const s of kept) {
-          // only fill if currently empty — never overwrite operator input
           const cur = next[s.name] ?? [];
           if (cur.some((v) => v.trim().length > 0)) continue;
           next[s.name] = s.values;
+          applied++;
         }
         return next;
       });
-      toast.success(`AI filled ${kept.length} aspect(s) — review before saving.`);
+      const parts: string[] = [];
+      if (res.fromProduct) parts.push(`${res.fromProduct} from product AI data`);
+      if (res.fromAi) parts.push(`${res.fromAi} from AI`);
+      toast.success(
+        `Auto-filled ${applied} aspect(s)${parts.length ? ` (${parts.join(", ")})` : ""}. Please review before saving.`,
+      );
     },
+
     onError: (e: any) => toast.error(e?.message ?? "Autofill failed"),
   });
 
