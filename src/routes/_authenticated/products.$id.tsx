@@ -201,6 +201,8 @@ function ProductDetail() {
 
       <EbayReadinessPanel productId={id} />
 
+      <EbayDraftPanel productId={id} />
+
       <PublishPanel
         productId={id}
         rows={(listings.data ?? []) as any}
