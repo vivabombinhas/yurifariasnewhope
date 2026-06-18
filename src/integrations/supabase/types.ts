@@ -403,6 +403,62 @@ export type Database = {
           },
         ]
       }
+      publishing_jobs: {
+        Row: {
+          action: string
+          attempt_count: number
+          created_at: string
+          created_by: string | null
+          id: string
+          last_error: string | null
+          marketplace: string
+          payload: Json | null
+          processed_at: string | null
+          product_id: string
+          result: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          attempt_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          marketplace: string
+          payload?: Json | null
+          processed_at?: string | null
+          product_id: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          attempt_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_error?: string | null
+          marketplace?: string
+          payload?: Json | null
+          processed_at?: string | null
+          product_id?: string
+          result?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
