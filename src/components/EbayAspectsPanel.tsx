@@ -239,9 +239,14 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           </p>
         )}
 
+        {(() => {
+          const requiredAspects = aspects.filter((a) => a.required);
+          const otherAspects = aspects.filter((a) => !a.required);
+          const requiredTotal = requiredAspects.length;
+          const requiredDone = requiredTotal - missingRequired.length;
+          const recommendedCount = otherAspects.filter((a) => a.mode === "RECOMMENDED").length;
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {aspects.map((a) => {
+          const renderAspect = (a: EbayAspectDTO) => {
             const current = values[a.name] ?? [];
             const single = a.cardinality === "SINGLE";
             const isMissing = a.required && !current.some((v) => v.trim().length > 0);
@@ -267,10 +272,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                   {!single && <Badge variant="outline">Multi</Badge>}
                 </div>
                 {useDropdown ? (
-                  <Select
-                    value={current[0] ?? ""}
-                    onValueChange={(v) => setSingle(v)}
-                  >
+                  <Select value={current[0] ?? ""} onValueChange={(v) => setSingle(v)}>
                     <SelectTrigger
                       aria-invalid={isMissing}
                       className={isMissing ? "border-destructive" : undefined}
@@ -303,10 +305,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                     className={isMissing ? "border-destructive" : undefined}
                   />
                 )}
-                {isMissing && (
-                  <p className="text-xs text-destructive">Required</p>
-                )}
-
+                {isMissing && <p className="text-xs text-destructive">Required</p>}
                 {hasOptions && !useDropdown && (
                   <datalist id={`aspect-${a.name}`}>
                     {a.values.map((v) => (
@@ -316,8 +315,54 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                 )}
               </div>
             );
-          })}
-        </div>
+          };
+
+          return (
+            <>
+              {requiredAspects.length > 0 && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {requiredAspects.map(renderAspect)}
+                </div>
+              )}
+
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs flex items-center justify-between">
+                <span>
+                  Required completed:{" "}
+                  <strong
+                    className={
+                      requiredTotal === 0 || requiredDone === requiredTotal
+                        ? "text-foreground"
+                        : "text-destructive"
+                    }
+                  >
+                    {requiredDone}/{requiredTotal}
+                  </strong>
+                </span>
+                <span className="text-muted-foreground">
+                  Recommended available: {recommendedCount}
+                </span>
+              </div>
+
+              {otherAspects.length > 0 && (
+                <details className="group rounded-md border">
+                  <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium flex items-center justify-between">
+                    <span>
+                      Show {otherAspects.length} recommended attribute
+                      {otherAspects.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="text-xs text-muted-foreground group-open:hidden">Expand</span>
+                    <span className="text-xs text-muted-foreground hidden group-open:inline">
+                      Collapse
+                    </span>
+                  </summary>
+                  <div className="grid gap-3 sm:grid-cols-2 p-3 pt-0">
+                    {otherAspects.map(renderAspect)}
+                  </div>
+                </details>
+              )}
+            </>
+          );
+        })()}
       </CardContent>
     </Card>
   );
