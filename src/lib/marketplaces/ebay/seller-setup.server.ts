@@ -286,3 +286,45 @@ export async function syncOfferWithSellerSetup(offerId: string): Promise<{
     },
   };
 }
+
+// ===== Business Policies opt-in (SELLING_POLICY_MANAGEMENT) =====
+
+export interface OptInStatus {
+  optedIn: boolean;
+  programs: string[];
+  raw: unknown;
+}
+
+export async function getOptedInPrograms(): Promise<OptInStatus> {
+  const env = await ensureSandbox();
+  const token = await getValidEbayAccessToken();
+  const res = await ebayFetch(env, "GET", `/sell/account/v1/program/get_opted_in_programs`, token);
+  if (!res.ok) {
+    throw new Error(
+      `getOptedInPrograms: ${ebayErrorMessage(res.status, res.json, res.text)} :: ${JSON.stringify(res.json ?? res.text)}`,
+    );
+  }
+  const programs: string[] = (res.json?.programs ?? []).map((p: any) => p.programType);
+  return {
+    optedIn: programs.includes("SELLING_POLICY_MANAGEMENT"),
+    programs,
+    raw: res.json,
+  };
+}
+
+export async function optInToBusinessPolicies(): Promise<{ ok: true; raw: unknown } | { ok: false; status: number; raw: unknown }> {
+  const env = await ensureSandbox();
+  const token = await getValidEbayAccessToken();
+  const res = await ebayFetch(
+    env,
+    "POST",
+    `/sell/account/v1/program/opt_in`,
+    token,
+    { programType: "SELLING_POLICY_MANAGEMENT" },
+  );
+  // 200/204 ok; some accounts return 409 if already opted in
+  if (!res.ok && res.status !== 409) {
+    return { ok: false, status: res.status, raw: res.json ?? res.text };
+  }
+  return { ok: true, raw: res.json ?? res.text ?? null };
+}
