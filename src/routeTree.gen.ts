@@ -21,6 +21,7 @@ import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
+import { Route as ApiPublicEbayImagePhotoIdRouteImport } from './routes/api/public/ebay/image.$photoId'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -83,6 +84,12 @@ const ApiPublicEbayCallbackRoute = ApiPublicEbayCallbackRouteImport.update({
   path: '/api/public/ebay/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicEbayImagePhotoIdRoute =
+  ApiPublicEbayImagePhotoIdRouteImport.update({
+    id: '/api/public/ebay/image/$photoId',
+    path: '/api/public/ebay/image/$photoId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products/': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
+  '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -108,6 +116,7 @@ export interface FileRoutesByTo {
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
+  '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -123,6 +132,7 @@ export interface FileRoutesById {
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
+  '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -138,6 +148,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/'
     | '/api/public/ebay/callback'
+    | '/api/public/ebay/image/$photoId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products'
     | '/api/public/ebay/callback'
+    | '/api/public/ebay/image/$photoId'
   id:
     | '__root__'
     | '/_authenticated'
@@ -164,12 +176,14 @@ export interface FileRouteTypes {
     | '/_authenticated/products/new'
     | '/_authenticated/products/'
     | '/api/public/ebay/callback'
+    | '/api/public/ebay/image/$photoId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicEbayCallbackRoute: typeof ApiPublicEbayCallbackRoute
+  ApiPublicEbayImagePhotoIdRoute: typeof ApiPublicEbayImagePhotoIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -258,6 +272,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicEbayCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/ebay/image/$photoId': {
+      id: '/api/public/ebay/image/$photoId'
+      path: '/api/public/ebay/image/$photoId'
+      fullPath: '/api/public/ebay/image/$photoId'
+      preLoaderRoute: typeof ApiPublicEbayImagePhotoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -303,6 +324,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiPublicEbayCallbackRoute: ApiPublicEbayCallbackRoute,
+  ApiPublicEbayImagePhotoIdRoute: ApiPublicEbayImagePhotoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
