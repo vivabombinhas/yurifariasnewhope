@@ -180,6 +180,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           {aspects.map((a) => {
             const current = values[a.name] ?? [];
             const single = a.cardinality === "SINGLE";
+            const isMissing = a.required && !current.some((v) => v.trim().length > 0);
             const setSingle = (v: string) =>
               setValues((prev) => ({ ...prev, [a.name]: v ? [v] : [] }));
             const setMulti = (v: string) =>
