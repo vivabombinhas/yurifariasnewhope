@@ -91,9 +91,22 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     });
   }, [aspectsQ.data]);
 
+  const missingRequired = useMemo(
+    () =>
+      (aspectsQ.data?.aspects ?? [])
+        .filter((a) => a.required)
+        .filter((a) => !(values[a.name]?.some((v) => v.trim().length > 0)))
+        .map((a) => a.name),
+    [aspectsQ.data, values],
+  );
+
   const saveMut = useMutation({
     mutationFn: async () => {
-      // strip empty
+      if (missingRequired.length) {
+        throw new Error(
+          `Fill required item specifics: ${missingRequired.join(", ")}`,
+        );
+      }
       const cleaned: Record<string, string[]> = {};
       for (const [k, v] of Object.entries(values)) {
         const filtered = v.map((x) => x.trim()).filter(Boolean);
@@ -108,6 +121,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to save aspects"),
   });
+
 
   if (!categoryId) {
     return (
@@ -126,9 +140,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     );
   }
 
-  const requiredMissing = aspects.some(
-    (a) => a.required && !(values[a.name]?.some((v) => v.trim().length > 0)),
-  );
+  const requiredMissing = missingRequired.length > 0;
 
   return (
     <Card>
@@ -141,7 +153,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           <Button
             size="sm"
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || aspectsQ.isLoading}
+            disabled={saveMut.isPending || aspectsQ.isLoading || requiredMissing}
           >
             <Save className="h-4 w-4 mr-1" />
             {saveMut.isPending ? "Saving…" : "Save"}
@@ -159,14 +171,16 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
         )}
         {requiredMissing && (
           <p className="text-xs text-destructive">
-            Some required specifics are not filled in.
+            Missing required: {missingRequired.join(", ")}
           </p>
         )}
+
 
         <div className="grid gap-3 sm:grid-cols-2">
           {aspects.map((a) => {
             const current = values[a.name] ?? [];
             const single = a.cardinality === "SINGLE";
+            const isMissing = a.required && !current.some((v) => v.trim().length > 0);
             const setSingle = (v: string) =>
               setValues((prev) => ({ ...prev, [a.name]: v ? [v] : [] }));
             const setMulti = (v: string) =>
@@ -193,7 +207,10 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                     value={current[0] ?? ""}
                     onValueChange={(v) => setSingle(v)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger
+                      aria-invalid={isMissing}
+                      className={isMissing ? "border-destructive" : undefined}
+                    >
                       <SelectValue placeholder="Select…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -210,14 +227,22 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                     value={current[0] ?? ""}
                     onChange={(e) => setSingle(e.target.value)}
                     placeholder={hasOptions ? a.values[0] : ""}
+                    aria-invalid={isMissing}
+                    className={isMissing ? "border-destructive" : undefined}
                   />
                 ) : (
                   <Input
                     value={current.join(", ")}
                     onChange={(e) => setMulti(e.target.value)}
                     placeholder="Comma-separated"
+                    aria-invalid={isMissing}
+                    className={isMissing ? "border-destructive" : undefined}
                   />
                 )}
+                {isMissing && (
+                  <p className="text-xs text-destructive">Required</p>
+                )}
+
                 {hasOptions && !useDropdown && (
                   <datalist id={`aspect-${a.name}`}>
                     {a.values.map((v) => (
