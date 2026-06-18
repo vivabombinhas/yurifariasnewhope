@@ -46,6 +46,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchEbayAspectsForCategory);
   const saveFn = useServerFn(saveEbayAspects);
+  const autofillFn = useServerFn(autofillEbayAspects);
 
   const categoryId = product.ebay_category_id ?? null;
 
