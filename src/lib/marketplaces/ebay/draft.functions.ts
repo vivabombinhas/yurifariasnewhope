@@ -140,6 +140,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       return { ok: true, offerId: result.offerId, sku: result.sku };
     } catch (e: any) {
       const msg = e?.message ?? String(e);
+      console.error("[createEbayDraft] failed", { productId: data.productId, error: msg });
       await context.supabase
         .from("publishing_jobs")
         .update({
