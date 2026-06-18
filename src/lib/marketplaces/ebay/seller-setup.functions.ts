@@ -75,7 +75,7 @@ export const syncEbayOfferWithSellerSetup = createServerFn({ method: "POST" })
 export const getEbayOptedInPrograms = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<
-    | { ok: true; optedIn: boolean; programs: string[]; raw: unknown }
+    | { ok: true; optedIn: boolean; programs: string[]; raw: any }
     | { ok: false; errorMessage: string }
   > => {
     try {
@@ -90,8 +90,8 @@ export const getEbayOptedInPrograms = createServerFn({ method: "POST" })
 export const optInEbayBusinessPolicies = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async (): Promise<
-    | { ok: true; optedIn: boolean; programs: string[]; raw: unknown }
-    | { ok: false; errorMessage: string; raw?: unknown }
+    | { ok: true; optedIn: boolean; programs: string[]; raw: any }
+    | { ok: false; errorMessage: string; raw?: any }
   > => {
     try {
       const mod = await import("./seller-setup.server");
