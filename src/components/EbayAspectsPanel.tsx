@@ -14,16 +14,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ListChecks, Save } from "lucide-react";
+import { ListChecks, Save, Sparkles } from "lucide-react";
 import {
   fetchEbayAspectsForCategory,
   saveEbayAspects,
   type EbayAspectDTO,
 } from "@/lib/marketplaces/ebay/taxonomy.functions";
+import { autofillEbayAspects } from "@/lib/marketplaces/ebay/autofill.functions";
 
 interface Props {
   product: {
     id: string;
+    title?: string | null;
     ebay_category_id?: string | null;
     ebay_category_name?: string | null;
     ebay_aspects?: Record<string, string[]> | null | unknown;
