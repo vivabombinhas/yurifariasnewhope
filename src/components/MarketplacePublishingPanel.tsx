@@ -17,6 +17,7 @@ import { EbayCategoryPanel } from "@/components/EbayCategoryPanel";
 import { EbayAspectsPanel } from "@/components/EbayAspectsPanel";
 import { EbayReadinessPanel } from "@/components/EbayReadinessPanel";
 import { EbayDraftPanel } from "@/components/EbayDraftPanel";
+import { EbayPublishPreflightPanel } from "@/components/EbayPublishPreflightPanel";
 
 interface Props {
   productId: string;
