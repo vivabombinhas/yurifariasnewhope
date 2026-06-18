@@ -197,6 +197,18 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => autofillMut.mutate()}
+            disabled={
+              autofillMut.isPending || aspectsQ.isLoading || !aspectsQ.data?.aspects.length
+            }
+            title="Use AI to fill aspects from product title/description. Only fills empty fields."
+          >
+            <Sparkles className="h-4 w-4 mr-1" />
+            {autofillMut.isPending ? "Filling…" : "Auto-fill with AI"}
+          </Button>
+          <Button
+            size="sm"
             onClick={() => saveMut.mutate()}
             disabled={saveMut.isPending || aspectsQ.isLoading || requiredMissing}
           >
