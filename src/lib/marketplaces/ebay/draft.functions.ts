@@ -48,21 +48,25 @@ export const createEbayDraft = createServerFn({ method: "POST" })
 
     const { data: photos, error: phErr } = await context.supabase
       .from("product_photos")
-      .select("storage_path, position, is_cover")
+      .select("id, storage_path, position, is_cover")
       .eq("product_id", data.productId)
       .order("is_cover", { ascending: false })
       .order("position", { ascending: true });
     if (phErr) throw phErr;
 
-    // Generate signed URLs for photos (private bucket)
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Build short, public, stable proxy URLs (eBay limits: ≤500 chars per URL,
+    // ≤3975 total, ≤12 photos). Signed Supabase URLs blow that budget.
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const reqUrl = new URL(getRequest().url);
+    const origin = `${reqUrl.protocol}//${reqUrl.host}`;
     const imageUrls: string[] = [];
-    for (const ph of photos ?? []) {
-      const { data: signed, error: sErr } = await supabaseAdmin.storage
-        .from("product-photos")
-        .createSignedUrl(ph.storage_path, PHOTO_SIGNED_URL_TTL);
-      if (sErr) continue;
-      if (signed?.signedUrl) imageUrls.push(signed.signedUrl);
+    let totalLen = 0;
+    for (const ph of (photos ?? []).slice(0, EBAY_MAX_PHOTOS)) {
+      const u = `${origin}/api/public/ebay/image/${ph.id}`;
+      if (u.length > EBAY_MAX_URL_LEN) continue;
+      if (totalLen + u.length > EBAY_MAX_TOTAL_LEN) break;
+      imageUrls.push(u);
+      totalLen += u.length;
     }
     if (!imageUrls.length) {
       return { ok: false, errorMessage: "No accessible photos for this product" };
