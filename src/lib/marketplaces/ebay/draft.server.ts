@@ -148,6 +148,7 @@ export async function createEbayDraftInSandbox(
     },
   };
 
+  console.log("[createEbayDraft] calling eBay Offer", { sku: input.sku, categoryId: input.categoryId });
   const offerRes = await ebayFetch(env, "POST", `/sell/inventory/v1/offer`, token, offerBody);
   if (!offerRes.ok) {
     throw new Error(`Offer: ${ebayErrorMessage(offerRes.status, offerRes.json, offerRes.text)}`);
