@@ -92,6 +92,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         aspects: product.ebay_aspects,
         imageUrls,
       });
+      console.log("[createEbayDraft] offer created", { offerId: result.offerId, sku: result.sku });
 
       // Upsert marketplace_listings (ebay, status=draft)
       const { data: existing } = await context.supabase
