@@ -14,7 +14,8 @@ const CONDITION_MAP: Record<string, string> = {
 };
 
 const MARKETPLACE_ID = "EBAY_US";
-const LOCALE = "en_US";
+const LOCALE = "en_US"; // body locale (eBay InventoryItem uses underscore form)
+const HTTP_LOCALE = "en-US"; // HTTP headers require BCP-47 hyphen form
 const CURRENCY = "USD";
 
 function apiHost(env: string) {
@@ -67,8 +68,8 @@ async function ebayFetch(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "Content-Language": LOCALE,
-      "Accept-Language": LOCALE,
+      "Content-Language": HTTP_LOCALE,
+      "Accept-Language": HTTP_LOCALE,
       "X-EBAY-C-MARKETPLACE-ID": MARKETPLACE_ID,
     },
     body: body == null ? undefined : JSON.stringify(body),
