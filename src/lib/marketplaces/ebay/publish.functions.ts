@@ -42,13 +42,19 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       };
 
       if (result.ok) {
+        const listingUrl =
+          env === "production"
+            ? `https://www.ebay.com/itm/${result.listingId}`
+            : `https://www.sandbox.ebay.com/itm/${result.listingId}`;
         newMeta.listingId = result.listingId;
+        newMeta.listingUrl = listingUrl;
         newMeta.publishStatus = "PUBLISHED";
         const { error: upErr } = await context.supabase
           .from("marketplace_listings")
           .update({
             status: "active",
             external_listing_id: result.listingId,
+            listing_url: listingUrl,
             published_at: new Date().toISOString(),
             error_message: null,
             provider_metadata: newMeta,
