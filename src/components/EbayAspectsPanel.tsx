@@ -91,9 +91,22 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     });
   }, [aspectsQ.data]);
 
+  const missingRequired = useMemo(
+    () =>
+      (aspectsQ.data?.aspects ?? [])
+        .filter((a) => a.required)
+        .filter((a) => !(values[a.name]?.some((v) => v.trim().length > 0)))
+        .map((a) => a.name),
+    [aspectsQ.data, values],
+  );
+
   const saveMut = useMutation({
     mutationFn: async () => {
-      // strip empty
+      if (missingRequired.length) {
+        throw new Error(
+          `Fill required item specifics: ${missingRequired.join(", ")}`,
+        );
+      }
       const cleaned: Record<string, string[]> = {};
       for (const [k, v] of Object.entries(values)) {
         const filtered = v.map((x) => x.trim()).filter(Boolean);
@@ -108,6 +121,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to save aspects"),
   });
+
 
   if (!categoryId) {
     return (
