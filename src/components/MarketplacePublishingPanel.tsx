@@ -58,6 +58,7 @@ export function MarketplacePublishingPanel({ productId, product, onSaved }: Prop
                     <EbayAspectsPanel product={product} onSaved={onSaved} />
                     <EbayReadinessPanel productId={productId} />
                     <EbayDraftPanel productId={productId} />
+                    <EbayPublishPreflightPanel productId={productId} />
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground p-3">
