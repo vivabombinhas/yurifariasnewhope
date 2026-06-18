@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS ebay_aspects jsonb NOT NULL DEFAULT '{}'::jsonb;

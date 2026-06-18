@@ -62,3 +62,52 @@ export const saveEbayCategory = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+export interface EbayAspectDTO {
+  name: string;
+  required: boolean;
+  mode: "REQUIRED" | "RECOMMENDED" | "OPTIONAL";
+  cardinality: "SINGLE" | "MULTI";
+  dataType: "STRING" | "NUMBER" | "DATE";
+  selectionMode: "FREE_TEXT" | "SELECTION_ONLY";
+  values: string[];
+}
+
+export const fetchEbayAspectsForCategory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ categoryId: z.string().min(1) }).parse(d),
+  )
+  .handler(async ({ data }): Promise<{ aspects: EbayAspectDTO[] }> => {
+    const { getItemAspectsForCategory } = await import("./taxonomy.server");
+    const aspects = await getItemAspectsForCategory(data.categoryId);
+    console.log("[eBay aspects]", {
+      category_id: data.categoryId,
+      aspects_count: aspects.length,
+    });
+    return { aspects };
+  });
+
+export const saveEbayAspects = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        productId: z.string().uuid(),
+        aspects: z.record(z.string(), z.array(z.string())),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }): Promise<{ ok: true }> => {
+    const { error } = await context.supabase
+      .from("products")
+      .update({ ebay_aspects: data.aspects })
+      .eq("id", data.productId);
+    if (error) throw error;
+    console.log("[eBay aspects]", {
+      product_id: data.productId,
+      saved_keys: Object.keys(data.aspects).length,
+    });
+    return { ok: true };
+  });
+
