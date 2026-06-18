@@ -103,24 +103,29 @@ export const Route = createFileRoute("/api/public/ebay/callback")({
           };
 
           if (existing) {
+            console.log("[ebay/callback] updating existing row", existing.id);
             const { error } = await supabaseAdmin
               .from("marketplace_accounts")
               .update(row)
               .eq("id", existing.id);
             if (error) throw error;
           } else {
+            console.log("[ebay/callback] inserting new row");
             const { error } = await supabaseAdmin
               .from("marketplace_accounts")
               .insert(row);
             if (error) throw error;
           }
+          console.log("[ebay/callback] saved successfully");
 
           return back({ ebay: "connected" });
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
+          console.error("[ebay/callback] FAILED", message, e);
           return back({ ebay: "error", message });
         }
       },
+
     },
   },
 });
