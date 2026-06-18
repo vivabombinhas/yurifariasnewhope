@@ -1,9 +1,10 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Loader2, Store, RefreshCcw } from "lucide-react";
+import { CheckCircle2, XCircle, Loader2, Store, RefreshCcw, AlertCircle } from "lucide-react";
 import {
   getEbaySellerSetup,
   createEbaySellerResource,
@@ -14,7 +15,9 @@ interface Props {
   productId: string;
 }
 
-const CREATE_LABEL: Record<string, string> = {
+type ResourceKey = "location" | "fulfillmentPolicy" | "paymentPolicy" | "returnPolicy";
+
+const CREATE_LABEL: Record<ResourceKey, string> = {
   location: "Create Sandbox Location",
   fulfillmentPolicy: "Create Fulfillment Policy",
   paymentPolicy: "Create Payment Policy",
@@ -27,6 +30,8 @@ export function EbaySellerSetupPanel({ productId }: Props) {
   const createFn = useServerFn(createEbaySellerResource);
   const syncFn = useServerFn(syncEbayOfferWithSellerSetup);
 
+  const [errors, setErrors] = useState<Partial<Record<ResourceKey, string>>>({});
+
   const query = useQuery({
     queryKey: ["ebay-seller-setup"],
     queryFn: () => getFn(),
@@ -34,9 +39,24 @@ export function EbaySellerSetupPanel({ productId }: Props) {
   });
 
   const createMut = useMutation({
-    mutationFn: (resource: string) => createFn({ data: { resource: resource as any } }),
-    onSuccess: (res) => {
-      if (res.ok) qc.setQueryData(["ebay-seller-setup"], res);
+    mutationFn: async (resource: ResourceKey) => {
+      const res = await createFn({ data: { resource: resource as any } });
+      return { resource, res };
+    },
+    onSuccess: ({ resource, res }) => {
+      if (res.ok) {
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next[resource];
+          return next;
+        });
+        qc.setQueryData(["ebay-seller-setup"], res);
+      } else {
+        setErrors((prev) => ({ ...prev, [resource]: res.errorMessage || "Unknown error" }));
+      }
+    },
+    onError: (err: any, resource) => {
+      setErrors((prev) => ({ ...prev, [resource]: err?.message || "Request failed" }));
     },
   });
 
@@ -49,7 +69,6 @@ export function EbaySellerSetupPanel({ productId }: Props) {
 
   const status = query.data?.ok ? query.data.status : null;
   const error = query.data && !query.data.ok ? query.data.errorMessage : null;
-  const createError = createMut.data && !createMut.data.ok ? createMut.data.errorMessage : null;
 
   return (
     <Card>
