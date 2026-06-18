@@ -20,6 +20,7 @@ import { Route as AuthenticatedIntakeRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products.index'
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
+import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -77,6 +78,11 @@ const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedProductsRoute,
 } as any)
+const ApiPublicEbayCallbackRoute = ApiPublicEbayCallbackRouteImport.update({
+  id: '/api/public/ebay/callback',
+  path: '/api/public/ebay/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -89,6 +95,7 @@ export interface FileRoutesByFullPath {
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products/': typeof AuthenticatedProductsIndexRoute
+  '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products': typeof AuthenticatedProductsIndexRoute
+  '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
+  '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/products/$id'
     | '/products/new'
     | '/products/'
+    | '/api/public/ebay/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/products/$id'
     | '/products/new'
     | '/products'
+    | '/api/public/ebay/callback'
   id:
     | '__root__'
     | '/_authenticated'
@@ -152,11 +163,13 @@ export interface FileRouteTypes {
     | '/_authenticated/products/$id'
     | '/_authenticated/products/new'
     | '/_authenticated/products/'
+    | '/api/public/ebay/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicEbayCallbackRoute: typeof ApiPublicEbayCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -238,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIdRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
+    '/api/public/ebay/callback': {
+      id: '/api/public/ebay/callback'
+      path: '/api/public/ebay/callback'
+      fullPath: '/api/public/ebay/callback'
+      preLoaderRoute: typeof ApiPublicEbayCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -282,17 +302,8 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicEbayCallbackRoute: ApiPublicEbayCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
