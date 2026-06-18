@@ -140,9 +140,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     );
   }
 
-  const requiredMissing = aspects.some(
-    (a) => a.required && !(values[a.name]?.some((v) => v.trim().length > 0)),
-  );
+  const requiredMissing = missingRequired.length > 0;
 
   return (
     <Card>
@@ -155,7 +153,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           <Button
             size="sm"
             onClick={() => saveMut.mutate()}
-            disabled={saveMut.isPending || aspectsQ.isLoading}
+            disabled={saveMut.isPending || aspectsQ.isLoading || requiredMissing}
           >
             <Save className="h-4 w-4 mr-1" />
             {saveMut.isPending ? "Saving…" : "Save"}
@@ -173,9 +171,10 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
         )}
         {requiredMissing && (
           <p className="text-xs text-destructive">
-            Some required specifics are not filled in.
+            Missing required: {missingRequired.join(", ")}
           </p>
         )}
+
 
         <div className="grid gap-3 sm:grid-cols-2">
           {aspects.map((a) => {
