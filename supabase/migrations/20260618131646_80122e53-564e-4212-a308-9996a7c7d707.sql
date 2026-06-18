@@ -1,0 +1,1 @@
+ALTER TABLE public.marketplace_listings ADD COLUMN IF NOT EXISTS provider_metadata jsonb NOT NULL DEFAULT '{}'::jsonb;

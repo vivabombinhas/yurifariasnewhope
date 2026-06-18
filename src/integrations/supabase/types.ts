@@ -201,6 +201,7 @@ export type Database = {
           marketplace: Database["public"]["Enums"]["marketplace"]
           notes: string | null
           product_id: string
+          provider_metadata: Json
           published_at: string | null
           sold_at: string | null
           status: Database["public"]["Enums"]["listing_status"]
@@ -217,6 +218,7 @@ export type Database = {
           marketplace: Database["public"]["Enums"]["marketplace"]
           notes?: string | null
           product_id: string
+          provider_metadata?: Json
           published_at?: string | null
           sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
@@ -233,6 +235,7 @@ export type Database = {
           marketplace?: Database["public"]["Enums"]["marketplace"]
           notes?: string | null
           product_id?: string
+          provider_metadata?: Json
           published_at?: string | null
           sold_at?: string | null
           status?: Database["public"]["Enums"]["listing_status"]
