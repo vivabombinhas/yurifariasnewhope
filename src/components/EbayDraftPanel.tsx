@@ -63,6 +63,8 @@ export function EbayDraftPanel({ productId }: Props) {
     (listing.data?.provider_metadata as { offerId?: string; sku?: string; env?: string }) ??
     null;
   const isDraft = listing.data?.status === "draft" && !!meta?.offerId;
+  const showPersistedListingError =
+    !!listing.data?.error_message && !createMut.isPending && !createMut.data && !createMut.error;
 
   return (
     <Card>
@@ -130,7 +132,7 @@ export function EbayDraftPanel({ productId }: Props) {
             Draft failed: {(createMut.error as any)?.message ?? String(createMut.error)}
           </p>
         )}
-        {listing.data?.error_message && !createMut.isPending && (
+        {showPersistedListingError && (
           <p className="text-destructive break-words">
             {listing.data.error_message}
           </p>
