@@ -11,11 +11,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<EbayPublishDTO> => {
-    const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
+    const env = String(process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     const isProd = env === "production";
-    if (env !== "sandbox" && !isProd) {
-      return { ok: false, errorMessage: "Publish is sandbox-only for now." };
-    }
     if (!isProd && env !== "sandbox") {
       return { ok: false, errorMessage: "Publish is sandbox-only for now." };
     }
