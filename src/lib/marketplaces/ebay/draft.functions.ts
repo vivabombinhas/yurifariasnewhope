@@ -9,7 +9,9 @@ export interface CreateDraftDTO {
   errorMessage?: string;
 }
 
-const PHOTO_SIGNED_URL_TTL = 60 * 60; // 1h
+const EBAY_MAX_PHOTOS = 12;
+const EBAY_MAX_URL_LEN = 500;
+const EBAY_MAX_TOTAL_LEN = 3975;
 
 export const createEbayDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
