@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Search, Tag } from "lucide-react";
+import { AlertTriangle, Search, Tag } from "lucide-react";
 import {
   fetchEbayCategorySuggestions,
   saveEbayCategory,
@@ -93,6 +93,24 @@ export function EbayCategoryPanel({ product, onSaved }: Props) {
             <div className="text-muted-foreground italic mt-1">Not set</div>
           )}
         </div>
+
+        {(() => {
+          const mismatch = detectCategoryMismatch(product.title, product.ebay_category_name);
+          if (!mismatch) return null;
+          return (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm text-amber-700 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium">This eBay category may not match this product.</div>
+                <div className="text-xs">
+                  Title looks like <b>{mismatch.productKind}</b> but selected category is{" "}
+                  <b>{product.ebay_category_name}</b>. Click <b>Find eBay Categories</b> to pick a better one.
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
 
         {suggestions && (
           <div>
