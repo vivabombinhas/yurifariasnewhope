@@ -12,7 +12,11 @@ export const publishEbayListing = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<EbayPublishDTO> => {
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
-    if (env !== "sandbox") {
+    const isProd = env === "production";
+    if (env !== "sandbox" && !isProd) {
+      return { ok: false, errorMessage: "Publish is sandbox-only for now." };
+    }
+    if (!isProd && env !== "sandbox") {
       return { ok: false, errorMessage: "Publish is sandbox-only for now." };
     }
 
