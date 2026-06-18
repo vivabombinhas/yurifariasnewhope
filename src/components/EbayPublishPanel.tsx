@@ -66,15 +66,21 @@ export function EbayPublishPanel({ productId }: Props) {
           <Button
             size="sm"
             onClick={() => mut.mutate()}
-            disabled={!offerId || mut.isPending}
-            title={!offerId ? "Create an eBay draft first" : undefined}
+            disabled={!offerId || mut.isPending || isActive}
+            title={
+              isActive
+                ? "Listing is already active on eBay"
+                : !offerId
+                ? "Create an eBay draft first"
+                : undefined
+            }
           >
             {mut.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (
               <Rocket className="h-4 w-4 mr-1" />
             )}
-            Publish eBay Listing (Sandbox)
+            {isActive ? "Already Published" : "Publish eBay Listing (Sandbox)"}
           </Button>
         </div>
       </CardHeader>
