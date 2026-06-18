@@ -119,6 +119,7 @@ export async function createEbayDraftInSandbox(
     },
   };
 
+  console.log("[createEbayDraft] calling eBay InventoryItem", { sku: input.sku, env });
   const invRes = await ebayFetch(
     env,
     "PUT",
@@ -129,6 +130,7 @@ export async function createEbayDraftInSandbox(
   if (!invRes.ok) {
     throw new Error(`InventoryItem: ${ebayErrorMessage(invRes.status, invRes.json, invRes.text)}`);
   }
+  console.log("[createEbayDraft] inventory item created", { sku: input.sku, status: invRes.status });
 
   // 2. POST Offer (UNPUBLISHED — do NOT call /publish)
   const offerBody = {
