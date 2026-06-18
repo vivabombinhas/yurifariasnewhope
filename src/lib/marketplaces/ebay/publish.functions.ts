@@ -43,10 +43,9 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       };
 
       if (result.ok) {
-        const listingUrl =
-          env === "production"
-            ? `https://www.ebay.com/itm/${result.listingId}`
-            : `https://www.sandbox.ebay.com/itm/${result.listingId}`;
+        const listingUrl = isProd
+          ? `https://www.ebay.com/itm/${result.listingId}`
+          : `https://www.sandbox.ebay.com/itm/${result.listingId}`;
         newMeta.listingId = result.listingId;
         newMeta.listingUrl = listingUrl;
         newMeta.publishStatus = "PUBLISHED";
