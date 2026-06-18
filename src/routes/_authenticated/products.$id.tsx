@@ -30,6 +30,7 @@ import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 import { PublishPanel } from "@/components/PublishPanel";
 import { EbayCategoryPanel } from "@/components/EbayCategoryPanel";
 import { EbayAspectsPanel } from "@/components/EbayAspectsPanel";
+import { EbayReadinessPanel } from "@/components/EbayReadinessPanel";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
@@ -196,6 +197,8 @@ function ProductDetail() {
       <EbayCategoryPanel product={p} onSaved={() => product.refetch()} />
 
       <EbayAspectsPanel product={p as any} onSaved={() => product.refetch()} />
+
+      <EbayReadinessPanel productId={id} />
 
       <PublishPanel
         productId={id}
