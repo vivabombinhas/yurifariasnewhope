@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,24 @@ import { checkEbayPublishPreflight } from "@/lib/marketplaces/ebay/publish-prefl
 
 interface Props {
   productId: string;
-  offerId?: string;
 }
 
-export function EbayPublishPreflightPanel({ productId, offerId }: Props) {
+export function EbayPublishPreflightPanel({ productId }: Props) {
   const fn = useServerFn(checkEbayPublishPreflight);
+  const listing = useQuery({
+    queryKey: ["ebay-listing", productId],
+    queryFn: async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await supabase
+        .from("marketplace_listings")
+        .select("provider_metadata")
+        .eq("product_id", productId)
+        .eq("marketplace", "ebay")
+        .maybeSingle();
+      return data;
+    },
+  });
+  const offerId = (listing.data?.provider_metadata as { offerId?: string } | null)?.offerId;
   const mut = useMutation({
     mutationFn: () => fn({ data: { productId } }),
   });
