@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedPublishingRouteImport } from './routes/_authenticated/publishing'
 import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
 import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
 import { Route as AuthenticatedIntakeRouteImport } from './routes/_authenticated/intake'
@@ -37,6 +38,11 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPublishingRoute = AuthenticatedPublishingRouteImport.update({
+  id: '/publishing',
+  path: '/publishing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/intake': typeof AuthenticatedIntakeRoute
   '/locations': typeof AuthenticatedLocationsRoute
   '/products': typeof AuthenticatedProductsRouteWithChildren
+  '/publishing': typeof AuthenticatedPublishingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/intake': typeof AuthenticatedIntakeRoute
   '/locations': typeof AuthenticatedLocationsRoute
+  '/publishing': typeof AuthenticatedPublishingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/_authenticated/intake': typeof AuthenticatedIntakeRoute
   '/_authenticated/locations': typeof AuthenticatedLocationsRoute
   '/_authenticated/products': typeof AuthenticatedProductsRouteWithChildren
+  '/_authenticated/publishing': typeof AuthenticatedPublishingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/intake'
     | '/locations'
     | '/products'
+    | '/publishing'
     | '/settings'
     | '/products/$id'
     | '/products/new'
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/intake'
     | '/locations'
+    | '/publishing'
     | '/settings'
     | '/'
     | '/products/$id'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/_authenticated/intake'
     | '/_authenticated/locations'
     | '/_authenticated/products'
+    | '/_authenticated/publishing'
     | '/_authenticated/settings'
     | '/_authenticated/'
     | '/_authenticated/products/$id'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/publishing': {
+      id: '/_authenticated/publishing'
+      path: '/publishing'
+      fullPath: '/publishing'
+      preLoaderRoute: typeof AuthenticatedPublishingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/products': {
@@ -243,6 +262,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedIntakeRoute: typeof AuthenticatedIntakeRoute
   AuthenticatedLocationsRoute: typeof AuthenticatedLocationsRoute
   AuthenticatedProductsRoute: typeof AuthenticatedProductsRouteWithChildren
+  AuthenticatedPublishingRoute: typeof AuthenticatedPublishingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
@@ -251,6 +271,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIntakeRoute: AuthenticatedIntakeRoute,
   AuthenticatedLocationsRoute: AuthenticatedLocationsRoute,
   AuthenticatedProductsRoute: AuthenticatedProductsRouteWithChildren,
+  AuthenticatedPublishingRoute: AuthenticatedPublishingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }

@@ -66,15 +66,10 @@ export function PublishPanel({
       setPending(marketplace);
       return publishFn({ data: { productId, marketplace } });
     },
-    onSuccess: (res) => {
-      if (res.not_implemented) {
-        toast.info(res.message ?? "Publish intent recorded.");
-      } else if (res.ok) {
-        toast.success("Published.");
-      } else {
-        toast.error(res.message ?? "Publish failed.");
-      }
+    onSuccess: () => {
+      toast.success("Publish job queued.");
       void qc.invalidateQueries({ queryKey: ["listings", productId] });
+      void qc.invalidateQueries({ queryKey: ["publishing-jobs"] });
       onChange();
     },
     onError: (e: any) => toast.error(e?.message ?? "Publish failed"),
