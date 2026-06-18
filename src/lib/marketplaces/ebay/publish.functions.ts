@@ -11,8 +11,9 @@ export const publishEbayListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<EbayPublishDTO> => {
-    const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
-    if (env !== "sandbox") {
+    const env = String(process.env.EBAY_ENV ?? "sandbox").toLowerCase();
+    const isProd = env === "production";
+    if (!isProd && env !== "sandbox") {
       return { ok: false, errorMessage: "Publish is sandbox-only for now." };
     }
 
@@ -42,13 +43,18 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       };
 
       if (result.ok) {
+        const listingUrl = isProd
+          ? `https://www.ebay.com/itm/${result.listingId}`
+          : `https://www.sandbox.ebay.com/itm/${result.listingId}`;
         newMeta.listingId = result.listingId;
+        newMeta.listingUrl = listingUrl;
         newMeta.publishStatus = "PUBLISHED";
         const { error: upErr } = await context.supabase
           .from("marketplace_listings")
           .update({
             status: "active",
             external_listing_id: result.listingId,
+            listing_url: listingUrl,
             published_at: new Date().toISOString(),
             error_message: null,
             provider_metadata: newMeta,
