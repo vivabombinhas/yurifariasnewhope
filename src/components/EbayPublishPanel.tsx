@@ -20,7 +20,7 @@ export function EbayPublishPanel({ productId }: Props) {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data } = await supabase
         .from("marketplace_listings")
-        .select("status, external_listing_id, provider_metadata, published_at, error_message")
+        .select("status, external_listing_id, listing_url, provider_metadata, published_at, error_message")
         .eq("product_id", productId)
         .eq("marketplace", "ebay")
         .maybeSingle();
