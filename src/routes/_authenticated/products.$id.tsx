@@ -29,6 +29,7 @@ import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImageP
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 import { PublishPanel } from "@/components/PublishPanel";
 import { EbayCategoryPanel } from "@/components/EbayCategoryPanel";
+import { EbayAspectsPanel } from "@/components/EbayAspectsPanel";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
