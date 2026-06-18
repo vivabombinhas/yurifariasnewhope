@@ -224,14 +224,22 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                     value={current[0] ?? ""}
                     onChange={(e) => setSingle(e.target.value)}
                     placeholder={hasOptions ? a.values[0] : ""}
+                    aria-invalid={isMissing}
+                    className={isMissing ? "border-destructive" : undefined}
                   />
                 ) : (
                   <Input
                     value={current.join(", ")}
                     onChange={(e) => setMulti(e.target.value)}
                     placeholder="Comma-separated"
+                    aria-invalid={isMissing}
+                    className={isMissing ? "border-destructive" : undefined}
                   />
                 )}
+                {isMissing && (
+                  <p className="text-xs text-destructive">Required</p>
+                )}
+
                 {hasOptions && !useDropdown && (
                   <datalist id={`aspect-${a.name}`}>
                     {a.values.map((v) => (
