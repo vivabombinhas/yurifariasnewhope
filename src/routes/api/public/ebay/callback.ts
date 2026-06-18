@@ -9,11 +9,18 @@ export const Route = createFileRoute("/api/public/ebay/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        console.log("[ebay/callback] hit", request.url);
         const url = new URL(request.url);
         const code = url.searchParams.get("code");
         const stateToken = url.searchParams.get("state");
         const errorParam = url.searchParams.get("error");
         const errorDesc = url.searchParams.get("error_description");
+        console.log("[ebay/callback] params", {
+          hasCode: !!code,
+          hasState: !!stateToken,
+          errorParam,
+          errorDesc,
+        });
 
         const back = (params: Record<string, string>) => {
           const dest = new URL("/settings", url.origin);
@@ -27,6 +34,7 @@ export const Route = createFileRoute("/api/public/ebay/callback")({
         };
 
         if (errorParam) {
+          console.log("[ebay/callback] error param", errorParam, errorDesc);
           return back({
             ebay: "error",
             message: errorDesc ?? errorParam,
@@ -45,10 +53,16 @@ export const Route = createFileRoute("/api/public/ebay/callback")({
           } = await import("@/lib/marketplaces/ebay/oauth.server");
 
           const cfg = loadEbayConfig();
+          console.log("[ebay/callback] cfg env", cfg.env, "ruName", cfg.ruName);
           const state = await verifyState(stateToken, cfg.stateSecret);
+          console.log("[ebay/callback] state verified for uid", state.uid);
 
+          console.log("[ebay/callback] token exchange start");
           const tokens = await exchangeCodeForTokens(cfg, code);
+          console.log("[ebay/callback] token exchange ok, expires_in", tokens.expires_in);
           const identity = await fetchEbayUser(cfg, tokens.access_token);
+          console.log("[ebay/callback] identity", identity);
+
 
           const accessExpiresAt = new Date(
             Date.now() + tokens.expires_in * 1000,
@@ -89,24 +103,29 @@ export const Route = createFileRoute("/api/public/ebay/callback")({
           };
 
           if (existing) {
+            console.log("[ebay/callback] updating existing row", existing.id);
             const { error } = await supabaseAdmin
               .from("marketplace_accounts")
               .update(row)
               .eq("id", existing.id);
             if (error) throw error;
           } else {
+            console.log("[ebay/callback] inserting new row");
             const { error } = await supabaseAdmin
               .from("marketplace_accounts")
               .insert(row);
             if (error) throw error;
           }
+          console.log("[ebay/callback] saved successfully");
 
           return back({ ebay: "connected" });
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
+          console.error("[ebay/callback] FAILED", message, e);
           return back({ ebay: "error", message });
         }
       },
+
     },
   },
 });
