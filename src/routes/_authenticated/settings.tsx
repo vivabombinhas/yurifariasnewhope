@@ -15,6 +15,7 @@ import {
   type Lang,
 } from "@/lib/i18n";
 import { RouteError } from "@/components/RouteError";
+import { MarketplaceConnections } from "@/components/MarketplaceConnections";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Inventory" }] }),
@@ -26,8 +27,10 @@ function SettingsPage() {
   const { lang, setLang, t } = useI18n();
 
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">{t("settings.title")}</h1>
+
+      <MarketplaceConnections />
 
       <Card>
         <CardHeader>
