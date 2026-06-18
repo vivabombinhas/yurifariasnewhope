@@ -317,7 +317,7 @@ async function callGateway<T>(
   userText: string,
   imageUrls: string[],
 ): Promise<{ raw: any; parsed: T; model: string }> {
-  const model = "google/gemini-2.5-flash";
+  const model = "google/gemini-3-flash-preview";
   const body = {
     model,
     messages: [
