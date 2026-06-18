@@ -207,7 +207,10 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
                     value={current[0] ?? ""}
                     onValueChange={(v) => setSingle(v)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger
+                      aria-invalid={isMissing}
+                      className={isMissing ? "border-destructive" : undefined}
+                    >
                       <SelectValue placeholder="Select…" />
                     </SelectTrigger>
                     <SelectContent>
