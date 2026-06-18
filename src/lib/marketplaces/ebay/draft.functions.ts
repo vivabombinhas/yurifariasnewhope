@@ -15,8 +15,10 @@ export const createEbayDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<CreateDraftDTO> => {
+    console.log("[createEbayDraft] started", { productId: data.productId });
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     if (env !== "sandbox") {
+      console.warn("[createEbayDraft] aborted: non-sandbox env", { env });
       return { ok: false, errorMessage: "Draft creation is restricted to sandbox environment." };
     }
 
