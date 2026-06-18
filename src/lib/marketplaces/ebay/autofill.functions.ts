@@ -6,12 +6,16 @@ export interface EbayAspectAutofillSuggestion {
   name: string;
   values: string[];
   confidence: "high" | "medium" | "low";
+  source?: "product" | "ai";
 }
 
 export interface EbayAspectAutofillResult {
   suggestions: EbayAspectAutofillSuggestion[];
   notes?: string;
+  fromProduct: number;
+  fromAi: number;
 }
+
 
 const Input = z.object({
   productId: z.string().uuid(),
