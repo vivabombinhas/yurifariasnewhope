@@ -55,7 +55,7 @@ export interface CreateDraftResult {
   offer: unknown;
 }
 
-async function ebayFetch(
+export async function ebayFetch(
   env: string,
   method: string,
   path: string,
