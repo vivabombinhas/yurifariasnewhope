@@ -23,6 +23,35 @@ interface Props {
   onSaved?: () => void;
 }
 
+// Heuristic: guess product "kind" from title and check the eBay category name mentions it.
+const KIND_KEYWORDS: Array<{ kind: string; words: string[]; categoryHints: string[] }> = [
+  { kind: "sneakers/shoes", words: ["sneaker", "shoe", "shoes", "boot", "boots", "jordan", "nike", "adidas", "yeezy", "air max", "running"], categoryHints: ["shoe", "footwear", "sneaker", "athletic"] },
+  { kind: "clothing", words: ["shirt", "tee", "hoodie", "jacket", "pants", "jeans", "dress", "coat", "sweater"], categoryHints: ["cloth", "shirt", "apparel", "outerwear", "pants", "dress"] },
+  { kind: "watch", words: ["watch", "rolex", "seiko", "casio", "g-shock"], categoryHints: ["watch"] },
+  { kind: "handbag/bag", words: ["handbag", "purse", "backpack", "bag", "tote", "wallet"], categoryHints: ["bag", "handbag", "wallet", "luggage"] },
+  { kind: "electronics", words: ["iphone", "samsung", "ipad", "laptop", "macbook", "playstation", "xbox", "nintendo", "camera", "lens", "headphone"], categoryHints: ["electronic", "phone", "computer", "console", "camera", "audio"] },
+  { kind: "jewelry", words: ["ring", "necklace", "bracelet", "earring", "gold", "silver", "diamond"], categoryHints: ["jewel", "ring", "necklace", "bracelet"] },
+  { kind: "toy/collectible", words: ["lego", "funko", "action figure", "pokemon", "card", "trading card"], categoryHints: ["toy", "collectible", "card", "game"] },
+];
+
+export function detectCategoryMismatch(
+  title: string | null | undefined,
+  categoryName: string | null | undefined,
+): { productKind: string } | null {
+  const t = (title ?? "").toLowerCase();
+  const c = (categoryName ?? "").toLowerCase();
+  if (!t || !c) return null;
+  for (const k of KIND_KEYWORDS) {
+    if (k.words.some((w) => t.includes(w))) {
+      if (!k.categoryHints.some((h) => c.includes(h))) {
+        return { productKind: k.kind };
+      }
+      return null; // matches OK
+    }
+  }
+  return null;
+}
+
 export function EbayCategoryPanel({ product, onSaved }: Props) {
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchEbayCategorySuggestions);
