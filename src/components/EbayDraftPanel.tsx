@@ -37,8 +37,12 @@ export function EbayDraftPanel({ productId }: Props) {
   });
 
   const createMut = useMutation({
-    mutationFn: () => draftFn({ data: { productId } }),
+    mutationFn: () => {
+      console.log("[EbayDraftPanel] clicked create draft", { productId });
+      return draftFn({ data: { productId } });
+    },
     onSuccess: (res) => {
+      console.log("[EbayDraftPanel] mutation result", res);
       if (res.ok) {
         toast.success(`eBay draft created (offerId: ${res.offerId})`);
         qc.invalidateQueries({ queryKey: ["ebay-listing", productId] });
@@ -48,7 +52,10 @@ export function EbayDraftPanel({ productId }: Props) {
         toast.error(res.errorMessage ?? "Failed to create draft");
       }
     },
-    onError: (e: any) => toast.error(e?.message ?? "Failed to create draft"),
+    onError: (e: any) => {
+      console.error("[EbayDraftPanel] mutation error", e);
+      toast.error(e?.message ?? "Failed to create draft");
+    },
   });
 
   const ready = !!readiness.data?.ready;
@@ -105,7 +112,25 @@ export function EbayDraftPanel({ productId }: Props) {
             </p>
           </div>
         )}
-        {listing.data?.error_message && (
+        {createMut.isPending && (
+          <p className="text-muted-foreground">Creating draft…</p>
+        )}
+        {createMut.data?.ok && (
+          <p className="text-emerald-600 dark:text-emerald-400">
+            Draft created: <span className="font-mono">{createMut.data.offerId}</span>
+          </p>
+        )}
+        {createMut.data && !createMut.data.ok && (
+          <p className="text-destructive break-words">
+            Draft failed: {createMut.data.errorMessage}
+          </p>
+        )}
+        {createMut.error && (
+          <p className="text-destructive break-words">
+            Draft failed: {(createMut.error as any)?.message ?? String(createMut.error)}
+          </p>
+        )}
+        {listing.data?.error_message && !createMut.isPending && (
           <p className="text-destructive break-words">
             {listing.data.error_message}
           </p>

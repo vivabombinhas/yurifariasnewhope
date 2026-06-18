@@ -15,8 +15,10 @@ export const createEbayDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<CreateDraftDTO> => {
+    console.log("[createEbayDraft] started", { productId: data.productId });
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     if (env !== "sandbox") {
+      console.warn("[createEbayDraft] aborted: non-sandbox env", { env });
       return { ok: false, errorMessage: "Draft creation is restricted to sandbox environment." };
     }
 
@@ -90,6 +92,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         aspects: product.ebay_aspects,
         imageUrls,
       });
+      console.log("[createEbayDraft] offer created", { offerId: result.offerId, sku: result.sku });
 
       // Upsert marketplace_listings (ebay, status=draft)
       const { data: existing } = await context.supabase
@@ -137,6 +140,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       return { ok: true, offerId: result.offerId, sku: result.sku };
     } catch (e: any) {
       const msg = e?.message ?? String(e);
+      console.error("[createEbayDraft] failed", { productId: data.productId, error: msg });
       await context.supabase
         .from("publishing_jobs")
         .update({
