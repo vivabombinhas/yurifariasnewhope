@@ -331,6 +331,7 @@ export type Database = {
           created_at: string
           currency: string
           description: string
+          ebay_aspects: Json
           ebay_category_confidence: number | null
           ebay_category_id: string | null
           ebay_category_name: string | null
@@ -354,6 +355,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string
+          ebay_aspects?: Json
           ebay_category_confidence?: number | null
           ebay_category_id?: string | null
           ebay_category_name?: string | null
@@ -377,6 +379,7 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string
+          ebay_aspects?: Json
           ebay_category_confidence?: number | null
           ebay_category_id?: string | null
           ebay_category_name?: string | null
