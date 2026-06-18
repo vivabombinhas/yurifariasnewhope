@@ -83,7 +83,7 @@ export const autofillEbayAspects = createServerFn({ method: "POST" })
     const { data: product, error } = await context.supabase
       .from("products")
       .select(
-        "id, title, description, condition, tags, item_specifics, ebay_aspects, brand:brands(name), category:categories(name)",
+        "id, title, description, condition, item_specifics, ebay_aspects, brand:brands(name), category:categories(name)",
       )
       .eq("id", data.productId)
       .maybeSingle();
