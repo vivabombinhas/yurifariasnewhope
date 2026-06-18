@@ -84,7 +84,7 @@ export async function ebayFetch(
   return { ok: res.ok, status: res.status, text, json };
 }
 
-function ebayErrorMessage(status: number, json: any, text: string): string {
+export function ebayErrorMessage(status: number, json: any, text: string): string {
   const errs = json?.errors;
   if (Array.isArray(errs) && errs.length) {
     return errs
