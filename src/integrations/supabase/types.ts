@@ -331,6 +331,10 @@ export type Database = {
           created_at: string
           currency: string
           description: string
+          ebay_category_confidence: number | null
+          ebay_category_id: string | null
+          ebay_category_name: string | null
+          ebay_category_source: string | null
           id: string
           item_specifics: Json
           location_id: string | null
@@ -350,6 +354,10 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string
+          ebay_category_confidence?: number | null
+          ebay_category_id?: string | null
+          ebay_category_name?: string | null
+          ebay_category_source?: string | null
           id?: string
           item_specifics?: Json
           location_id?: string | null
@@ -369,6 +377,10 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string
+          ebay_category_confidence?: number | null
+          ebay_category_id?: string | null
+          ebay_category_name?: string | null
+          ebay_category_source?: string | null
           id?: string
           item_specifics?: Json
           location_id?: string | null
