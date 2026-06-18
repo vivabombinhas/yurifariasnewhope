@@ -96,7 +96,7 @@ export const autofillEbayAspects = createServerFn({ method: "POST" })
       brand: (product as any).brand?.name ?? null,
       internal_category: (product as any).category?.name ?? null,
       condition: product.condition ?? null,
-      tags: Array.isArray(product.tags) ? product.tags : [],
+      tags: [] as string[],
       existing_item_specifics: product.item_specifics ?? [],
       existing_ebay_aspects: product.ebay_aspects ?? {},
     };
