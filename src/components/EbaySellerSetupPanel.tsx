@@ -31,8 +31,33 @@ export function EbaySellerSetupPanel({ productId }: Props) {
   const getFn = useServerFn(getEbaySellerSetup);
   const createFn = useServerFn(createEbaySellerResource);
   const syncFn = useServerFn(syncEbayOfferWithSellerSetup);
+  const getOptInFn = useServerFn(getEbayOptedInPrograms);
+  const optInFn = useServerFn(optInEbayBusinessPolicies);
 
   const [errors, setErrors] = useState<Partial<Record<ResourceKey, string>>>({});
+  const [optInError, setOptInError] = useState<{ message: string; raw?: any } | null>(null);
+
+  const optInQuery = useQuery({
+    queryKey: ["ebay-opt-in-programs"],
+    queryFn: () => getOptInFn(),
+    staleTime: 30_000,
+  });
+
+  const optInMut = useMutation({
+    mutationFn: () => optInFn(),
+    onSuccess: (res) => {
+      if (res.ok) {
+        setOptInError(null);
+        qc.setQueryData(["ebay-opt-in-programs"], res);
+        qc.invalidateQueries({ queryKey: ["ebay-seller-setup"] });
+      } else {
+        setOptInError({ message: res.errorMessage, raw: (res as any).raw });
+      }
+    },
+    onError: (err: any) => {
+      setOptInError({ message: err?.message ?? "Request failed" });
+    },
+  });
 
   const query = useQuery({
     queryKey: ["ebay-seller-setup"],
