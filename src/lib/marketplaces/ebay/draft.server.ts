@@ -100,6 +100,23 @@ function apiUrl(env: string, path: string) {
   return `${apiHost(env)}${path}`;
 }
 
+function buildInventoryBody(existing: Record<string, any> | null, input: CreateDraftInput) {
+  return {
+    ...(existing ?? {}),
+    availability: existing?.availability ?? {
+      shipToLocationAvailability: { quantity: 1 },
+    },
+    product: {
+      ...(existing?.product ?? {}),
+      title: input.title.slice(0, 80),
+      description: input.description,
+      aspects: aspectsForApi(input.aspects),
+      imageUrls: input.imageUrls,
+    },
+    condition: input.ebayConditionEnum,
+  };
+}
+
 async function ebayFetchWithDiagnostics(
   env: string,
   method: string,
@@ -279,19 +296,19 @@ export async function createEbayDraftInSandbox(
     }
   }
 
+  const currentInventoryRes = await ebayFetch(
+    env,
+    "GET",
+    `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`,
+    token,
+  );
+  const currentInventory = currentInventoryRes.ok && currentInventoryRes.json && typeof currentInventoryRes.json === "object"
+    ? currentInventoryRes.json
+    : null;
+
   // 1. PUT InventoryItem (fully replaces existing inventory item for this SKU)
-  const inventoryBody = {
-    availability: {
-      shipToLocationAvailability: { quantity: 1 },
-    },
-    condition: input.ebayConditionEnum,
-    product: {
-      title: input.title.slice(0, 80),
-      description: input.description,
-      aspects: aspectsForApi(input.aspects),
-      imageUrls: input.imageUrls,
-    },
-  };
+  // Spread existing first, then write condition last so stale remote condition cannot overwrite the selected enum.
+  let inventoryBody = buildInventoryBody(currentInventory, input);
 
   console.log("[createEbayDraft] PUT inventory_item", {
     publishAttemptId,
