@@ -3,7 +3,6 @@
  * SANDBOX ONLY. Does NOT call /publish.
  */
 import { getValidEbayAccessToken } from "./token-service.server";
-import { mapEbayCondition, isShoeCategory } from "./condition-map";
 
 const MARKETPLACE_ID = "EBAY_US";
 const LOCALE = "en_US"; // body locale (eBay InventoryItem uses underscore form)
@@ -34,7 +33,10 @@ export interface CreateDraftInput {
   title: string;
   description: string;
   priceCents: number;
-  condition: string; // product_condition enum
+  internalCondition: string | null;
+  ebayConditionId: number;
+  ebayConditionEnum: string;
+  ebayConditionName: string;
   categoryId: string;
   aspects: unknown;
   imageUrls: string[];
@@ -93,14 +95,8 @@ export async function createEbayDraftInSandbox(
   if (env !== "sandbox") {
     throw new Error("Draft creation is restricted to sandbox environment.");
   }
-  const ebayCondition = mapEbayCondition(input.condition, input.categoryId);
-  if (!ebayCondition) {
-    throw new Error(
-      `Unmapped product condition "${input.condition}" for eBay category ${input.categoryId}.` +
-        (isShoeCategory(input.categoryId)
-          ? " This category requires NEW_WITH_BOX / PRE_OWNED_* conditions."
-          : ""),
-    );
+  if (!input.ebayConditionEnum || !input.ebayConditionId || !input.ebayConditionName) {
+    throw new Error("Select a valid eBay Condition before creating the draft.");
   }
 
   const token = await getValidEbayAccessToken();
@@ -118,6 +114,20 @@ export async function createEbayDraftInSandbox(
   const existingOffers: any[] = existingOffersRes.json?.offers ?? [];
   for (const off of existingOffers) {
     if (!off?.offerId) continue;
+    const maybePublished =
+      String(off.status ?? "").toUpperCase() === "PUBLISHED" ||
+      !!off.listing?.listingId ||
+      !!off.listingId;
+    if (maybePublished) {
+      console.warn("[createEbayDraft] skipped published offer cleanup", {
+        offerId: off.offerId,
+        status: off.status,
+        listingId: off.listing?.listingId ?? off.listingId,
+      });
+      throw new Error(
+        `Existing eBay offer ${off.offerId} appears published. Refusing to overwrite inventory item ${input.sku} without an explicit active-listing workflow.`,
+      );
+    }
     const del = await ebayFetch(
       env,
       "DELETE",
@@ -135,7 +145,7 @@ export async function createEbayDraftInSandbox(
     availability: {
       shipToLocationAvailability: { quantity: 1 },
     },
-    condition: ebayCondition,
+    condition: input.ebayConditionEnum,
     product: {
       title: input.title.slice(0, 80),
       description: input.description,
@@ -147,9 +157,11 @@ export async function createEbayDraftInSandbox(
   console.log("[createEbayDraft] PUT inventory_item", {
     sku: input.sku,
     env,
-    categoryId: input.categoryId,
-    productCondition: input.condition,
-    ebayCondition,
+    internalCondition: input.internalCondition,
+    ebayCategoryId: input.categoryId,
+    ebayConditionId: input.ebayConditionId,
+    ebayConditionName: input.ebayConditionName,
+    ebayConditionEnum: input.ebayConditionEnum,
     imageCount: input.imageUrls.length,
   });
   const invRes = await ebayFetch(
@@ -165,7 +177,7 @@ export async function createEbayDraftInSandbox(
   console.log("[createEbayDraft] inventory item upserted", {
     sku: input.sku,
     status: invRes.status,
-    ebayCondition,
+    ebayConditionEnum: input.ebayConditionEnum,
   });
 
   // 2. POST Offer (UNPUBLISHED — do NOT call /publish)
@@ -187,7 +199,7 @@ export async function createEbayDraftInSandbox(
   console.log("[createEbayDraft] POST offer", {
     sku: input.sku,
     categoryId: input.categoryId,
-    ebayCondition,
+    ebayConditionEnum: input.ebayConditionEnum,
   });
   const offerRes = await ebayFetch(env, "POST", `/sell/inventory/v1/offer`, token, offerBody);
   if (!offerRes.ok) {
@@ -199,7 +211,7 @@ export async function createEbayDraftInSandbox(
     sku: input.sku,
     offerId,
     categoryId: input.categoryId,
-    ebayCondition,
+    ebayConditionEnum: input.ebayConditionEnum,
   });
 
   return {

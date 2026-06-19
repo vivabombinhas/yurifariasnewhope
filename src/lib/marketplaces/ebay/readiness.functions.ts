@@ -17,8 +17,6 @@ export interface EbayReadinessResult {
   checks: ReadinessCheck[];
 }
 
-import { mapEbayCondition, isShoeCategory } from "./condition-map";
-
 export const checkEbayReadiness = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
@@ -30,7 +28,7 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
       context.supabase
         .from("products")
         .select(
-          "id, title, description, sku, price_cents, condition, ebay_category_id, ebay_aspects",
+          "id, title, description, sku, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects",
         )
         .eq("id", data.productId)
         .maybeSingle(),
@@ -129,33 +127,56 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
           },
     );
 
-    // 9. Condition mapped
-    const ebayCondition = mapEbayCondition(p.condition, p.ebay_category_id);
-    const conditionInvalid =
-      p.condition && !ebayCondition && isShoeCategory(p.ebay_category_id);
-    checks.push(
-      ebayCondition
-        ? {
-            id: "condition",
-            label: "Condition mapped to eBay",
-            status: "ok",
-            detail: ebayCondition,
-          }
-        : conditionInvalid
-          ? {
-              id: "condition",
-              label: "Condition not valid for this category",
-              status: "missing",
-              detail: `"${p.condition}" is not accepted by category ${p.ebay_category_id}. Shoe categories require NEW_WITH_BOX / PRE_OWNED_*.`,
-              action: "Change product condition",
-            }
-          : {
-              id: "condition",
-              label: "Condition mapped to eBay",
-              status: "missing",
-              action: "Set product condition",
-            },
-    );
+    // 9. eBay Condition selected and valid for selected category
+    if (!p.ebay_condition_id || !p.ebay_condition_enum || !p.ebay_condition_name) {
+      checks.push({
+        id: "ebay_condition",
+        label: "eBay Condition selected",
+        status: "missing",
+        action: "Select eBay Condition",
+      });
+    } else if (p.ebay_category_id && accountRes.data?.status === "connected") {
+      try {
+        const { getEbayConditionPolicies } = await import("./condition-policies.server");
+        const policies = await getEbayConditionPolicies(p.ebay_category_id);
+        const valid = policies.find(
+          (c) =>
+            c.conditionId === p.ebay_condition_id &&
+            c.conditionEnum === p.ebay_condition_enum &&
+            c.displayName === p.ebay_condition_name,
+        );
+        checks.push(
+          valid
+            ? {
+                id: "ebay_condition",
+                label: "eBay Condition valid for category",
+                status: "ok",
+                detail: `${p.ebay_condition_name} · ${p.ebay_condition_enum} · ${p.ebay_condition_id}`,
+              }
+            : {
+                id: "ebay_condition",
+                label: "eBay Condition valid for category",
+                status: "missing",
+                detail: `${p.ebay_condition_name} is not accepted by category ${p.ebay_category_id}.`,
+                action: "Select eBay Condition again",
+              },
+        );
+      } catch (e: any) {
+        checks.push({
+          id: "ebay_condition",
+          label: "eBay Condition valid for category",
+          status: "warning",
+          detail: e?.message ?? "Could not validate eBay condition",
+        });
+      }
+    } else {
+      checks.push({
+        id: "ebay_condition",
+        label: "eBay Condition selected",
+        status: "missing",
+        action: "Select category and connect eBay first",
+      });
+    }
 
     // 10. quantity = 1 (each item is unique → always ok in this app)
     checks.push({

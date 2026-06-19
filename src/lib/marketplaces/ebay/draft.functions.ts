@@ -6,6 +6,10 @@ export interface CreateDraftDTO {
   ok: boolean;
   offerId?: string;
   sku?: string;
+  categoryId?: string;
+  ebayConditionId?: number;
+  ebayConditionName?: string;
+  ebayConditionEnum?: string;
   errorMessage?: string;
 }
 
@@ -39,12 +43,27 @@ export const createEbayDraft = createServerFn({ method: "POST" })
     const { data: product, error: pErr } = await context.supabase
       .from("products")
       .select(
-        "id, sku, title, description, price_cents, condition, ebay_category_id, ebay_aspects",
+        "id, sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects",
       )
       .eq("id", data.productId)
       .maybeSingle();
     if (pErr) throw pErr;
     if (!product) return { ok: false, errorMessage: "Product not found" };
+
+    const { data: currentListing, error: listingErr } = await context.supabase
+      .from("marketplace_listings")
+      .select("id, status, external_listing_id, provider_metadata")
+      .eq("product_id", data.productId)
+      .eq("marketplace", "ebay")
+      .maybeSingle();
+    if (listingErr) throw listingErr;
+    if (currentListing?.status === "active") {
+      return {
+        ok: false,
+        errorMessage:
+          "This eBay listing is already published. Create a separate fresh draft only after explicitly ending or confirming the active listing workflow.",
+      };
+    }
 
     const { data: photos, error: phErr } = await context.supabase
       .from("product_photos")
@@ -132,7 +151,13 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         marketplace: "ebay",
         action: "create_draft",
         status: "pending",
-        payload: { env, sku: product.sku, categoryId: product.ebay_category_id },
+        payload: {
+          env,
+          sku: product.sku,
+          categoryId: product.ebay_category_id,
+          ebayConditionId: product.ebay_condition_id,
+          ebayConditionEnum: product.ebay_condition_enum,
+        },
       })
       .select("id")
       .single();
@@ -145,26 +170,40 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         title: product.title,
         description: product.description,
         priceCents: product.price_cents ?? 0,
-        condition: product.condition ?? "",
+        internalCondition: product.condition ?? null,
+        ebayConditionId: product.ebay_condition_id!,
+        ebayConditionEnum: product.ebay_condition_enum!,
+        ebayConditionName: product.ebay_condition_name!,
         categoryId: product.ebay_category_id!,
         aspects: product.ebay_aspects,
         imageUrls,
       });
-      console.log("[createEbayDraft] offer created", { offerId: result.offerId, sku: result.sku });
+      console.log("[createEbayDraft] offer created", {
+        offerId: result.offerId,
+        sku: result.sku,
+        categoryId: product.ebay_category_id,
+        ebayConditionId: product.ebay_condition_id,
+        ebayConditionName: product.ebay_condition_name,
+        ebayConditionEnum: product.ebay_condition_enum,
+      });
 
       // Upsert marketplace_listings (ebay, status=draft)
-      const { data: existing } = await context.supabase
-        .from("marketplace_listings")
-        .select("id")
-        .eq("product_id", data.productId)
-        .eq("marketplace", "ebay")
-        .maybeSingle();
+      const existing = currentListing ? { id: currentListing.id } : null;
 
       const listingPatch = {
         status: "draft" as const,
         external_listing_id: null,
         error_message: null,
-        provider_metadata: { offerId: result.offerId, sku: result.sku, env },
+        provider_metadata: {
+          offerId: result.offerId,
+          sku: result.sku,
+          env,
+          categoryId: product.ebay_category_id,
+          ebayConditionId: product.ebay_condition_id,
+          ebayConditionName: product.ebay_condition_name,
+          ebayConditionEnum: product.ebay_condition_enum,
+          draftOutdated: false,
+        },
       };
 
       if (existing) {
@@ -185,7 +224,13 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         .update({
           status: "success",
           processed_at: new Date().toISOString(),
-          result: { offerId: result.offerId, sku: result.sku },
+          result: {
+            offerId: result.offerId,
+            sku: result.sku,
+            categoryId: product.ebay_category_id,
+            ebayConditionId: product.ebay_condition_id,
+            ebayConditionEnum: product.ebay_condition_enum,
+          },
           last_error: null,
         })
         .eq("id", job.id);
@@ -195,7 +240,15 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         sku: result.sku,
         offerId: result.offerId,
       });
-      return { ok: true, offerId: result.offerId, sku: result.sku };
+      return {
+        ok: true,
+        offerId: result.offerId,
+        sku: result.sku,
+        categoryId: product.ebay_category_id ?? undefined,
+        ebayConditionId: product.ebay_condition_id ?? undefined,
+        ebayConditionName: product.ebay_condition_name ?? undefined,
+        ebayConditionEnum: product.ebay_condition_enum ?? undefined,
+      };
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       console.error("[createEbayDraft] failed", { productId: data.productId, error: msg });

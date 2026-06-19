@@ -30,6 +30,47 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     if (!listing || !offerId) {
       return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
     }
+    if (meta.draftOutdated) {
+      return {
+        ok: false,
+        errorMessage: "eBay draft is outdated because category or condition changed. Recreate eBay Draft before publishing.",
+      };
+    }
+
+    const { data: product, error: pErr } = await context.supabase
+      .from("products")
+      .select("ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name")
+      .eq("id", data.productId)
+      .maybeSingle();
+    if (pErr) throw pErr;
+    if (
+      !product?.ebay_category_id ||
+      !product.ebay_condition_id ||
+      !product.ebay_condition_enum ||
+      !product.ebay_condition_name ||
+      meta.categoryId !== product.ebay_category_id ||
+      meta.ebayConditionId !== product.ebay_condition_id ||
+      meta.ebayConditionEnum !== product.ebay_condition_enum
+    ) {
+      return {
+        ok: false,
+        errorMessage: "eBay draft does not match the selected category/condition. Recreate eBay Draft before publishing.",
+      };
+    }
+
+    const { getEbayConditionPolicies } = await import("./condition-policies.server");
+    const validCondition = (await getEbayConditionPolicies(product.ebay_category_id)).some(
+      (c) =>
+        c.conditionId === product.ebay_condition_id &&
+        c.conditionEnum === product.ebay_condition_enum &&
+        c.displayName === product.ebay_condition_name,
+    );
+    if (!validCondition) {
+      return {
+        ok: false,
+        errorMessage: "Selected eBay Condition is no longer valid for this category. Select eBay Condition again and recreate draft.",
+      };
+    }
 
     try {
       const { publishOffer } = await import("./publish.server");

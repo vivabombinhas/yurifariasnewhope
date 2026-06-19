@@ -339,6 +339,9 @@ export type Database = {
           ebay_category_id: string | null
           ebay_category_name: string | null
           ebay_category_source: string | null
+          ebay_condition_enum: string | null
+          ebay_condition_id: number | null
+          ebay_condition_name: string | null
           id: string
           item_specifics: Json
           location_id: string | null
@@ -363,6 +366,9 @@ export type Database = {
           ebay_category_id?: string | null
           ebay_category_name?: string | null
           ebay_category_source?: string | null
+          ebay_condition_enum?: string | null
+          ebay_condition_id?: number | null
+          ebay_condition_name?: string | null
           id?: string
           item_specifics?: Json
           location_id?: string | null
@@ -387,6 +393,9 @@ export type Database = {
           ebay_category_id?: string | null
           ebay_category_name?: string | null
           ebay_category_source?: string | null
+          ebay_condition_enum?: string | null
+          ebay_condition_id?: number | null
+          ebay_condition_name?: string | null
           id?: string
           item_specifics?: Json
           location_id?: string | null

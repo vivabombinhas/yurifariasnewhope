@@ -25,8 +25,12 @@ export const checkEbayPublishPreflight = createServerFn({ method: "POST" })
     if (error) throw error;
 
     const offerId = (listing?.provider_metadata as { offerId?: string } | null)?.offerId;
+    const meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
     if (!offerId) {
       return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
+    }
+    if (meta.draftOutdated) {
+      return { ok: false, errorMessage: "eBay draft is outdated. Recreate eBay Draft before preflight/publish." };
     }
 
     try {

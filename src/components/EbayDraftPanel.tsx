@@ -60,10 +60,20 @@ export function EbayDraftPanel({ productId }: Props) {
 
   const ready = !!readiness.data?.ready;
   const meta =
-    (listing.data?.provider_metadata as { offerId?: string; sku?: string; env?: string }) ??
+    (listing.data?.provider_metadata as {
+      offerId?: string;
+      sku?: string;
+      env?: string;
+      categoryId?: string;
+      ebayConditionId?: number;
+      ebayConditionName?: string;
+      ebayConditionEnum?: string;
+      draftOutdated?: boolean;
+    }) ??
     null;
   const isDraft = listing.data?.status === "draft" && !!meta?.offerId;
   const isActive = listing.data?.status === "active";
+  const isOutdated = !!meta?.draftOutdated;
   const persistedListingError =
     !createMut.isPending && !createMut.data && !createMut.error
       ? listing.data?.error_message
@@ -71,10 +81,8 @@ export function EbayDraftPanel({ productId }: Props) {
 
   const handleCreate = () => {
     if (isActive) {
-      const ok = window.confirm(
-        "This listing is already ACTIVE on eBay. Recreating the draft will overwrite the existing inventory item / offer. Continue?",
-      );
-      if (!ok) return;
+      toast.error("This listing is already active. It will not be overwritten automatically.");
+      return;
     }
     createMut.mutate();
   };
@@ -87,6 +95,7 @@ export function EbayDraftPanel({ productId }: Props) {
         </CardTitle>
         <div className="flex items-center gap-2">
           {isDraft && <Badge variant="secondary">Draft created</Badge>}
+          {isOutdated && <Badge variant="destructive">Outdated</Badge>}
           {isActive && <Badge variant="default">Active</Badge>}
           <Button
             size="sm"
@@ -100,7 +109,7 @@ export function EbayDraftPanel({ productId }: Props) {
             ) : (
               <FileText className="h-4 w-4 mr-1" />
             )}
-            {isActive ? "Recreate Draft (overwrite active)" : isDraft ? "Recreate eBay Draft" : "Create eBay Draft"}
+            {isActive ? "Already Published" : isDraft ? "Recreate eBay Draft" : "Create eBay Draft"}
           </Button>
         </div>
       </CardHeader>
@@ -124,6 +133,25 @@ export function EbayDraftPanel({ productId }: Props) {
               <span className="text-muted-foreground">env: </span>
               <span className="font-mono">{meta.env ?? "sandbox"}</span>
             </div>
+            {meta.categoryId && (
+              <div>
+                <span className="text-muted-foreground">categoryId: </span>
+                <span className="font-mono">{meta.categoryId}</span>
+              </div>
+            )}
+            {meta.ebayConditionEnum && (
+              <div>
+                <span className="text-muted-foreground">condition: </span>
+                <span className="font-mono">
+                  {meta.ebayConditionName} · {meta.ebayConditionEnum} · {meta.ebayConditionId}
+                </span>
+              </div>
+            )}
+            {isOutdated && (
+              <p className="text-xs text-destructive">
+                Category or eBay Condition changed. Recreate this draft before publishing.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Unpublished offer. <code>/publish</code> was NOT called.
             </p>
@@ -133,9 +161,15 @@ export function EbayDraftPanel({ productId }: Props) {
           <p className="text-muted-foreground">Creating draft…</p>
         )}
         {createMut.data?.ok && (
-          <p className="text-emerald-600 dark:text-emerald-400">
-            Draft created: <span className="font-mono">{createMut.data.offerId}</span>
-          </p>
+          <div className="text-emerald-600 dark:text-emerald-400 space-y-1">
+            <p>Draft created: <span className="font-mono">{createMut.data.offerId}</span></p>
+            <p className="text-xs">
+              categoryId: <span className="font-mono">{createMut.data.categoryId}</span> · condition:{" "}
+              <span className="font-mono">
+                {createMut.data.ebayConditionName} · {createMut.data.ebayConditionEnum} · {createMut.data.ebayConditionId}
+              </span>
+            </p>
+          </div>
         )}
         {createMut.data && !createMut.data.ok && (
           <p className="text-destructive break-words">
