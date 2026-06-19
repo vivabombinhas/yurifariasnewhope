@@ -57,7 +57,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       .eq("marketplace", "ebay")
       .maybeSingle();
     if (listingErr) throw listingErr;
-    if (currentListing?.status === "active") {
+    if (currentListing?.status === "active" || currentListing?.external_listing_id) {
       return {
         ok: false,
         errorMessage:
