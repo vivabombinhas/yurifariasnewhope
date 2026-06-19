@@ -17,15 +17,7 @@ export interface EbayReadinessResult {
   checks: ReadinessCheck[];
 }
 
-// Map our product_condition enum → eBay ConditionEnum (subset)
-const CONDITION_MAP: Record<string, string> = {
-  new: "NEW",
-  like_new: "LIKE_NEW",
-  very_good: "USED_VERY_GOOD",
-  good: "USED_GOOD",
-  acceptable: "USED_ACCEPTABLE",
-  for_parts: "FOR_PARTS_OR_NOT_WORKING",
-};
+import { mapEbayCondition, isShoeCategory } from "./condition-map";
 
 export const checkEbayReadiness = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -138,7 +130,9 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
     );
 
     // 9. Condition mapped
-    const ebayCondition = p.condition ? CONDITION_MAP[p.condition] : null;
+    const ebayCondition = mapEbayCondition(p.condition, p.ebay_category_id);
+    const conditionInvalid =
+      p.condition && !ebayCondition && isShoeCategory(p.ebay_category_id);
     checks.push(
       ebayCondition
         ? {
@@ -147,12 +141,20 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
             status: "ok",
             detail: ebayCondition,
           }
-        : {
-            id: "condition",
-            label: "Condition mapped to eBay",
-            status: "missing",
-            action: "Set product condition",
-          },
+        : conditionInvalid
+          ? {
+              id: "condition",
+              label: "Condition not valid for this category",
+              status: "missing",
+              detail: `"${p.condition}" is not accepted by category ${p.ebay_category_id}. Shoe categories require NEW_WITH_BOX / PRE_OWNED_*.`,
+              action: "Change product condition",
+            }
+          : {
+              id: "condition",
+              label: "Condition mapped to eBay",
+              status: "missing",
+              action: "Set product condition",
+            },
     );
 
     // 10. quantity = 1 (each item is unique → always ok in this app)

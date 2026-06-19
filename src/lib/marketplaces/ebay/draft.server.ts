@@ -3,15 +3,7 @@
  * SANDBOX ONLY. Does NOT call /publish.
  */
 import { getValidEbayAccessToken } from "./token-service.server";
-
-const CONDITION_MAP: Record<string, string> = {
-  new: "NEW",
-  like_new: "LIKE_NEW",
-  very_good: "USED_VERY_GOOD",
-  good: "USED_GOOD",
-  acceptable: "USED_ACCEPTABLE",
-  for_parts: "FOR_PARTS_OR_NOT_WORKING",
-};
+import { mapEbayCondition, isShoeCategory } from "./condition-map";
 
 const MARKETPLACE_ID = "EBAY_US";
 const LOCALE = "en_US"; // body locale (eBay InventoryItem uses underscore form)
@@ -101,8 +93,15 @@ export async function createEbayDraftInSandbox(
   if (env !== "sandbox") {
     throw new Error("Draft creation is restricted to sandbox environment.");
   }
-  const ebayCondition = CONDITION_MAP[input.condition];
-  if (!ebayCondition) throw new Error(`Unmapped product condition: ${input.condition}`);
+  const ebayCondition = mapEbayCondition(input.condition, input.categoryId);
+  if (!ebayCondition) {
+    throw new Error(
+      `Unmapped product condition "${input.condition}" for eBay category ${input.categoryId}.` +
+        (isShoeCategory(input.categoryId)
+          ? " This category requires NEW_WITH_BOX / PRE_OWNED_* conditions."
+          : ""),
+    );
+  }
 
   const token = await getValidEbayAccessToken();
 
