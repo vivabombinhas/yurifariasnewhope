@@ -91,6 +91,61 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: msg };
     }
 
+    const { readEbayPublishAuditResources } = await import("./publish-audit.server");
+    const auditResources = await readEbayPublishAuditResources({ sku: product.sku, offerId });
+    const inventoryJson = auditResources.inventoryItemRaw.json && typeof auditResources.inventoryItemRaw.json === "object"
+      ? auditResources.inventoryItemRaw.json
+      : {};
+    const offerJson = auditResources.offerRaw?.json && typeof auditResources.offerRaw.json === "object"
+      ? auditResources.offerRaw.json
+      : {};
+    const allOffers = Array.isArray(auditResources.offersForSkuRaw.json?.offers)
+      ? auditResources.offersForSkuRaw.json.offers
+      : [];
+    const unpublishedOfferCount = allOffers.filter((o: any) => String(o?.status ?? "").toUpperCase() === "UNPUBLISHED").length;
+    const hasPublishedListing = !!listing.external_listing_id || allOffers.some((o: any) => !!o?.listingId || !!o?.listing?.listingId || String(o?.status ?? "").toUpperCase() === "PUBLISHED");
+    const offerCreatedAt = new Date(String(offerJson.createdDate ?? offerJson.createdAt ?? 0)).getTime();
+    const productUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
+    const preconditionsOk =
+      String(inventoryJson.sku ?? product.sku) === product.sku &&
+      String(offerJson.sku ?? "") === product.sku &&
+      String(offerJson.categoryId ?? "") === String(product.ebay_category_id) &&
+      String(inventoryJson.condition ?? "") === product.ebay_condition_enum &&
+      auditResources.conditionPoliciesTable.some((p) => p.conditionEnum === product.ebay_condition_enum && p.conditionId === product.ebay_condition_id) &&
+      Number.isFinite(offerCreatedAt) &&
+      Number.isFinite(productUpdatedAt) &&
+      offerCreatedAt > productUpdatedAt &&
+      !hasPublishedListing &&
+      unpublishedOfferCount === 1;
+    if (!preconditionsOk) {
+      const msg = JSON.stringify({
+        code: "EBAY_PUBLISH_PRECONDITIONS_FAILED",
+        message: "Publish blocked because the read-only audit does not satisfy all required criteria.",
+        publishAttemptId,
+        productId: data.productId,
+        sku: product.sku,
+        inventorySku: inventoryJson.sku ?? null,
+        offerSku: offerJson.sku ?? null,
+        localCategoryId: product.ebay_category_id,
+        offerCategoryId: offerJson.categoryId ?? null,
+        localConditionEnum: product.ebay_condition_enum,
+        inventoryCondition: inventoryJson.condition ?? null,
+        unpublishedOfferCount,
+        hasPublishedListing,
+        offerCreatedAt: offerJson.createdDate ?? offerJson.createdAt ?? null,
+        productUpdatedAt: product.updated_at,
+      });
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg.slice(0, 2000),
+          last_failed_step: "pre_publish_audit",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
+
     const { verifyEbayInventoryItemCondition } = await import("./draft.server");
     let inventoryVerification: Awaited<ReturnType<typeof verifyEbayInventoryItemCondition>>;
     try {
