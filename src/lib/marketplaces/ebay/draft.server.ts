@@ -32,6 +32,8 @@ function aspectsForApi(raw: unknown): Record<string, string[]> {
 export interface CreateDraftInput {
   productId?: string;
   publishAttemptId?: string;
+  accountExternalId?: string | null;
+  accountName?: string | null;
   sku: string;
   title: string;
   description: string;
@@ -315,7 +317,7 @@ export async function createEbayDraftInSandbox(
   console.log("[createEbayDraft] PUT inventory_item HTTP diagnostics", {
     publishAttemptId,
     productId: input.productId,
-    accountUser: "see marketplace_accounts.external_account_id in DB audit",
+    accountUser: input.accountExternalId ?? input.accountName ?? null,
     ...putDiagnostics,
   });
   if (!invRes.ok) {
@@ -328,7 +330,16 @@ export async function createEbayDraftInSandbox(
   });
 
   const { inventoryItemGet, verification } = await verifyInventoryItemCondition(env, token, input);
-  console.log("[createEbayDraft] inventory condition verified", verification);
+  console.log("[createEbayDraft] immediate GET inventory_item diagnostics", {
+    publishAttemptId,
+    productId: input.productId,
+    accountUser: input.accountExternalId ?? input.accountName ?? null,
+    sku: input.sku,
+    url: apiUrl(env, `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`),
+    getReturnedCondition: verification.getReturnedCondition,
+    response: inventoryItemGet,
+  });
+  console.log("[createEbayDraft] inventory condition verified", { publishAttemptId, ...verification });
 
   // 2. POST Offer (UNPUBLISHED — do NOT call /publish)
   const offerBody = {
@@ -347,6 +358,8 @@ export async function createEbayDraftInSandbox(
   };
 
   console.log("[createEbayDraft] POST offer", {
+    publishAttemptId,
+    productId: input.productId,
     sku: input.sku,
     categoryId: input.categoryId,
     ebayConditionEnum: input.ebayConditionEnum,
@@ -358,6 +371,8 @@ export async function createEbayDraftInSandbox(
   const offerId: string | undefined = offerRes.json?.offerId;
   if (!offerId) throw new Error("Offer created but no offerId returned");
   console.log("[createEbayDraft] offer created (fresh)", {
+    publishAttemptId,
+    productId: input.productId,
     sku: input.sku,
     offerId,
     categoryId: input.categoryId,
