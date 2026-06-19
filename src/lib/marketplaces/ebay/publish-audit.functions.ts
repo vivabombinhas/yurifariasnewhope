@@ -219,7 +219,7 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
     const lastChangedAt = draftOutdatedAt ?? textOrNull(product.updated_at);
     const offerMs = timestampMs(offerCreatedAt);
     const changedMs = timestampMs(lastChangedAt);
-    const offerCreatedBeforeOrAfterLastConditionChange =
+    const offerCreatedBeforeOrAfterLastConditionChange: "before" | "after" | "same" | "unknown" =
       offerMs == null || changedMs == null
         ? "unknown"
         : offerMs < changedMs
