@@ -3,15 +3,7 @@
  * SANDBOX ONLY. Does NOT call /publish.
  */
 import { getValidEbayAccessToken } from "./token-service.server";
-
-const CONDITION_MAP: Record<string, string> = {
-  new: "NEW",
-  like_new: "LIKE_NEW",
-  very_good: "USED_VERY_GOOD",
-  good: "USED_GOOD",
-  acceptable: "USED_ACCEPTABLE",
-  for_parts: "FOR_PARTS_OR_NOT_WORKING",
-};
+import { mapEbayCondition, isShoeCategory } from "./condition-map";
 
 const MARKETPLACE_ID = "EBAY_US";
 const LOCALE = "en_US"; // body locale (eBay InventoryItem uses underscore form)
