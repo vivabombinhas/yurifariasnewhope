@@ -29,8 +29,8 @@ const CONDITION_ID_ENUMS: Record<number, string> = {
   2030: "GOOD_REFURBISHED",
   2500: "SELLER_REFURBISHED",
   2750: "LIKE_NEW",
-  2990: "USED_EXCELLENT",
-  3000: "USED_GOOD",
+  2990: "PRE_OWNED_EXCELLENT",
+  3000: "USED_EXCELLENT",
   3010: "USED_ACCEPTABLE",
   4000: "USED_VERY_GOOD",
   5000: "USED_GOOD",
@@ -43,7 +43,7 @@ function normalize(value: string) {
 }
 
 export function conditionEnumForPolicy(conditionId: number, displayName: string): string {
-  const byId = CONDITION_ID_ENUMS[conditionId];
+  const byId = getConditionEnumForId(conditionId);
   if (byId) return byId;
   const name = normalize(displayName);
   if (name === "new with defects") return "NEW_WITH_DEFECTS";
@@ -53,6 +53,25 @@ export function conditionEnumForPolicy(conditionId: number, displayName: string)
   if (name.includes("excellent")) return "USED_EXCELLENT";
   if (name.includes("fair") || name.includes("acceptable")) return "USED_ACCEPTABLE";
   return displayName.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+}
+
+export function getConditionEnumForId(conditionId: number): string | null {
+  return CONDITION_ID_ENUMS[conditionId] ?? null;
+}
+
+export function assertConditionIdEnumMatch(conditionId: number, conditionEnum: string) {
+  const canonicalEnum = getConditionEnumForId(conditionId);
+  if (canonicalEnum !== conditionEnum) {
+    throw new Error(
+      JSON.stringify({
+        code: "EBAY_CONDITION_ID_ENUM_MISMATCH",
+        message: "eBay conditionId and conditionEnum do not match the canonical map.",
+        conditionId,
+        providedConditionEnum: conditionEnum,
+        canonicalConditionEnum: canonicalEnum,
+      }),
+    );
+  }
 }
 
 export async function getEbayConditionPolicies(categoryId: string): Promise<EbayConditionPolicy[]> {

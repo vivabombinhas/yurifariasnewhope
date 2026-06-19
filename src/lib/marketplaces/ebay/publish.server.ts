@@ -32,10 +32,11 @@ export interface EbayPublishErr {
 
 export type EbayPublishResult = EbayPublishOk | EbayPublishErr;
 
-export async function publishOffer(offerId: string): Promise<EbayPublishResult> {
+export async function publishOffer(offerId: string, publishAttemptId?: string): Promise<EbayPublishResult> {
   const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
   const token = await getValidEbayAccessToken();
 
+  console.log("[ebayPublish] POST offer publish", { publishAttemptId, env, offerId });
   const res = await ebayFetch(
     env,
     "POST",

@@ -503,6 +503,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ebay_condition_enum_for_id: {
+        Args: { _condition_id: number }
+        Returns: string
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

@@ -3,6 +3,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 
 export type EbayPublishAuditConclusion =
+  | "EBAY_CONDITION_ID_ENUM_MISMATCH"
   | "CATEGORY_DRIFT"
   | "CONDITION_NOT_PERSISTED"
   | "INVENTORY_CONDITION_DRIFT"
@@ -31,6 +32,7 @@ export interface EbayPublishAuditReport {
     ebayConditionId: number | null;
     ebayConditionName: NullableString;
     ebayConditionEnum: NullableString;
+    canonicalConditionEnum: NullableString;
     lastChangedAt: NullableString;
     fieldTimestamps: {
       productUpdatedAt: NullableString;
@@ -73,6 +75,7 @@ export interface EbayPublishAuditReport {
     dbConditionEnumEqualsInventoryCondition: boolean;
     inventoryConditionAllowedForOfferCategory: boolean;
     dbConditionIdAllowedForOfferCategory: boolean;
+    conditionIdEnumMatch: boolean;
     offerIsNewOrOld: "new" | "old" | "unknown";
     offerCreatedBeforeOrAfterLastConditionChange: "before" | "after" | "same" | "unknown";
     otherUnpublishedOffersForSku: Array<{ offerId: string; status: string | null; categoryId: string | null }>;
@@ -188,11 +191,15 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
     const dbConditionEnum = textOrNull(product.ebay_condition_enum);
     const dbConditionId = numberOrNull(product.ebay_condition_id);
     const dbCategoryId = textOrNull(product.ebay_category_id);
+    const { getConditionEnumForId } = await import("./condition-policies.server");
+    const canonicalConditionEnum = dbConditionId == null ? null : getConditionEnumForId(dbConditionId);
 
     const dbCategoryIdEqualsOfferCategoryId = dbCategoryId === offerCategoryId;
     const dbConditionEnumEqualsInventoryCondition = dbConditionEnum === inventoryCondition;
     const inventoryConditionAllowedForOfferCategory = !!inventoryCondition && policyTable.some((p) => p.conditionEnum === inventoryCondition);
     const dbConditionIdAllowedForOfferCategory = dbConditionId != null && policyTable.some((p) => p.conditionId === dbConditionId);
+    const conditionIdEnumMismatch = dbConditionId != null && !!dbConditionEnum && canonicalConditionEnum !== dbConditionEnum;
+    const conditionIdEnumMatch = dbConditionId != null && !!dbConditionEnum && canonicalConditionEnum === dbConditionEnum;
 
     const currentOfferId = textOrNull(offerJson.offerId) ?? offerId;
     const offerSummaryRows: OfferSummaryRow[] = allOffers.map((offer: Record<string, any>) => ({
@@ -247,9 +254,12 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
       otherUnpublishedOffersForSku,
       hasPublishedListingForSku,
       unpublishedOfferCountForSku,
+      conditionIdEnumMatch,
     };
 
-    const conclusion = classifyConclusion({
+    const conclusion = conditionIdEnumMismatch
+      ? "EBAY_CONDITION_ID_ENUM_MISMATCH"
+      : classifyConclusion({
       dbCategoryIdEqualsOfferCategoryId,
       dbConditionEnum,
       dbConditionId,
@@ -272,6 +282,7 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
         ebayConditionId: dbConditionId,
         ebayConditionName: textOrNull(product.ebay_condition_name),
         ebayConditionEnum: dbConditionEnum,
+        canonicalConditionEnum,
         lastChangedAt,
         fieldTimestamps: {
           productUpdatedAt: textOrNull(product.updated_at),
