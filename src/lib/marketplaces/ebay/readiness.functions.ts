@@ -130,7 +130,9 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
     );
 
     // 9. Condition mapped
-    const ebayCondition = p.condition ? CONDITION_MAP[p.condition] : null;
+    const ebayCondition = mapEbayCondition(p.condition, p.ebay_category_id);
+    const conditionInvalid =
+      p.condition && !ebayCondition && isShoeCategory(p.ebay_category_id);
     checks.push(
       ebayCondition
         ? {
