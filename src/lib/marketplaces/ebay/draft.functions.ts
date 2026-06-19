@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 import { z } from "zod";
 
 export interface CreateDraftDTO {
@@ -200,6 +201,9 @@ export const createEbayDraft = createServerFn({ method: "POST" })
 
       // Upsert marketplace_listings (ebay, status=draft)
       const existing = currentListing ? { id: currentListing.id } : null;
+      const conditionVerificationJson = JSON.parse(
+        JSON.stringify(result.conditionVerification),
+      ) as Json;
 
       const listingPatch = {
         status: "draft" as const,
@@ -213,7 +217,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           ebayConditionId: product.ebay_condition_id,
           ebayConditionName: product.ebay_condition_name,
           ebayConditionEnum: product.ebay_condition_enum,
-          conditionVerification: result.conditionVerification,
+          conditionVerification: conditionVerificationJson,
           draftOutdated: false,
         },
       };
@@ -242,7 +246,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
             categoryId: product.ebay_category_id,
             ebayConditionId: product.ebay_condition_id,
             ebayConditionEnum: product.ebay_condition_enum,
-            conditionVerification: result.conditionVerification,
+            conditionVerification: conditionVerificationJson,
           },
           last_error: null,
         })
