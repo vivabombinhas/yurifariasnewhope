@@ -186,7 +186,8 @@ export const saveEbayCondition = createServerFn({ method: "POST" })
         ebay_condition_id: selected.conditionId,
         ebay_condition_enum: selected.conditionEnum,
         ebay_condition_name: selected.displayName,
-      })
+        needs_condition_reselection: false,
+      } as any)
       .eq("id", data.productId);
     if (error) throw error;
     await markEbayDraftOutdated(context.supabase, data.productId, "condition_changed");
