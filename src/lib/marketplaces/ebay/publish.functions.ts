@@ -110,6 +110,26 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: msg };
     }
 
+    // Ensure the eBay account has a valid Inventory Location (country=US, ENABLED, postalCode or city+state)
+    // and patch the offer to use it. Fixes errorId 25002 "No <Item.Country> exists".
+    let locationInfo: { merchantLocationKey: string; status: string; country: string; postalCode?: string; city?: string; stateOrProvince?: string; created: boolean };
+    try {
+      const { ensureValidMerchantLocation, setOfferMerchantLocation } = await import("./seller-setup.server");
+      locationInfo = await ensureValidMerchantLocation(context.supabase);
+      await setOfferMerchantLocation(offerId, locationInfo.merchantLocationKey);
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg.slice(0, 2000),
+          last_failed_step: "merchant_location",
+          last_error: JSON.parse(JSON.stringify({ message: msg, offerId })) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
+
     try {
       const { publishOffer } = await import("./publish.server");
       const result = await publishOffer(offerId);
@@ -171,6 +191,10 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         productId: data.productId,
         offerId,
         ...inventoryVerification.verification,
+        merchantLocationKey: locationInfo.merchantLocationKey,
+        locationStatus: locationInfo.status,
+        locationCountry: locationInfo.country,
+        locationPostalCode: locationInfo.postalCode,
         ok: result.ok,
         listingId: result.ok ? result.listingId : undefined,
         status: result.raw.status,

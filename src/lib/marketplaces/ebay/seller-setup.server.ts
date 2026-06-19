@@ -328,3 +328,216 @@ export async function optInToBusinessPolicies(): Promise<{ ok: true; raw: unknow
   }
   return { ok: true, raw: res.json ?? res.text ?? null };
 }
+
+// ===== Merchant Location validation =====
+
+export interface ValidMerchantLocation {
+  merchantLocationKey: string;
+  status: string;
+  country: string;
+  postalCode?: string;
+  city?: string;
+  stateOrProvince?: string;
+  created: boolean;
+}
+
+interface MinimalSupabase {
+  from: (table: string) => any;
+}
+
+function locationIsValid(loc: any, expectedCountry: string) {
+  const status = loc?.merchantLocationStatus;
+  const addr = loc?.location?.address ?? {};
+  const country = addr.country;
+  const postalCode = addr.postalCode;
+  const city = addr.city;
+  const state = addr.stateOrProvince;
+  if (status !== "ENABLED") return false;
+  if (!country || country !== expectedCountry) return false;
+  if (!postalCode && !(city && state)) return false;
+  return true;
+}
+
+async function fetchLocation(env: string, token: string, key: string) {
+  return ebayFetch(
+    env,
+    "GET",
+    `/sell/inventory/v1/location/${encodeURIComponent(key)}`,
+    token,
+  );
+}
+
+/**
+ * Ensure the eBay account has a valid Inventory Location for EBAY_US.
+ * - Validates the currently-saved merchantLocationKey
+ * - Falls back to scanning all locations
+ * - If none are valid, creates a fresh location with a new key and persists it
+ * - Throws INVALID_MERCHANT_LOCATION if even the new one is not valid
+ */
+export async function ensureValidMerchantLocation(
+  supabase: MinimalSupabase,
+): Promise<ValidMerchantLocation> {
+  const env = await ensureSandbox();
+  const token = await getValidEbayAccessToken();
+  const expectedCountry = "US";
+
+  const { data: account, error: accErr } = await supabase
+    .from("marketplace_accounts")
+    .select("id, merchant_location_key")
+    .eq("marketplace", "ebay")
+    .maybeSingle();
+  if (accErr) throw accErr;
+
+  // Try saved key first
+  let candidate: { key: string; loc: any } | null = null;
+  if (account?.merchant_location_key) {
+    const r = await fetchLocation(env, token, account.merchant_location_key);
+    if (r.ok && r.json) candidate = { key: account.merchant_location_key, loc: r.json };
+  }
+
+  // Then scan all locations
+  if (!candidate || !locationIsValid(candidate.loc, expectedCountry)) {
+    const listRes = await ebayFetch(env, "GET", `/sell/inventory/v1/location`, token);
+    const locations = (listRes.json?.locations ?? []) as any[];
+    const found = locations.find((l) => locationIsValid(l, expectedCountry));
+    if (found) candidate = { key: found.merchantLocationKey, loc: found };
+  }
+
+  // Still nothing — create a fresh location with a new key
+  if (!candidate || !locationIsValid(candidate.loc, expectedCountry)) {
+    const newKey = `loc_${Date.now()}`;
+    const body = {
+      location: {
+        address: {
+          country: "US",
+          city: "San Jose",
+          stateOrProvince: "CA",
+          postalCode: "95125",
+          addressLine1: "2025 Hamilton Ave",
+        },
+      },
+      locationInstructions: "Items ship from here",
+      name: "Default Warehouse",
+      merchantLocationStatus: "ENABLED",
+      locationTypes: ["WAREHOUSE"],
+    };
+    const createRes = await ebayFetch(
+      env,
+      "POST",
+      `/sell/inventory/v1/location/${encodeURIComponent(newKey)}`,
+      token,
+      body,
+    );
+    if (!createRes.ok && createRes.status !== 409) {
+      throw new Error(
+        `INVALID_MERCHANT_LOCATION: failed to create location ${newKey}: ${ebayErrorMessage(createRes.status, createRes.json, createRes.text)}`,
+      );
+    }
+    // Ensure enabled (best-effort)
+    await ebayFetch(
+      env,
+      "POST",
+      `/sell/inventory/v1/location/${encodeURIComponent(newKey)}/enable`,
+      token,
+    );
+    const verify = await fetchLocation(env, token, newKey);
+    if (!verify.ok || !verify.json || !locationIsValid(verify.json, expectedCountry)) {
+      const addr = verify.json?.location?.address ?? {};
+      throw new Error(
+        `INVALID_MERCHANT_LOCATION: ${JSON.stringify({
+          merchantLocationKey: newKey,
+          status: verify.json?.merchantLocationStatus,
+          country: addr.country,
+          postalCode: addr.postalCode,
+          city: addr.city,
+          stateOrProvince: addr.stateOrProvince,
+        })}`,
+      );
+    }
+    candidate = { key: newKey, loc: verify.json };
+
+    // Persist new key
+    const { error: upErr } = await supabase
+      .from("marketplace_accounts")
+      .update({ merchant_location_key: newKey })
+      .eq("marketplace", "ebay");
+    if (upErr) throw upErr;
+
+    const addr = verify.json.location?.address ?? {};
+    return {
+      merchantLocationKey: newKey,
+      status: verify.json.merchantLocationStatus,
+      country: addr.country,
+      postalCode: addr.postalCode,
+      city: addr.city,
+      stateOrProvince: addr.stateOrProvince,
+      created: true,
+    };
+  }
+
+  // Persist saved key if it differs from current account row
+  if (account?.merchant_location_key !== candidate.key) {
+    await supabase
+      .from("marketplace_accounts")
+      .update({ merchant_location_key: candidate.key })
+      .eq("marketplace", "ebay");
+  }
+
+  const addr = candidate.loc.location?.address ?? candidate.loc.address ?? {};
+  return {
+    merchantLocationKey: candidate.key,
+    status: candidate.loc.merchantLocationStatus,
+    country: addr.country,
+    postalCode: addr.postalCode,
+    city: addr.city,
+    stateOrProvince: addr.stateOrProvince,
+    created: false,
+  };
+}
+
+/**
+ * Patch only merchantLocationKey on an existing unpublished Offer,
+ * preserving every other field eBay's PUT requires.
+ */
+export async function setOfferMerchantLocation(
+  offerId: string,
+  merchantLocationKey: string,
+): Promise<void> {
+  const env = await ensureSandbox();
+  const token = await getValidEbayAccessToken();
+
+  const offerRes = await ebayFetch(
+    env,
+    "GET",
+    `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}`,
+    token,
+  );
+  if (!offerRes.ok) {
+    throw new Error(`Read offer: ${ebayErrorMessage(offerRes.status, offerRes.json, offerRes.text)}`);
+  }
+  const offer = offerRes.json ?? {};
+  if (offer.merchantLocationKey === merchantLocationKey) return;
+
+  const body: any = {
+    sku: offer.sku,
+    marketplaceId: offer.marketplaceId ?? MARKETPLACE_ID,
+    format: offer.format ?? "FIXED_PRICE",
+    availableQuantity: offer.availableQuantity ?? 1,
+    categoryId: offer.categoryId,
+    listingDescription: offer.listingDescription,
+    pricingSummary: offer.pricingSummary,
+    merchantLocationKey,
+    listingPolicies: offer.listingPolicies,
+  };
+
+  const putRes = await ebayFetch(
+    env,
+    "PUT",
+    `/sell/inventory/v1/offer/${encodeURIComponent(offerId)}`,
+    token,
+    body,
+  );
+  if (!putRes.ok) {
+    throw new Error(`Update offer location: ${ebayErrorMessage(putRes.status, putRes.json, putRes.text)}`);
+  }
+}
