@@ -3,7 +3,7 @@
  * SANDBOX ONLY. Does NOT call /publish.
  */
 import { getValidEbayAccessToken } from "./token-service.server";
-import { getEbayConditionPolicies } from "./condition-policies.server";
+import { assertConditionIdEnumMatch, getEbayConditionPolicies } from "./condition-policies.server";
 
 const MARKETPLACE_ID = "EBAY_US";
 const LOCALE = "en_US"; // body locale (eBay InventoryItem uses underscore form)
@@ -30,6 +30,8 @@ function aspectsForApi(raw: unknown): Record<string, string[]> {
 }
 
 export interface CreateDraftInput {
+  productId?: string;
+  publishAttemptId?: string;
   sku: string;
   title: string;
   description: string;
@@ -92,6 +94,37 @@ export async function ebayFetch(
   return { ok: res.ok, status: res.status, text, json };
 }
 
+function apiUrl(env: string, path: string) {
+  return `${apiHost(env)}${path}`;
+}
+
+async function ebayFetchWithDiagnostics(
+  env: string,
+  method: string,
+  path: string,
+  token: string,
+  body: unknown,
+) {
+  const serializedBody = body == null ? undefined : JSON.stringify(body);
+  const res = await ebayFetch(env, method, path, token, body);
+  return {
+    res,
+    diagnostics: {
+      url: apiUrl(env, path),
+      env,
+      method,
+      skuInUrl: decodeURIComponent(path.split("/").pop() ?? ""),
+      requestHeaders: {
+        "Content-Type": "application/json",
+        "Content-Language": HTTP_LOCALE,
+      },
+      requestBody: serializedBody ? JSON.parse(serializedBody) : null,
+      responseStatus: res.status,
+      response: { ok: res.ok, status: res.status, json: res.json, text: res.text },
+    },
+  };
+}
+
 export function ebayErrorMessage(status: number, json: any, text: string): string {
   const errs = json?.errors;
   if (Array.isArray(errs) && errs.length) {
@@ -103,6 +136,7 @@ export function ebayErrorMessage(status: number, json: any, text: string): strin
 }
 
 async function assertSelectedConditionAllowed(input: CreateDraftInput) {
+  assertConditionIdEnumMatch(input.ebayConditionId, input.ebayConditionEnum);
   const policies = await getEbayConditionPolicies(input.categoryId);
   const selected = policies.find(
     (p) =>
@@ -180,6 +214,7 @@ export async function verifyEbayInventoryItemCondition(input: CreateDraftInput) 
 export async function createEbayDraftInSandbox(
   input: CreateDraftInput,
 ): Promise<CreateDraftResult> {
+  const publishAttemptId = input.publishAttemptId ?? crypto.randomUUID();
   const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
   if (env !== "sandbox") {
     throw new Error("Draft creation is restricted to sandbox environment.");
@@ -257,7 +292,10 @@ export async function createEbayDraftInSandbox(
   };
 
   console.log("[createEbayDraft] PUT inventory_item", {
+    publishAttemptId,
+    productId: input.productId,
     sku: input.sku,
+    url: apiUrl(env, `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`),
     env,
     internalCondition: input.internalCondition,
     ebayCategoryId: input.categoryId,
@@ -267,13 +305,19 @@ export async function createEbayDraftInSandbox(
     putSentCondition: input.ebayConditionEnum,
     imageCount: input.imageUrls.length,
   });
-  const invRes = await ebayFetch(
+  const { res: invRes, diagnostics: putDiagnostics } = await ebayFetchWithDiagnostics(
     env,
     "PUT",
     `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`,
     token,
     inventoryBody,
   );
+  console.log("[createEbayDraft] PUT inventory_item HTTP diagnostics", {
+    publishAttemptId,
+    productId: input.productId,
+    accountUser: "see marketplace_accounts.external_account_id in DB audit",
+    ...putDiagnostics,
+  });
   if (!invRes.ok) {
     throw new Error(`InventoryItem: ${ebayErrorMessage(invRes.status, invRes.json, invRes.text)}`);
   }
