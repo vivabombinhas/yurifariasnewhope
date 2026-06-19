@@ -68,6 +68,16 @@ export function EbayDraftPanel({ productId }: Props) {
       ebayConditionId?: number;
       ebayConditionName?: string;
       ebayConditionEnum?: string;
+      conditionVerification?: {
+        internalCondition: string | null;
+        ebayCategoryId: string;
+        selectedEbayConditionId: number;
+        selectedEbayConditionName: string;
+        selectedEbayConditionEnum: string;
+        putSentCondition: string;
+        getReturnedCondition: string | null;
+        offerId?: string;
+      };
       draftOutdated?: boolean;
     }) ??
     null;
@@ -147,6 +157,14 @@ export function EbayDraftPanel({ productId }: Props) {
                 </span>
               </div>
             )}
+            {meta.conditionVerification && (
+              <div className="text-xs">
+                <span className="text-muted-foreground">InventoryItem verified: </span>
+                <span className="font-mono">
+                  sent {meta.conditionVerification.putSentCondition} / got {meta.conditionVerification.getReturnedCondition ?? "null"}
+                </span>
+              </div>
+            )}
             {isOutdated && (
               <p className="text-xs text-destructive">
                 Category or eBay Condition changed. Recreate this draft before publishing.
@@ -169,6 +187,12 @@ export function EbayDraftPanel({ productId }: Props) {
                 {createMut.data.ebayConditionName} · {createMut.data.ebayConditionEnum} · {createMut.data.ebayConditionId}
               </span>
             </p>
+            {createMut.data.conditionVerification && (
+              <p className="text-xs">
+                InventoryItem: sent <span className="font-mono">{createMut.data.conditionVerification.putSentCondition}</span> · got{" "}
+                <span className="font-mono">{createMut.data.conditionVerification.getReturnedCondition ?? "null"}</span>
+              </p>
+            )}
           </div>
         )}
         {createMut.data && !createMut.data.ok && (
