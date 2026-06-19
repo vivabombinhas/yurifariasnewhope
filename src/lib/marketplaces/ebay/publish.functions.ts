@@ -60,21 +60,6 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       .eq("id", data.productId)
       .maybeSingle();
     if (pErr) throw pErr;
-    const { assertConditionIdEnumMatch } = await import("./condition-policies.server");
-    try {
-      assertConditionIdEnumMatch(product?.ebay_condition_id ?? 0, product?.ebay_condition_enum ?? "");
-    } catch (e: any) {
-      const msg = e?.message ?? String(e);
-      await context.supabase
-        .from("marketplace_listings")
-        .update({
-          error_message: msg,
-          last_failed_step: "condition_validate",
-          last_error: JSON.parse(msg) as Json,
-        })
-        .eq("id", listing.id);
-      return { ok: false, errorMessage: msg };
-    }
     if (
       !product?.sku ||
       !product.ebay_category_id ||
@@ -89,6 +74,21 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         ok: false,
         errorMessage: "eBay draft does not match the selected category/condition. Recreate eBay Draft before publishing.",
       };
+    }
+    const { assertConditionIdEnumMatch } = await import("./condition-policies.server");
+    try {
+      assertConditionIdEnumMatch(product.ebay_condition_id, product.ebay_condition_enum);
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg,
+          last_failed_step: "condition_validate",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
     }
 
     const { verifyEbayInventoryItemCondition } = await import("./draft.server");
