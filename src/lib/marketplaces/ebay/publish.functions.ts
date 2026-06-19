@@ -12,6 +12,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<EbayPublishDTO> => {
+    const publishAttemptId = crypto.randomUUID();
     const env = String(process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     const isProd = env === "production";
     if (!isProd && env !== "sandbox") {
@@ -59,6 +60,21 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       .eq("id", data.productId)
       .maybeSingle();
     if (pErr) throw pErr;
+    const { assertConditionIdEnumMatch } = await import("./condition-policies.server");
+    try {
+      assertConditionIdEnumMatch(product?.ebay_condition_id ?? 0, product?.ebay_condition_enum ?? "");
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg,
+          last_failed_step: "condition_validate",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
     if (
       !product?.sku ||
       !product.ebay_category_id ||
@@ -79,6 +95,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     let inventoryVerification: Awaited<ReturnType<typeof verifyEbayInventoryItemCondition>>;
     try {
       inventoryVerification = await verifyEbayInventoryItemCondition({
+        productId: data.productId,
+        publishAttemptId,
         sku: product.sku,
         title: product.title ?? "",
         description: product.description ?? "",
@@ -132,7 +150,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
 
     try {
       const { publishOffer } = await import("./publish.server");
-      const result = await publishOffer(offerId);
+      const result = await publishOffer(offerId, publishAttemptId);
 
       const conditionVerificationJson = JSON.parse(
         JSON.stringify({ ...inventoryVerification.verification, offerId }),
@@ -149,6 +167,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         ...meta,
         marketplace: "ebay",
         offerId,
+          publishAttemptId,
         conditionVerification: conditionVerificationJson,
         lastPublishRaw: result.raw,
       };
@@ -188,7 +207,9 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       }
 
       console.log("[ebayPublish]", {
+        publishAttemptId,
         productId: data.productId,
+        sku: product.sku,
         offerId,
         ...inventoryVerification.verification,
         merchantLocationKey: locationInfo.merchantLocationKey,
@@ -203,7 +224,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: true, result };
     } catch (e: any) {
       const msg = e?.message ?? String(e);
-      console.error("[ebayPublish] failed", { offerId, error: msg });
+      console.error("[ebayPublish] failed", { publishAttemptId, productId: data.productId, offerId, error: msg });
       await context.supabase
         .from("marketplace_listings")
         .update({
