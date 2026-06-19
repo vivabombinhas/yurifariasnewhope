@@ -105,7 +105,32 @@ export async function createEbayDraftInSandbox(
 
   const token = await getValidEbayAccessToken();
 
-  // 1. PUT InventoryItem
+  // 0. Clean up any stale Offer/InventoryItem for this SKU so we always send
+  //    a fresh InventoryItem with the current condition. eBay caches the
+  //    InventoryItem server-side; if a prior Offer references an inventory
+  //    item with an outdated condition, Publish will keep failing.
+  const existingOffersRes = await ebayFetch(
+    env,
+    "GET",
+    `/sell/inventory/v1/offer?sku=${encodeURIComponent(input.sku)}`,
+    token,
+  );
+  const existingOffers: any[] = existingOffersRes.json?.offers ?? [];
+  for (const off of existingOffers) {
+    if (!off?.offerId) continue;
+    const del = await ebayFetch(
+      env,
+      "DELETE",
+      `/sell/inventory/v1/offer/${encodeURIComponent(off.offerId)}`,
+      token,
+    );
+    console.log("[createEbayDraft] deleted stale offer", {
+      offerId: off.offerId,
+      status: del.status,
+    });
+  }
+
+  // 1. PUT InventoryItem (fully replaces existing inventory item for this SKU)
   const inventoryBody = {
     availability: {
       shipToLocationAvailability: { quantity: 1 },
@@ -119,7 +144,14 @@ export async function createEbayDraftInSandbox(
     },
   };
 
-  console.log("[createEbayDraft] calling eBay InventoryItem", { sku: input.sku, env });
+  console.log("[createEbayDraft] PUT inventory_item", {
+    sku: input.sku,
+    env,
+    categoryId: input.categoryId,
+    productCondition: input.condition,
+    ebayCondition,
+    imageCount: input.imageUrls.length,
+  });
   const invRes = await ebayFetch(
     env,
     "PUT",
@@ -130,7 +162,11 @@ export async function createEbayDraftInSandbox(
   if (!invRes.ok) {
     throw new Error(`InventoryItem: ${ebayErrorMessage(invRes.status, invRes.json, invRes.text)}`);
   }
-  console.log("[createEbayDraft] inventory item created", { sku: input.sku, status: invRes.status });
+  console.log("[createEbayDraft] inventory item upserted", {
+    sku: input.sku,
+    status: invRes.status,
+    ebayCondition,
+  });
 
   // 2. POST Offer (UNPUBLISHED — do NOT call /publish)
   const offerBody = {
@@ -148,13 +184,23 @@ export async function createEbayDraftInSandbox(
     },
   };
 
-  console.log("[createEbayDraft] calling eBay Offer", { sku: input.sku, categoryId: input.categoryId });
+  console.log("[createEbayDraft] POST offer", {
+    sku: input.sku,
+    categoryId: input.categoryId,
+    ebayCondition,
+  });
   const offerRes = await ebayFetch(env, "POST", `/sell/inventory/v1/offer`, token, offerBody);
   if (!offerRes.ok) {
     throw new Error(`Offer: ${ebayErrorMessage(offerRes.status, offerRes.json, offerRes.text)}`);
   }
   const offerId: string | undefined = offerRes.json?.offerId;
   if (!offerId) throw new Error("Offer created but no offerId returned");
+  console.log("[createEbayDraft] offer created (fresh)", {
+    sku: input.sku,
+    offerId,
+    categoryId: input.categoryId,
+    ebayCondition,
+  });
 
   return {
     sku: input.sku,
