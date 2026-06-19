@@ -24,7 +24,7 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     const checks: ReadinessCheck[] = [];
 
-    const [productRes, photosRes, accountRes] = await Promise.all([
+    const [productRes, photosRes, accountRes, listingRes] = await Promise.all([
       context.supabase
         .from("products")
         .select(
@@ -41,6 +41,12 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
         .select("status")
         .eq("marketplace", "ebay")
         .eq("environment", env)
+        .maybeSingle(),
+      context.supabase
+        .from("marketplace_listings")
+        .select("status, external_listing_id, provider_metadata")
+        .eq("product_id", data.productId)
+        .eq("marketplace", "ebay")
         .maybeSingle(),
     ]);
 
@@ -178,7 +184,67 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
       });
     }
 
-    // 10. quantity = 1 (each item is unique → always ok in this app)
+    // 10. Real InventoryItem condition verification. This is what prevents
+    // Readiness from going green while eBay still stores an old condition.
+    if (
+      p.ebay_category_id &&
+      p.ebay_condition_id &&
+      p.ebay_condition_enum &&
+      p.ebay_condition_name &&
+      p.sku &&
+      accountRes.data?.status === "connected"
+    ) {
+      try {
+        const meta = (listingRes.data?.provider_metadata ?? {}) as Record<string, any>;
+        if (!meta.offerId && listingRes.data?.status !== "active") {
+          checks.push({
+            id: "inventory_condition_verified",
+            label: "InventoryItem condition confirmed by eBay",
+            status: "missing",
+            detail: "Create or recreate the eBay draft to write and verify InventoryItem condition.",
+            action: "Recreate eBay Draft",
+          });
+        } else {
+          const { verifyEbayInventoryItemCondition } = await import("./draft.server");
+          const verified = await verifyEbayInventoryItemCondition({
+            sku: p.sku,
+            title: p.title ?? "",
+            description: p.description ?? "",
+            priceCents: p.price_cents ?? 0,
+            internalCondition: p.condition ?? null,
+            ebayConditionId: p.ebay_condition_id,
+            ebayConditionEnum: p.ebay_condition_enum,
+            ebayConditionName: p.ebay_condition_name,
+            categoryId: p.ebay_category_id,
+            aspects: p.ebay_aspects,
+            imageUrls: [],
+          });
+          checks.push({
+            id: "inventory_condition_verified",
+            label: "InventoryItem condition confirmed by eBay",
+            status: "ok",
+            detail: `${verified.verification.putSentCondition} confirmed (offerId: ${meta.offerId ?? "active"})`,
+          });
+        }
+      } catch (e: any) {
+        checks.push({
+          id: "inventory_condition_verified",
+          label: "InventoryItem condition confirmed by eBay",
+          status: "missing",
+          detail: e?.message ?? "eBay InventoryItem condition did not match the selected condition.",
+          action: "Recreate eBay Draft",
+        });
+      }
+    } else {
+      checks.push({
+        id: "inventory_condition_verified",
+        label: "InventoryItem condition confirmed by eBay",
+        status: "missing",
+        action: "Select category and eBay Condition first",
+      });
+    }
+
+    // 11. quantity = 1 (each item is unique → always ok in this app)
     checks.push({
       id: "quantity",
       label: "Quantity = 1 (unique item)",
