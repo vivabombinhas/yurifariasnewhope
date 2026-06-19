@@ -16,15 +16,17 @@ const DEFAULT_MAP: Record<string, string> = {
   for_parts: "FOR_PARTS_OR_NOT_WORKING",
 };
 
-// Shoe/sneaker style mapping — categories that require NEW_WITH_BOX / PRE_OWNED_*
+// Shoe/sneaker mapping — Athletic Shoes (15709) and similar shoe categories
+// only accept: NEW_WITH_BOX, NEW_WITHOUT_BOX, NEW_WITH_DEFECTS, PRE_OWNED.
+// PRE_OWNED_EXCELLENT / PRE_OWNED_FAIR are NOT accepted here (they belong to
+// collectibles categories) — sending them results in errorId 25059.
 const SHOE_MAP: Record<string, string> = {
   new: "NEW_WITH_BOX",
-  like_new: "PRE_OWNED_EXCELLENT",
-  very_good: "PRE_OWNED_EXCELLENT",
-  good: "PRE_OWNED_FAIR",
-  acceptable: "PRE_OWNED_FAIR",
-  // No "for_parts" equivalent — fall back to PRE_OWNED_FAIR
-  for_parts: "PRE_OWNED_FAIR",
+  like_new: "NEW_WITHOUT_BOX",
+  very_good: "PRE_OWNED",
+  good: "PRE_OWNED",
+  acceptable: "PRE_OWNED",
+  for_parts: "PRE_OWNED",
 };
 
 // Known eBay leaf categories that require the shoe-style condition enums.
