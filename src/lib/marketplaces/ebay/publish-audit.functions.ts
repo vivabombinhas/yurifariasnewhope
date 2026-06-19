@@ -198,7 +198,8 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
     const dbConditionEnumEqualsInventoryCondition = dbConditionEnum === inventoryCondition;
     const inventoryConditionAllowedForOfferCategory = !!inventoryCondition && policyTable.some((p) => p.conditionEnum === inventoryCondition);
     const dbConditionIdAllowedForOfferCategory = dbConditionId != null && policyTable.some((p) => p.conditionId === dbConditionId);
-    const conditionIdEnumMatch = !!dbConditionEnum && canonicalConditionEnum === dbConditionEnum;
+    const conditionIdEnumMismatch = dbConditionId != null && !!dbConditionEnum && canonicalConditionEnum !== dbConditionEnum;
+    const conditionIdEnumMatch = dbConditionId != null && !!dbConditionEnum && canonicalConditionEnum === dbConditionEnum;
 
     const currentOfferId = textOrNull(offerJson.offerId) ?? offerId;
     const offerSummaryRows: OfferSummaryRow[] = allOffers.map((offer: Record<string, any>) => ({
@@ -256,7 +257,7 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
       conditionIdEnumMatch,
     };
 
-    const conclusion = !conditionIdEnumMatch
+    const conclusion = conditionIdEnumMismatch
       ? "EBAY_CONDITION_ID_ENUM_MISMATCH"
       : classifyConclusion({
       dbCategoryIdEqualsOfferCategoryId,
