@@ -76,19 +76,39 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     }
 
     const { verifyEbayInventoryItemCondition } = await import("./draft.server");
-    const inventoryVerification = await verifyEbayInventoryItemCondition({
-      sku: product.sku,
-      title: product.title ?? "",
-      description: product.description ?? "",
-      priceCents: product.price_cents ?? 0,
-      internalCondition: product.condition ?? null,
-      ebayConditionId: product.ebay_condition_id,
-      ebayConditionEnum: product.ebay_condition_enum,
-      ebayConditionName: product.ebay_condition_name,
-      categoryId: product.ebay_category_id,
-      aspects: product.ebay_aspects,
-      imageUrls: [],
-    });
+    let inventoryVerification: Awaited<ReturnType<typeof verifyEbayInventoryItemCondition>>;
+    try {
+      inventoryVerification = await verifyEbayInventoryItemCondition({
+        sku: product.sku,
+        title: product.title ?? "",
+        description: product.description ?? "",
+        priceCents: product.price_cents ?? 0,
+        internalCondition: product.condition ?? null,
+        ebayConditionId: product.ebay_condition_id,
+        ebayConditionEnum: product.ebay_condition_enum,
+        ebayConditionName: product.ebay_condition_name,
+        categoryId: product.ebay_category_id,
+        aspects: product.ebay_aspects,
+        imageUrls: [],
+      });
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      let parsedError: Json;
+      try {
+        parsedError = JSON.parse(msg) as Json;
+      } catch {
+        parsedError = { message: msg, offerId } as Json;
+      }
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg,
+          last_failed_step: "inventory_verify",
+          last_error: parsedError,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
 
     try {
       const { publishOffer } = await import("./publish.server");
