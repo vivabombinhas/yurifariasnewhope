@@ -32,7 +32,8 @@ export const createEbayDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<CreateDraftDTO> => {
-    console.log("[createEbayDraft] started", { productId: data.productId });
+    const publishAttemptId = crypto.randomUUID();
+    console.log("[createEbayDraft] started", { publishAttemptId, productId: data.productId });
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     if (env !== "sandbox") {
       console.warn("[createEbayDraft] aborted: non-sandbox env", { env });
@@ -62,13 +63,22 @@ export const createEbayDraft = createServerFn({ method: "POST" })
     if (pErr) throw pErr;
     if (!product) return { ok: false, errorMessage: "Product not found" };
 
-    const { data: currentListing, error: listingErr } = await context.supabase
-      .from("marketplace_listings")
-      .select("id, status, external_listing_id, provider_metadata")
-      .eq("product_id", data.productId)
-      .eq("marketplace", "ebay")
-      .maybeSingle();
+    const [{ data: currentListing, error: listingErr }, { data: account, error: accountErr }] = await Promise.all([
+      context.supabase
+        .from("marketplace_listings")
+        .select("id, status, external_listing_id, provider_metadata")
+        .eq("product_id", data.productId)
+        .eq("marketplace", "ebay")
+        .maybeSingle(),
+      context.supabase
+        .from("marketplace_accounts")
+        .select("account_name, external_account_id")
+        .eq("marketplace", "ebay")
+        .eq("environment", env)
+        .maybeSingle(),
+    ]);
     if (listingErr) throw listingErr;
+    if (accountErr) throw accountErr;
     if (currentListing?.status === "active" || currentListing?.external_listing_id) {
       return {
         ok: false,
@@ -164,6 +174,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         action: "create_draft",
         status: "pending",
         payload: {
+          publishAttemptId,
           env,
           sku: product.sku,
           categoryId: product.ebay_category_id,
@@ -178,6 +189,10 @@ export const createEbayDraft = createServerFn({ method: "POST" })
     try {
       const { createEbayDraftInSandbox } = await import("./draft.server");
       const result = await createEbayDraftInSandbox({
+        productId: data.productId,
+        publishAttemptId,
+        accountExternalId: account?.external_account_id ?? null,
+        accountName: account?.account_name ?? null,
         sku: product.sku,
         title: product.title,
         description: product.description,
@@ -191,6 +206,8 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         imageUrls,
       });
       console.log("[createEbayDraft] offer created", {
+        publishAttemptId,
+        productId: data.productId,
         offerId: result.offerId,
         sku: result.sku,
         categoryId: product.ebay_category_id,
@@ -211,6 +228,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         error_message: null,
         provider_metadata: {
           offerId: result.offerId,
+          publishAttemptId,
           sku: result.sku,
           env,
           categoryId: product.ebay_category_id,
@@ -242,6 +260,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           processed_at: new Date().toISOString(),
           result: {
             offerId: result.offerId,
+            publishAttemptId,
             sku: result.sku,
             categoryId: product.ebay_category_id,
             ebayConditionId: product.ebay_condition_id,
@@ -253,6 +272,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         .eq("id", job.id);
 
       console.log("[eBay draft]", {
+        publishAttemptId,
         product_id: data.productId,
         sku: result.sku,
         offerId: result.offerId,
@@ -275,7 +295,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       } catch {
         parsedError = { message: msg };
       }
-      console.error("[createEbayDraft] failed", { productId: data.productId, error: msg });
+      console.error("[createEbayDraft] failed", { publishAttemptId, productId: data.productId, error: msg });
       await context.supabase
         .from("publishing_jobs")
         .update({
@@ -296,7 +316,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         .eq("product_id", data.productId)
         .eq("marketplace", "ebay");
 
-      console.error("[eBay draft] failed", { product_id: data.productId, msg });
+      console.error("[eBay draft] failed", { publishAttemptId, product_id: data.productId, msg });
       return { ok: false, errorMessage: msg };
     }
   });
