@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import type { Json } from "@/integrations/supabase/types";
 import type { EbayPublishResult } from "./publish.server";
 
 export type EbayPublishDTO =
@@ -93,11 +94,15 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       const { publishOffer } = await import("./publish.server");
       const result = await publishOffer(offerId);
 
+      const conditionVerificationJson = JSON.parse(
+        JSON.stringify({ ...inventoryVerification.verification, offerId }),
+      ) as Json;
+
       const newMeta: Record<string, any> = {
         ...meta,
         marketplace: "ebay",
         offerId,
-        conditionVerification: { ...inventoryVerification.verification, offerId },
+        conditionVerification: conditionVerificationJson,
         lastPublishRaw: result.raw,
       };
 
@@ -132,7 +137,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
             last_error: {
               message: result.errorMessage,
               errors: result.errors,
-              conditionVerification: { ...inventoryVerification.verification, offerId },
+              conditionVerification: conditionVerificationJson,
             },
             provider_metadata: newMeta,
           })
