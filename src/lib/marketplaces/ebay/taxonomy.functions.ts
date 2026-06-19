@@ -172,7 +172,8 @@ export const saveEbayCondition = createServerFn({ method: "POST" })
     if (pErr) throw pErr;
     if (!product?.ebay_category_id) throw new Error("Select an eBay category first.");
 
-    const { getEbayConditionPolicies } = await import("./condition-policies.server");
+    const { assertConditionIdEnumMatch, getEbayConditionPolicies } = await import("./condition-policies.server");
+    assertConditionIdEnumMatch(data.conditionId, data.conditionEnum);
     const policies = await getEbayConditionPolicies(product.ebay_category_id);
     const selected = policies.find(
       (p) => p.conditionId === data.conditionId && p.conditionEnum === data.conditionEnum,
