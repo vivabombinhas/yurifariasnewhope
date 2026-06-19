@@ -97,6 +97,13 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       const conditionVerificationJson = JSON.parse(
         JSON.stringify({ ...inventoryVerification.verification, offerId }),
       ) as Json;
+      const publishLastErrorJson = JSON.parse(
+        JSON.stringify({
+          message: result.ok ? null : result.errorMessage,
+          errors: result.ok ? [] : result.errors,
+          conditionVerification: conditionVerificationJson,
+        }),
+      ) as Json;
 
       const newMeta: Record<string, any> = {
         ...meta,
@@ -134,11 +141,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
           .update({
             error_message: result.errorMessage.slice(0, 2000),
             last_failed_step: "publish",
-            last_error: {
-              message: result.errorMessage,
-              errors: result.errors,
-              conditionVerification: conditionVerificationJson,
-            },
+            last_error: publishLastErrorJson,
             provider_metadata: newMeta,
           })
           .eq("id", listing.id);
@@ -162,7 +165,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         .update({
           error_message: msg,
           last_failed_step: "publish",
-          last_error: { message: msg, offerId },
+          last_error: JSON.parse(JSON.stringify({ message: msg, offerId })) as Json,
         })
         .eq("id", listing.id);
       return { ok: false, errorMessage: msg };
