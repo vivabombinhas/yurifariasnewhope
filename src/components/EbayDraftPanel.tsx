@@ -58,7 +58,9 @@ export function EbayDraftPanel({ productId }: Props) {
     },
   });
 
-  const ready = !!readiness.data?.ready;
+  const ready = !!readiness.data?.checks
+    ?.filter((c) => c.id !== "inventory_condition_verified")
+    .every((c) => c.status === "ok");
   const meta =
     (listing.data?.provider_metadata as {
       offerId?: string;
@@ -112,7 +114,7 @@ export function EbayDraftPanel({ productId }: Props) {
             variant={isActive ? "outline" : "default"}
             onClick={handleCreate}
             disabled={!ready || createMut.isPending}
-            title={!ready ? "Pass eBay Readiness checks first" : undefined}
+            title={!ready ? "Pass required eBay setup checks first" : undefined}
           >
             {createMut.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -126,7 +128,7 @@ export function EbayDraftPanel({ productId }: Props) {
       <CardContent className="space-y-2 text-sm">
         {!ready && (
           <p className="text-muted-foreground">
-            Pass all eBay Readiness checks above before creating a draft.
+            Pass the required eBay setup checks above before creating a draft.
           </p>
         )}
         {isDraft && meta && (
