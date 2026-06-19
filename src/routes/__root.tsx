@@ -78,17 +78,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Yuri farias new hope" },
+      { name: "description", content: "Embrace You helps users list items for sale by generating AI-powered product suggestions." },
       { name: "author", content: "Lovable" },
       // Prevent browser auto-translation (Chrome/Edge) from mutating React-managed
       // text nodes — root cause of "Failed to execute 'removeChild' on 'Node'" crashes.
       { name: "google", content: "notranslate" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Yuri farias new hope" },
+      { property: "og:description", content: "Embrace You helps users list items for sale by generating AI-powered product suggestions." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Yuri farias new hope" },
+      { name: "twitter:description", content: "Embrace You helps users list items for sale by generating AI-powered product suggestions." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cbd81566-d2bf-4daa-94d4-fce0b881dace/id-preview-35926677--d4c53189-cd2c-47d7-b37c-8246c3a877fd.lovable.app-1781831832850.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/cbd81566-d2bf-4daa-94d4-fce0b881dace/id-preview-35926677--d4c53189-cd2c-47d7-b37c-8246c3a877fd.lovable.app-1781831832850.png" },
     ],
     links: [
       {
