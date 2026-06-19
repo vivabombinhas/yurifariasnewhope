@@ -21,6 +21,7 @@ import { EbayDraftPanel } from "@/components/EbayDraftPanel";
 import { EbayPublishPreflightPanel } from "@/components/EbayPublishPreflightPanel";
 import { EbaySellerSetupPanel } from "@/components/EbaySellerSetupPanel";
 import { EbayPublishPanel } from "@/components/EbayPublishPanel";
+import { EbayPublishAuditPanel } from "@/components/EbayPublishAuditPanel";
 
 interface Props {
   productId: string;
@@ -64,6 +65,7 @@ export function MarketplacePublishingPanel({ productId, product, onSaved }: Prop
                     <EbayDraftPanel productId={productId} />
                     <EbaySellerSetupPanel productId={productId} />
                     <EbayPublishPreflightPanel productId={productId} />
+                    <EbayPublishAuditPanel productId={productId} />
                     <EbayPublishPanel productId={productId} />
                   </div>
                 ) : (
