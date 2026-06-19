@@ -93,8 +93,15 @@ export async function createEbayDraftInSandbox(
   if (env !== "sandbox") {
     throw new Error("Draft creation is restricted to sandbox environment.");
   }
-  const ebayCondition = CONDITION_MAP[input.condition];
-  if (!ebayCondition) throw new Error(`Unmapped product condition: ${input.condition}`);
+  const ebayCondition = mapEbayCondition(input.condition, input.categoryId);
+  if (!ebayCondition) {
+    throw new Error(
+      `Unmapped product condition "${input.condition}" for eBay category ${input.categoryId}.` +
+        (isShoeCategory(input.categoryId)
+          ? " This category requires NEW_WITH_BOX / PRE_OWNED_* conditions."
+          : ""),
+    );
+  }
 
   const token = await getValidEbayAccessToken();
 
