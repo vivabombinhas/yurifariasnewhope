@@ -54,6 +54,40 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       };
     }
 
+    const { generateEbayPublishAudit } = await import("./publish-audit.functions");
+    const prePublishAudit = await generateEbayPublishAudit({ data: { productId: data.productId } });
+    const auditBlocksPublish =
+      prePublishAudit.localProduct.productId !== data.productId ||
+      prePublishAudit.localProduct.sku !== prePublishAudit.inventoryItem.sku ||
+      prePublishAudit.localProduct.sku !== prePublishAudit.offer.sku ||
+      !prePublishAudit.comparisons.dbCategoryIdEqualsOfferCategoryId ||
+      !prePublishAudit.comparisons.conditionIdEnumMatch ||
+      !prePublishAudit.comparisons.dbConditionEnumEqualsInventoryCondition ||
+      !prePublishAudit.comparisons.inventoryConditionAllowedForOfferCategory ||
+      prePublishAudit.comparisons.offerCreatedBeforeOrAfterLastConditionChange !== "after" ||
+      prePublishAudit.comparisons.hasPublishedListingForSku ||
+      prePublishAudit.comparisons.unpublishedOfferCountForSku !== 1;
+    if (auditBlocksPublish) {
+      const msg = JSON.stringify({
+        code: "EBAY_PUBLISH_PRECONDITIONS_FAILED",
+        message: "Publish blocked because the read-only audit does not satisfy all required criteria.",
+        publishAttemptId,
+        conclusion: prePublishAudit.conclusion,
+        productId: data.productId,
+        sku: prePublishAudit.localProduct.sku,
+        comparisons: prePublishAudit.comparisons,
+      });
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg.slice(0, 2000),
+          last_failed_step: "pre_publish_audit",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
+
     const { data: product, error: pErr } = await context.supabase
       .from("products")
       .select("sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects")
