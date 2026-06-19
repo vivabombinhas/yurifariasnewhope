@@ -126,7 +126,6 @@ function classifyConclusion(input: {
   dbConditionEnumEqualsInventoryCondition: boolean;
   inventoryConditionAllowedForOfferCategory: boolean;
   dbConditionIdAllowedForOfferCategory: boolean;
-  conditionIdEnumMatch: boolean;
   offerCreatedBeforeOrAfterLastConditionChange: "before" | "after" | "same" | "unknown";
   unpublishedOfferCountForSku: number;
 }): EbayPublishAuditConclusion {
