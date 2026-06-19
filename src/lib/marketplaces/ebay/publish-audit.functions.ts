@@ -75,6 +75,7 @@ export interface EbayPublishAuditReport {
     dbConditionEnumEqualsInventoryCondition: boolean;
     inventoryConditionAllowedForOfferCategory: boolean;
     dbConditionIdAllowedForOfferCategory: boolean;
+    conditionIdEnumMatch: boolean;
     offerIsNewOrOld: "new" | "old" | "unknown";
     offerCreatedBeforeOrAfterLastConditionChange: "before" | "after" | "same" | "unknown";
     otherUnpublishedOffersForSku: Array<{ offerId: string; status: string | null; categoryId: string | null }>;
