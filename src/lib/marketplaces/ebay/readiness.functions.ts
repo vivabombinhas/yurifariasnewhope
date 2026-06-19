@@ -141,12 +141,20 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
             status: "ok",
             detail: ebayCondition,
           }
-        : {
-            id: "condition",
-            label: "Condition mapped to eBay",
-            status: "missing",
-            action: "Set product condition",
-          },
+        : conditionInvalid
+          ? {
+              id: "condition",
+              label: "Condition not valid for this category",
+              status: "missing",
+              detail: `"${p.condition}" is not accepted by category ${p.ebay_category_id}. Shoe categories require NEW_WITH_BOX / PRE_OWNED_*.`,
+              action: "Change product condition",
+            }
+          : {
+              id: "condition",
+              label: "Condition mapped to eBay",
+              status: "missing",
+              action: "Set product condition",
+            },
     );
 
     // 10. quantity = 1 (each item is unique → always ok in this app)
