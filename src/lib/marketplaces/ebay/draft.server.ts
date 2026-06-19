@@ -201,6 +201,9 @@ export async function createEbayDraftInSandbox(
     `/sell/inventory/v1/offer?sku=${encodeURIComponent(input.sku)}`,
     token,
   );
+  if (!existingOffersRes.ok) {
+    throw new Error(`List existing offers: ${ebayErrorMessage(existingOffersRes.status, existingOffersRes.json, existingOffersRes.text)}`);
+  }
   const existingOffers: any[] = existingOffersRes.json?.offers ?? [];
   for (const off of existingOffers) {
     if (!off?.offerId) continue;
@@ -234,6 +237,9 @@ export async function createEbayDraftInSandbox(
       offerId: off.offerId,
       status: del.status,
     });
+    if (!del.ok) {
+      throw new Error(`Delete stale offer ${off.offerId}: ${ebayErrorMessage(del.status, del.json, del.text)}`);
+    }
   }
 
   // 1. PUT InventoryItem (fully replaces existing inventory item for this SKU)
