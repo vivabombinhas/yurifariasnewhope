@@ -30,6 +30,7 @@ export function EbayPublishPanel({ productId }: Props) {
 
   const meta = (listing.data?.provider_metadata ?? {}) as Record<string, any>;
   const offerId: string | undefined = meta.offerId;
+  const draftOutdated = !!meta.draftOutdated;
 
   const mut = useMutation({
     mutationFn: () => fn({ data: { productId } }),
@@ -66,10 +67,12 @@ export function EbayPublishPanel({ productId }: Props) {
           <Button
             size="sm"
             onClick={() => mut.mutate()}
-            disabled={!offerId || mut.isPending || isActive}
+            disabled={!offerId || mut.isPending || isActive || draftOutdated}
             title={
               isActive
                 ? "Listing is already active on eBay"
+                : draftOutdated
+                ? "Recreate the eBay draft before publishing"
                 : !offerId
                 ? "Create an eBay draft first"
                 : undefined
@@ -88,6 +91,11 @@ export function EbayPublishPanel({ productId }: Props) {
         {!offerId && (
           <p className="text-muted-foreground">
             Create an eBay draft first; publish needs the offerId.
+          </p>
+        )}
+        {draftOutdated && (
+          <p className="text-destructive">
+            eBay draft is outdated. Recreate eBay Draft before publishing.
           </p>
         )}
 

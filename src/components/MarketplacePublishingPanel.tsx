@@ -14,6 +14,7 @@ import { CheckCircle2, Plug, Send, Settings2, AlertCircle } from "lucide-react";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
 import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions";
 import { EbayCategoryPanel } from "@/components/EbayCategoryPanel";
+import { EbayConditionPanel } from "@/components/EbayConditionPanel";
 import { EbayAspectsPanel } from "@/components/EbayAspectsPanel";
 import { EbayReadinessPanel } from "@/components/EbayReadinessPanel";
 import { EbayDraftPanel } from "@/components/EbayDraftPanel";
@@ -57,6 +58,7 @@ export function MarketplacePublishingPanel({ productId, product, onSaved }: Prop
                 {m.id === "ebay" ? (
                   <div className="space-y-4 pt-2">
                     <EbayCategoryPanel product={product} onSaved={onSaved} />
+                    <EbayConditionPanel product={product} onSaved={onSaved} />
                     <EbayAspectsPanel product={product} onSaved={onSaved} />
                     <EbayReadinessPanel productId={productId} />
                     <EbayDraftPanel productId={productId} />

@@ -1,0 +1,140 @@
+/**
+ * eBay Sell Metadata API — condition policies by category.
+ * SERVER ONLY. Source of truth for category-specific eBay conditions.
+ */
+import { getValidEbayAccessToken } from "./token-service.server";
+
+const MARKETPLACE_ID = "EBAY_US";
+
+function metadataHost(env: string) {
+  return env === "production" ? "https://api.ebay.com" : "https://api.sandbox.ebay.com";
+}
+
+export interface EbayConditionPolicy {
+  categoryId: string;
+  conditionRequired: boolean;
+  conditionId: number;
+  displayName: string;
+  conditionEnum: string;
+  conditionDescriptors: unknown[];
+}
+
+const CONDITION_ID_ENUMS: Record<number, string> = {
+  1000: "NEW",
+  1500: "NEW_OTHER",
+  1750: "NEW_WITH_DEFECTS",
+  2000: "CERTIFIED_REFURBISHED",
+  2010: "EXCELLENT_REFURBISHED",
+  2020: "VERY_GOOD_REFURBISHED",
+  2030: "GOOD_REFURBISHED",
+  2500: "SELLER_REFURBISHED",
+  2750: "LIKE_NEW",
+  2990: "PRE_OWNED_EXCELLENT",
+  3000: "USED_EXCELLENT",
+  3010: "PRE_OWNED_FAIR",
+  4000: "USED_VERY_GOOD",
+  5000: "USED_GOOD",
+  6000: "USED_ACCEPTABLE",
+  7000: "FOR_PARTS_OR_NOT_WORKING",
+};
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+}
+
+export function conditionEnumForPolicy(conditionId: number, displayName: string): string {
+  const name = normalize(displayName);
+  if (name === "new with box") return "NEW_WITH_BOX";
+  if (name === "new without box") return "NEW_WITHOUT_BOX";
+  if (name === "new with tags") return "NEW_WITH_TAGS";
+  if (name === "new without tags") return "NEW_WITHOUT_TAGS";
+  if (name === "new with defects") return "NEW_WITH_DEFECTS";
+  if (name === "pre owned" || name === "pre-owned") return "PRE_OWNED";
+  if (name === "pre owned excellent" || name === "pre-owned excellent") return "PRE_OWNED_EXCELLENT";
+  if (name === "pre owned fair" || name === "pre-owned fair") return "PRE_OWNED_FAIR";
+  if (name === "used" || name === "used excellent") return "USED_EXCELLENT";
+  return CONDITION_ID_ENUMS[conditionId] ?? displayName.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+}
+
+export async function getEbayConditionPolicies(categoryId: string): Promise<EbayConditionPolicy[]> {
+  const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
+  const token = await getValidEbayAccessToken();
+  const params = new URLSearchParams({ filter: `categoryIds:{${categoryId}}` });
+  const url = `${metadataHost(env)}/sell/metadata/v1/marketplace/${MARKETPLACE_ID}/get_item_condition_policies?${params}`;
+
+  const res = await fetch(url, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "X-EBAY-C-MARKETPLACE-ID": MARKETPLACE_ID,
+      Accept: "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`eBay condition policies ${res.status}: ${body.slice(0, 500)}`);
+  }
+
+  const json = (await res.json()) as {
+    itemConditionPolicies?: Array<{
+      categoryId: string;
+      itemConditionRequired?: boolean;
+      itemConditions?: Array<{
+        conditionId: string;
+        conditionDescription: string;
+        conditionDescriptors?: unknown[];
+      }>;
+    }>;
+  };
+
+  const policy =
+    (json.itemConditionPolicies ?? []).find((p) => String(p.categoryId) === String(categoryId)) ??
+    json.itemConditionPolicies?.[0];
+
+  return (policy?.itemConditions ?? []).map((c) => {
+    const conditionId = Number(c.conditionId);
+    const displayName = c.conditionDescription;
+    return {
+      categoryId: policy?.categoryId ?? categoryId,
+      conditionRequired: !!policy?.itemConditionRequired,
+      conditionId,
+      displayName,
+      conditionEnum: conditionEnumForPolicy(conditionId, displayName),
+      conditionDescriptors: c.conditionDescriptors ?? [],
+    };
+  });
+}
+
+export function suggestEbayConditionPolicy(
+  policies: EbayConditionPolicy[],
+  internalCondition: string | null | undefined,
+  conditionGrade: string | null | undefined,
+  conditionNotes: string | null | undefined,
+): EbayConditionPolicy | null {
+  if (!policies.length || !internalCondition) return null;
+  const text = normalize(`${conditionGrade ?? ""} ${conditionNotes ?? ""}`);
+  const hasDefect = /\b(defect|factory second|irregular|flaw|damaged|damage|stain|hole|tear|scuff|scratch|crack|broken)\b/.test(text);
+  const hasBoxOrTag = /\b(with box|original box|in box|with tags|tag attached|tags attached|new with tags)\b/.test(text);
+  const lacksBoxOrTag = /\b(without box|no box|missing box|without tags|no tags|missing tags)\b/.test(text);
+  const byEnum = (enums: string[]) =>
+    policies.find((p) => enums.includes(p.conditionEnum)) ?? null;
+  const byName = (names: string[]) =>
+    policies.find((p) => names.some((n) => normalize(p.displayName).includes(n))) ?? null;
+
+  if (internalCondition === "new") {
+    if (hasDefect) return byEnum(["NEW_WITH_DEFECTS"]) ?? byName(["defect"]);
+    if (hasBoxOrTag) return byEnum(["NEW_WITH_BOX", "NEW_WITH_TAGS", "NEW"]);
+    if (lacksBoxOrTag) return byEnum(["NEW_WITHOUT_BOX", "NEW_WITHOUT_TAGS", "NEW_OTHER"]);
+    const newOptions = policies.filter((p) => p.conditionEnum.startsWith("NEW"));
+    return newOptions.length === 1 ? newOptions[0]! : null;
+  }
+
+  if (internalCondition === "like_new") {
+    return byEnum(["LIKE_NEW", "PRE_OWNED_EXCELLENT", "USED_EXCELLENT", "PRE_OWNED"]);
+  }
+  if (["very_good", "good", "acceptable", "for_parts"].includes(internalCondition)) {
+    return byEnum(["PRE_OWNED", "USED_EXCELLENT", "USED_VERY_GOOD", "USED_GOOD", "USED_ACCEPTABLE", "FOR_PARTS_OR_NOT_WORKING"]);
+  }
+  return null;
+}
