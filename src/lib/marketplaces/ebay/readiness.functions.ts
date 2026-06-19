@@ -143,7 +143,8 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
       });
     } else if (p.ebay_category_id && accountRes.data?.status === "connected") {
       try {
-        const { getEbayConditionPolicies } = await import("./condition-policies.server");
+        const { assertConditionIdEnumMatch, getEbayConditionPolicies } = await import("./condition-policies.server");
+        assertConditionIdEnumMatch(p.ebay_condition_id, p.ebay_condition_enum);
         const policies = await getEbayConditionPolicies(p.ebay_category_id);
         const valid = policies.find(
           (c) =>
