@@ -346,7 +346,59 @@ export async function createEbayDraftInSandbox(
     ebayConditionEnum: input.ebayConditionEnum,
   });
 
-  const { inventoryItemGet, verification } = await verifyInventoryItemCondition(env, token, input);
+  let inventoryItemGet: unknown;
+  let verification: EbayInventoryConditionVerification;
+  try {
+    const verified = await verifyInventoryItemCondition(env, token, input);
+    inventoryItemGet = verified.inventoryItemGet;
+    verification = verified.verification;
+  } catch (e: any) {
+    const driftMessage = e?.message ?? String(e);
+    let parsedDrift: any = null;
+    try {
+      parsedDrift = JSON.parse(driftMessage);
+    } catch {
+      parsedDrift = null;
+    }
+    if (parsedDrift?.code !== "INVENTORY_CONDITION_DRIFT") throw e;
+
+    console.warn("[createEbayDraft] PUT succeeded but GET still returned stale condition; deleting and recreating InventoryItem", {
+      publishAttemptId,
+      productId: input.productId,
+      sku: input.sku,
+      sentCondition: input.ebayConditionEnum,
+      returnedCondition: parsedDrift.getReturnedCondition,
+    });
+    const deleteInventoryRes = await ebayFetch(
+      env,
+      "DELETE",
+      `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`,
+      token,
+    );
+    if (!deleteInventoryRes.ok) {
+      throw new Error(`Delete stale InventoryItem: ${ebayErrorMessage(deleteInventoryRes.status, deleteInventoryRes.json, deleteInventoryRes.text)}`);
+    }
+    inventoryBody = buildInventoryBody(null, input);
+    const recreate = await ebayFetchWithDiagnostics(
+      env,
+      "PUT",
+      `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`,
+      token,
+      inventoryBody,
+    );
+    console.log("[createEbayDraft] recreate InventoryItem HTTP diagnostics", {
+      publishAttemptId,
+      productId: input.productId,
+      accountUser: input.accountExternalId ?? input.accountName ?? null,
+      ...recreate.diagnostics,
+    });
+    if (!recreate.res.ok) {
+      throw new Error(`Recreate InventoryItem: ${ebayErrorMessage(recreate.res.status, recreate.res.json, recreate.res.text)}`);
+    }
+    const verified = await verifyInventoryItemCondition(env, token, input);
+    inventoryItemGet = verified.inventoryItemGet;
+    verification = verified.verification;
+  }
   console.log("[createEbayDraft] immediate GET inventory_item diagnostics", {
     publishAttemptId,
     productId: input.productId,
