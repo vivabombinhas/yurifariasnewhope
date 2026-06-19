@@ -82,6 +82,14 @@ export interface EbayPublishAuditReport {
   conclusion: EbayPublishAuditConclusion;
 }
 
+type OfferSummaryRow = {
+  offerId: string;
+  status: string | null;
+  categoryId: string | null;
+  listingId: string | null;
+  createdAt: string | null;
+};
+
 function asRecord(value: any): Record<string, any> {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -187,14 +195,14 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
     const dbConditionIdAllowedForOfferCategory = dbConditionId != null && policyTable.some((p) => p.conditionId === dbConditionId);
 
     const currentOfferId = textOrNull(offerJson.offerId) ?? offerId;
-    const offerSummaryRows = allOffers.map((offer) => ({
+    const offerSummaryRows: OfferSummaryRow[] = allOffers.map((offer: Record<string, any>) => ({
       offerId: textOrNull(offer.offerId) ?? "",
       status: textOrNull(offer.status),
       categoryId: textOrNull(offer.categoryId),
       listingId: listingIdFromOffer(offer),
       createdAt: textOrNull(offer.createdDate ?? offer.createdAt),
     }));
-    const unpublishedOffers = offerSummaryRows.filter((offer) => String(offer.status ?? "").toUpperCase() === "UNPUBLISHED");
+    const unpublishedOffers = offerSummaryRows.filter((offer: OfferSummaryRow) => String(offer.status ?? "").toUpperCase() === "UNPUBLISHED");
     const otherUnpublishedOffersForSku = unpublishedOffers
       .filter((offer) => offer.offerId && offer.offerId !== currentOfferId)
       .map((offer) => ({ offerId: offer.offerId, status: offer.status, categoryId: offer.categoryId }));
@@ -222,7 +230,7 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
 
     const unpublishedOfferCountForSku = unpublishedOffers.length;
     const dbOfferId = textOrNull(meta.offerId);
-    const offerIsNewOrOld =
+    const offerIsNewOrOld: "new" | "old" | "unknown" =
       !currentOfferId || !dbOfferId
         ? "unknown"
         : currentOfferId === dbOfferId && offerCreatedBeforeOrAfterLastConditionChange !== "before"
