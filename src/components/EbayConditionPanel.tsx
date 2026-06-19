@@ -119,6 +119,33 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
         <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
       </CardHeader>
       <CardContent className="space-y-3">
+        {needsReselection && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Reselection required
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              The previously saved eBay condition was inconsistent (ID and enum did not match) and
+              has been cleared. Pick a valid condition for this category to continue.
+            </p>
+          </div>
+        )}
+        {!hasSemanticMatch && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+            <p className="font-medium text-destructive">
+              This category does not offer a condition equivalent to "{product.condition}".
+            </p>
+            <ul className="text-xs text-muted-foreground mt-2 list-disc pl-5 space-y-1">
+              <li>Manually pick one of the allowed conditions below.</li>
+              <li>Review the eBay category for this product.</li>
+              <li>Or skip publishing this item to eBay.</li>
+            </ul>
+            <p className="text-xs text-muted-foreground mt-2">
+              Nothing will be selected automatically — a damaged-but-functional item should not be
+              filed as "For parts or not working".
+            </p>
+          </div>
+        )}
         {q.isLoading && <p className="text-sm text-muted-foreground">Loading eBay conditions…</p>}
         {q.isError && (
           <p className="text-sm text-destructive">
