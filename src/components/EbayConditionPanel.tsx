@@ -22,25 +22,43 @@ import {
 interface Props {
   product: {
     id: string;
+    condition?: string | null;
     ebay_category_id?: string | null;
     ebay_category_name?: string | null;
     ebay_condition_id?: number | null;
     ebay_condition_enum?: string | null;
     ebay_condition_name?: string | null;
+    needs_condition_reselection?: boolean | null;
   };
   onSaved?: () => void;
 }
+
+// Internal condition → enums that are semantically safe to pick automatically/manually.
+const INTERNAL_TO_EBAY_ENUMS: Record<string, string[]> = {
+  new: ["NEW"],
+  new_other: ["NEW_OTHER", "NEW"],
+  like_new: ["LIKE_NEW", "PRE_OWNED_EXCELLENT", "USED_EXCELLENT"],
+  excellent: ["PRE_OWNED_EXCELLENT", "USED_EXCELLENT", "USED_VERY_GOOD"],
+  very_good: ["USED_VERY_GOOD", "USED_EXCELLENT", "USED_GOOD"],
+  good: ["USED_GOOD", "USED_VERY_GOOD"],
+  acceptable: ["USED_ACCEPTABLE"],
+  for_parts: ["FOR_PARTS_OR_NOT_WORKING"],
+};
 
 export function EbayConditionPanel({ product, onSaved }: Props) {
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchEbayConditionPoliciesForCategory);
   const saveFn = useServerFn(saveEbayCondition);
   const categoryId = product.ebay_category_id ?? null;
+  const needsReselection = !!product.needs_condition_reselection;
+  const internalCondition = (product.condition ?? "").toLowerCase();
 
   const q = useQuery({
     enabled: !!categoryId,
     queryKey: ["ebay-conditions", product.id, categoryId],
     queryFn: () => fetchFn({ data: { productId: product.id } }),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const conditions = q.data?.conditions ?? [];
@@ -48,6 +66,11 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   const selected = conditions.find((c) => String(c.conditionId) === savedValue);
   const selectedValue = selected ? savedValue : "";
   const suggested = conditions.find((c) => c.suggested);
+  const safeEnums = INTERNAL_TO_EBAY_ENUMS[internalCondition] ?? [];
+  const hasSemanticMatch =
+    !internalCondition ||
+    safeEnums.length === 0 ||
+    conditions.some((c) => safeEnums.includes(c.conditionEnum));
 
   const saveMut = useMutation({
     mutationFn: async (conditionId: string) => {
@@ -96,6 +119,33 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
         <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
       </CardHeader>
       <CardContent className="space-y-3">
+        {needsReselection && (
+          <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Reselection required
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              The previously saved eBay condition was inconsistent (ID and enum did not match) and
+              has been cleared. Pick a valid condition for this category to continue.
+            </p>
+          </div>
+        )}
+        {!hasSemanticMatch && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm">
+            <p className="font-medium text-destructive">
+              This category does not offer a condition equivalent to "{product.condition}".
+            </p>
+            <ul className="text-xs text-muted-foreground mt-2 list-disc pl-5 space-y-1">
+              <li>Manually pick one of the allowed conditions below.</li>
+              <li>Review the eBay category for this product.</li>
+              <li>Or skip publishing this item to eBay.</li>
+            </ul>
+            <p className="text-xs text-muted-foreground mt-2">
+              Nothing will be selected automatically — a damaged-but-functional item should not be
+              filed as "For parts or not working".
+            </p>
+          </div>
+        )}
         {q.isLoading && <p className="text-sm text-muted-foreground">Loading eBay conditions…</p>}
         {q.isError && (
           <p className="text-sm text-destructive">

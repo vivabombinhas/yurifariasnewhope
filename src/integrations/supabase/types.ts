@@ -357,6 +357,7 @@ export type Database = {
           id: string
           item_specifics: Json
           location_id: string | null
+          needs_condition_reselection: boolean
           price_cents: number | null
           shipping_notes: string | null
           sku: string
@@ -384,6 +385,7 @@ export type Database = {
           id?: string
           item_specifics?: Json
           location_id?: string | null
+          needs_condition_reselection?: boolean
           price_cents?: number | null
           shipping_notes?: string | null
           sku: string
@@ -411,6 +413,7 @@ export type Database = {
           id?: string
           item_specifics?: Json
           location_id?: string | null
+          needs_condition_reselection?: boolean
           price_cents?: number | null
           shipping_notes?: string | null
           sku?: string
