@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
+import type { Json } from "@/integrations/supabase/types";
 import type { EbayPublishResult } from "./publish.server";
 
 export type EbayPublishDTO =
@@ -19,11 +20,26 @@ export const publishEbayListing = createServerFn({ method: "POST" })
 
     const { data: listing, error } = await context.supabase
       .from("marketplace_listings")
-      .select("id, provider_metadata")
+      .select("id, status, external_listing_id, listing_url, provider_metadata")
       .eq("product_id", data.productId)
       .eq("marketplace", "ebay")
       .maybeSingle();
     if (error) throw error;
+
+    if (listing?.status === "active" && listing.external_listing_id) {
+      return {
+        ok: true,
+        result: {
+          ok: true,
+          listingId: listing.external_listing_id,
+          raw: {
+            status: 200,
+            json: { existing: true, listingUrl: listing.listing_url },
+            text: "existing active listing",
+          },
+        },
+      };
+    }
 
     const meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
     const offerId: string | undefined = meta.offerId;
@@ -39,12 +55,13 @@ export const publishEbayListing = createServerFn({ method: "POST" })
 
     const { data: product, error: pErr } = await context.supabase
       .from("products")
-      .select("ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name")
+      .select("sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects")
       .eq("id", data.productId)
       .maybeSingle();
     if (pErr) throw pErr;
     if (
-      !product?.ebay_category_id ||
+      !product?.sku ||
+      !product.ebay_category_id ||
       !product.ebay_condition_id ||
       !product.ebay_condition_enum ||
       !product.ebay_condition_name ||
@@ -58,28 +75,61 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       };
     }
 
-    const { getEbayConditionPolicies } = await import("./condition-policies.server");
-    const validCondition = (await getEbayConditionPolicies(product.ebay_category_id)).some(
-      (c) =>
-        c.conditionId === product.ebay_condition_id &&
-        c.conditionEnum === product.ebay_condition_enum &&
-        c.displayName === product.ebay_condition_name,
-    );
-    if (!validCondition) {
-      return {
-        ok: false,
-        errorMessage: "Selected eBay Condition is no longer valid for this category. Select eBay Condition again and recreate draft.",
-      };
+    const { verifyEbayInventoryItemCondition } = await import("./draft.server");
+    let inventoryVerification: Awaited<ReturnType<typeof verifyEbayInventoryItemCondition>>;
+    try {
+      inventoryVerification = await verifyEbayInventoryItemCondition({
+        sku: product.sku,
+        title: product.title ?? "",
+        description: product.description ?? "",
+        priceCents: product.price_cents ?? 0,
+        internalCondition: product.condition ?? null,
+        ebayConditionId: product.ebay_condition_id,
+        ebayConditionEnum: product.ebay_condition_enum,
+        ebayConditionName: product.ebay_condition_name,
+        categoryId: product.ebay_category_id,
+        aspects: product.ebay_aspects,
+        imageUrls: [],
+      });
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      let parsedError: Json;
+      try {
+        parsedError = JSON.parse(msg) as Json;
+      } catch {
+        parsedError = { message: msg, offerId } as Json;
+      }
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg,
+          last_failed_step: "inventory_verify",
+          last_error: parsedError,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
     }
 
     try {
       const { publishOffer } = await import("./publish.server");
       const result = await publishOffer(offerId);
 
+      const conditionVerificationJson = JSON.parse(
+        JSON.stringify({ ...inventoryVerification.verification, offerId }),
+      ) as Json;
+      const publishLastErrorJson = JSON.parse(
+        JSON.stringify({
+          message: result.ok ? null : result.errorMessage,
+          errors: result.ok ? [] : result.errors,
+          conditionVerification: conditionVerificationJson,
+        }),
+      ) as Json;
+
       const newMeta: Record<string, any> = {
         ...meta,
         marketplace: "ebay",
         offerId,
+        conditionVerification: conditionVerificationJson,
         lastPublishRaw: result.raw,
       };
 
@@ -98,6 +148,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
             listing_url: listingUrl,
             published_at: new Date().toISOString(),
             error_message: null,
+            last_failed_step: null,
+            last_error: null,
             provider_metadata: newMeta,
           })
           .eq("id", listing.id);
@@ -108,6 +160,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
           .from("marketplace_listings")
           .update({
             error_message: result.errorMessage.slice(0, 2000),
+            last_failed_step: "publish",
+            last_error: publishLastErrorJson,
             provider_metadata: newMeta,
           })
           .eq("id", listing.id);
@@ -116,6 +170,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       console.log("[ebayPublish]", {
         productId: data.productId,
         offerId,
+        ...inventoryVerification.verification,
         ok: result.ok,
         listingId: result.ok ? result.listingId : undefined,
         status: result.raw.status,
@@ -125,6 +180,14 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       console.error("[ebayPublish] failed", { offerId, error: msg });
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg,
+          last_failed_step: "publish",
+          last_error: JSON.parse(JSON.stringify({ message: msg, offerId })) as Json,
+        })
+        .eq("id", listing.id);
       return { ok: false, errorMessage: msg };
     }
   });

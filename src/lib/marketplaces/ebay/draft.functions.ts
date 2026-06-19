@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Json } from "@/integrations/supabase/types";
 import { z } from "zod";
 
 export interface CreateDraftDTO {
@@ -10,6 +11,16 @@ export interface CreateDraftDTO {
   ebayConditionId?: number;
   ebayConditionName?: string;
   ebayConditionEnum?: string;
+  conditionVerification?: {
+    internalCondition: string | null;
+    ebayCategoryId: string;
+    selectedEbayConditionId: number;
+    selectedEbayConditionName: string;
+    selectedEbayConditionEnum: string;
+    putSentCondition: string;
+    getReturnedCondition: string | null;
+    offerId?: string;
+  };
   errorMessage?: string;
 }
 
@@ -31,9 +42,10 @@ export const createEbayDraft = createServerFn({ method: "POST" })
     // Run readiness check first
     const { checkEbayReadiness } = await import("./readiness.functions");
     const readiness = await checkEbayReadiness({ data: { productId: data.productId } });
-    if (!readiness.ready) {
+    const blockingChecks = readiness.checks.filter((c) => c.status !== "ok" && c.id !== "inventory_condition_verified");
+    if (blockingChecks.length) {
       const missing = readiness.checks
-        .filter((c) => c.status !== "ok")
+        .filter((c) => c.status !== "ok" && c.id !== "inventory_condition_verified")
         .map((c) => c.label)
         .join(", ");
       return { ok: false, errorMessage: `Product not ready: ${missing}` };
@@ -189,6 +201,9 @@ export const createEbayDraft = createServerFn({ method: "POST" })
 
       // Upsert marketplace_listings (ebay, status=draft)
       const existing = currentListing ? { id: currentListing.id } : null;
+      const conditionVerificationJson = JSON.parse(
+        JSON.stringify(result.conditionVerification),
+      ) as Json;
 
       const listingPatch = {
         status: "draft" as const,
@@ -202,6 +217,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           ebayConditionId: product.ebay_condition_id,
           ebayConditionName: product.ebay_condition_name,
           ebayConditionEnum: product.ebay_condition_enum,
+          conditionVerification: conditionVerificationJson,
           draftOutdated: false,
         },
       };
@@ -230,6 +246,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
             categoryId: product.ebay_category_id,
             ebayConditionId: product.ebay_condition_id,
             ebayConditionEnum: product.ebay_condition_enum,
+            conditionVerification: conditionVerificationJson,
           },
           last_error: null,
         })
@@ -248,9 +265,16 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         ebayConditionId: product.ebay_condition_id ?? undefined,
         ebayConditionName: product.ebay_condition_name ?? undefined,
         ebayConditionEnum: product.ebay_condition_enum ?? undefined,
+        conditionVerification: result.conditionVerification,
       };
     } catch (e: any) {
       const msg = e?.message ?? String(e);
+      let parsedError: any = null;
+      try {
+        parsedError = JSON.parse(msg);
+      } catch {
+        parsedError = { message: msg };
+      }
       console.error("[createEbayDraft] failed", { productId: data.productId, error: msg });
       await context.supabase
         .from("publishing_jobs")
@@ -264,7 +288,11 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       // Also surface error on listing row if exists
       await context.supabase
         .from("marketplace_listings")
-        .update({ error_message: msg })
+        .update({
+          error_message: msg,
+          last_failed_step: parsedError?.code === "INVENTORY_CONDITION_DRIFT" ? "inventory_verify" : "inventory_upsert",
+          last_error: parsedError,
+        })
         .eq("product_id", data.productId)
         .eq("marketplace", "ebay");
 

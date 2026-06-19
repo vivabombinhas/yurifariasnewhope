@@ -58,7 +58,9 @@ export function EbayDraftPanel({ productId }: Props) {
     },
   });
 
-  const ready = !!readiness.data?.ready;
+  const ready = !!readiness.data?.checks
+    ?.filter((c) => c.id !== "inventory_condition_verified")
+    .every((c) => c.status === "ok");
   const meta =
     (listing.data?.provider_metadata as {
       offerId?: string;
@@ -68,6 +70,16 @@ export function EbayDraftPanel({ productId }: Props) {
       ebayConditionId?: number;
       ebayConditionName?: string;
       ebayConditionEnum?: string;
+      conditionVerification?: {
+        internalCondition: string | null;
+        ebayCategoryId: string;
+        selectedEbayConditionId: number;
+        selectedEbayConditionName: string;
+        selectedEbayConditionEnum: string;
+        putSentCondition: string;
+        getReturnedCondition: string | null;
+        offerId?: string;
+      };
       draftOutdated?: boolean;
     }) ??
     null;
@@ -102,7 +114,7 @@ export function EbayDraftPanel({ productId }: Props) {
             variant={isActive ? "outline" : "default"}
             onClick={handleCreate}
             disabled={!ready || createMut.isPending}
-            title={!ready ? "Pass eBay Readiness checks first" : undefined}
+            title={!ready ? "Pass required eBay setup checks first" : undefined}
           >
             {createMut.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
@@ -116,7 +128,7 @@ export function EbayDraftPanel({ productId }: Props) {
       <CardContent className="space-y-2 text-sm">
         {!ready && (
           <p className="text-muted-foreground">
-            Pass all eBay Readiness checks above before creating a draft.
+            Pass the required eBay setup checks above before creating a draft.
           </p>
         )}
         {isDraft && meta && (
@@ -147,6 +159,14 @@ export function EbayDraftPanel({ productId }: Props) {
                 </span>
               </div>
             )}
+            {meta.conditionVerification && (
+              <div className="text-xs">
+                <span className="text-muted-foreground">InventoryItem verified: </span>
+                <span className="font-mono">
+                  sent {meta.conditionVerification.putSentCondition} / got {meta.conditionVerification.getReturnedCondition ?? "null"}
+                </span>
+              </div>
+            )}
             {isOutdated && (
               <p className="text-xs text-destructive">
                 Category or eBay Condition changed. Recreate this draft before publishing.
@@ -169,6 +189,12 @@ export function EbayDraftPanel({ productId }: Props) {
                 {createMut.data.ebayConditionName} · {createMut.data.ebayConditionEnum} · {createMut.data.ebayConditionId}
               </span>
             </p>
+            {createMut.data.conditionVerification && (
+              <p className="text-xs">
+                InventoryItem: sent <span className="font-mono">{createMut.data.conditionVerification.putSentCondition}</span> · got{" "}
+                <span className="font-mono">{createMut.data.conditionVerification.getReturnedCondition ?? "null"}</span>
+              </p>
+            )}
           </div>
         )}
         {createMut.data && !createMut.data.ok && (
