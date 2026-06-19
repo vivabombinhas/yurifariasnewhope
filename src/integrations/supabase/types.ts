@@ -136,6 +136,7 @@ export type Database = {
         Row: {
           access_token: string
           account_name: string | null
+          business_policy_ids: Json
           connected_at: string
           created_at: string
           environment: string
@@ -144,6 +145,7 @@ export type Database = {
           id: string
           last_refresh_at: string | null
           marketplace: Database["public"]["Enums"]["marketplace"]
+          merchant_location_key: string | null
           metadata: Json
           refresh_token: string
           scopes: string[]
@@ -154,6 +156,7 @@ export type Database = {
         Insert: {
           access_token: string
           account_name?: string | null
+          business_policy_ids?: Json
           connected_at?: string
           created_at?: string
           environment?: string
@@ -162,6 +165,7 @@ export type Database = {
           id?: string
           last_refresh_at?: string | null
           marketplace: Database["public"]["Enums"]["marketplace"]
+          merchant_location_key?: string | null
           metadata?: Json
           refresh_token: string
           scopes?: string[]
@@ -172,6 +176,7 @@ export type Database = {
         Update: {
           access_token?: string
           account_name?: string | null
+          business_policy_ids?: Json
           connected_at?: string
           created_at?: string
           environment?: string
@@ -180,6 +185,7 @@ export type Database = {
           id?: string
           last_refresh_at?: string | null
           marketplace?: Database["public"]["Enums"]["marketplace"]
+          merchant_location_key?: string | null
           metadata?: Json
           refresh_token?: string
           scopes?: string[]
@@ -195,6 +201,8 @@ export type Database = {
           error_message: string | null
           external_listing_id: string | null
           id: string
+          last_error: Json | null
+          last_failed_step: string | null
           last_sync_at: string | null
           listed_at: string | null
           listing_url: string | null
@@ -212,6 +220,8 @@ export type Database = {
           error_message?: string | null
           external_listing_id?: string | null
           id?: string
+          last_error?: Json | null
+          last_failed_step?: string | null
           last_sync_at?: string | null
           listed_at?: string | null
           listing_url?: string | null
@@ -229,6 +239,8 @@ export type Database = {
           error_message?: string | null
           external_listing_id?: string | null
           id?: string
+          last_error?: Json | null
+          last_failed_step?: string | null
           last_sync_at?: string | null
           listed_at?: string | null
           listing_url?: string | null
