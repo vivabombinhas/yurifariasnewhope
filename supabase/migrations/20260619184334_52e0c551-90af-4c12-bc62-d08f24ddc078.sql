@@ -1,0 +1,33 @@
+CREATE OR REPLACE FUNCTION public.ebay_condition_enum_for_id(_condition_id integer)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public
+AS $$
+  SELECT CASE _condition_id
+    WHEN 1000 THEN 'NEW'
+    WHEN 1500 THEN 'NEW_OTHER'
+    WHEN 1750 THEN 'NEW_WITH_DEFECTS'
+    WHEN 2000 THEN 'CERTIFIED_REFURBISHED'
+    WHEN 2010 THEN 'EXCELLENT_REFURBISHED'
+    WHEN 2020 THEN 'VERY_GOOD_REFURBISHED'
+    WHEN 2030 THEN 'GOOD_REFURBISHED'
+    WHEN 2500 THEN 'SELLER_REFURBISHED'
+    WHEN 2750 THEN 'LIKE_NEW'
+    WHEN 2990 THEN 'PRE_OWNED_EXCELLENT'
+    WHEN 3000 THEN 'USED_EXCELLENT'
+    WHEN 3010 THEN 'USED_ACCEPTABLE'
+    WHEN 4000 THEN 'USED_VERY_GOOD'
+    WHEN 5000 THEN 'USED_GOOD'
+    WHEN 6000 THEN 'USED_ACCEPTABLE'
+    WHEN 7000 THEN 'FOR_PARTS_OR_NOT_WORKING'
+    ELSE NULL
+  END
+$$;
+
+ALTER TABLE public.products
+  ADD CONSTRAINT products_ebay_condition_id_enum_match
+  CHECK (
+    (ebay_condition_id IS NULL AND ebay_condition_enum IS NULL)
+    OR public.ebay_condition_enum_for_id(ebay_condition_id) = ebay_condition_enum
+  ) NOT VALID;
