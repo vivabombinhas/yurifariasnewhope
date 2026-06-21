@@ -146,10 +146,8 @@ export async function createSandboxLocation(): Promise<{ merchantLocationKey: st
   return { merchantLocationKey: DEFAULT_LOCATION_KEY };
 }
 
-export async function createSandboxFulfillmentPolicy(): Promise<{ id: string }> {
-  const env = await ensureSandbox();
-  const token = await getValidEbayAccessToken();
-  const body = {
+function defaultFulfillmentPolicyBody() {
+  return {
     name: "Default Fulfillment",
     marketplaceId: MARKETPLACE_ID,
     categoryTypes: [{ name: "ALL_EXCLUDING_MOTORS_VEHICLES" }],
@@ -171,11 +169,67 @@ export async function createSandboxFulfillmentPolicy(): Promise<{ id: string }> 
       },
     ],
   };
-  const res = await ebayFetch(env, "POST", `/sell/account/v1/fulfillment_policy`, token, body);
+}
+
+export async function createSandboxFulfillmentPolicy(): Promise<{ id: string }> {
+  const env = await ensureSandbox();
+  const token = await getValidEbayAccessToken();
+  const res = await ebayFetch(
+    env,
+    "POST",
+    `/sell/account/v1/fulfillment_policy`,
+    token,
+    defaultFulfillmentPolicyBody(),
+  );
   if (!res.ok) {
     throw new Error(`Fulfillment policy: ${ebayErrorMessage(res.status, res.json, res.text)}`);
   }
   return { id: res.json?.fulfillmentPolicyId };
+}
+
+/**
+ * Returns a Fulfillment Policy ID guaranteed to have at least one valid
+ * domestic shipping service. Repairs the existing default policy in place
+ * when it lacks shippingServices (eBay errorId 25007), or creates a fresh
+ * one. Idempotent.
+ */
+export async function ensureValidFulfillmentPolicy(): Promise<{ id: string; repaired: boolean }> {
+  const env = await ensureSandbox();
+  const token = await getValidEbayAccessToken();
+  const mq = `?marketplace_id=${MARKETPLACE_ID}`;
+  const listRes = await ebayFetch(env, "GET", `/sell/account/v1/fulfillment_policy${mq}`, token);
+  const policies = (listRes.json?.fulfillmentPolicies ?? []) as any[];
+
+  const hasService = (p: any) =>
+    Array.isArray(p?.shippingOptions) &&
+    p.shippingOptions.some(
+      (o: any) => Array.isArray(o?.shippingServices) && o.shippingServices.length > 0,
+    );
+
+  const valid = policies.find(hasService);
+  if (valid) return { id: valid.fulfillmentPolicyId, repaired: false };
+
+  // Repair the first existing policy (preserve its ID so the offer keeps working)
+  const stale = policies[0];
+  if (stale?.fulfillmentPolicyId) {
+    const putRes = await ebayFetch(
+      env,
+      "PUT",
+      `/sell/account/v1/fulfillment_policy/${encodeURIComponent(stale.fulfillmentPolicyId)}`,
+      token,
+      { ...defaultFulfillmentPolicyBody(), name: stale.name ?? "Default Fulfillment" },
+    );
+    if (!putRes.ok) {
+      throw new Error(
+        `Repair fulfillment policy: ${ebayErrorMessage(putRes.status, putRes.json, putRes.text)}`,
+      );
+    }
+    return { id: stale.fulfillmentPolicyId, repaired: true };
+  }
+
+  // No policy at all — create one
+  const created = await createSandboxFulfillmentPolicy();
+  return { id: created.id, repaired: true };
 }
 
 export async function createSandboxPaymentPolicy(): Promise<{ id: string }> {
@@ -235,6 +289,10 @@ export async function syncOfferWithSellerSetup(offerId: string): Promise<{
   if (!d.merchantLocationKey || !d.fulfillmentPolicyId || !d.paymentPolicyId || !d.returnPolicyId) {
     throw new Error("Seller setup incomplete; create all four resources first.");
   }
+
+  // Ensure the Fulfillment Policy actually has a shipping service (eBay errorId 25007 guard)
+  const fulfillment = await ensureValidFulfillmentPolicy();
+  d.fulfillmentPolicyId = fulfillment.id;
 
   // Fetch existing offer
   const offerRes = await ebayFetch(
