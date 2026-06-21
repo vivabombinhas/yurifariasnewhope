@@ -114,6 +114,9 @@ function buildInventoryBody(existing: Record<string, any> | null, input: CreateD
       imageUrls: input.imageUrls,
     },
     condition: input.ebayConditionEnum,
+    conditionDescription: input.ebayConditionName.toLowerCase() === "new"
+      ? undefined
+      : input.description.slice(0, 1000),
   };
 }
 
