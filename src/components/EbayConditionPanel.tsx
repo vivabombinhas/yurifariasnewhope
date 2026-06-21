@@ -74,7 +74,9 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   const selectedValue = selected ? savedValue : "";
   const suggested = conditions.find((c) => c.suggested);
   const safeEnums = INTERNAL_TO_EBAY_ENUMS[internalCondition] ?? [];
-  const semanticMatch = conditions.find((c) => safeEnums.includes(c.conditionEnum));
+  const semanticMatch = safeEnums
+    .map((conditionEnum) => conditions.find((c) => c.conditionEnum === conditionEnum))
+    .find(Boolean);
   const hasSemanticMatch =
     !internalCondition ||
     safeEnums.length === 0 ||
@@ -233,7 +235,7 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
           {selected ? (
             <>
               <Badge variant="outline">ID {selected.conditionId}</Badge>
-              <Badge variant="outline">{selected.conditionEnum}</Badge>
+              <Badge variant="outline">{selected.displayName}</Badge>
             </>
           ) : product.ebay_condition_name ? (
             <Badge variant="outline">Saved value not valid for this category</Badge>
