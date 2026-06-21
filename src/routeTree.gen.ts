@@ -19,6 +19,7 @@ import { Route as AuthenticatedLocationsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedIntakeRouteImport } from './routes/_authenticated/intake'
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products.index'
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
+import { Route as AuthenticatedProductsBatchRouteImport } from './routes/_authenticated/products.batch'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
 import { Route as ApiPublicEbayImagePhotoIdRouteImport } from './routes/api/public/ebay/image.$photoId'
@@ -74,6 +75,12 @@ const AuthenticatedProductsNewRoute =
     path: '/new',
     getParentRoute: () => AuthenticatedProductsRoute,
   } as any)
+const AuthenticatedProductsBatchRoute =
+  AuthenticatedProductsBatchRouteImport.update({
+    id: '/batch',
+    path: '/batch',
+    getParentRoute: () => AuthenticatedProductsRoute,
+  } as any)
 const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/publishing': typeof AuthenticatedPublishingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
+  '/products/batch': typeof AuthenticatedProductsBatchRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products/': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
@@ -113,6 +121,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/': typeof AuthenticatedIndexRoute
   '/products/$id': typeof AuthenticatedProductsIdRoute
+  '/products/batch': typeof AuthenticatedProductsBatchRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
@@ -129,6 +138,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/products/$id': typeof AuthenticatedProductsIdRoute
+  '/_authenticated/products/batch': typeof AuthenticatedProductsBatchRoute
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
@@ -145,6 +155,7 @@ export interface FileRouteTypes {
     | '/publishing'
     | '/settings'
     | '/products/$id'
+    | '/products/batch'
     | '/products/new'
     | '/products/'
     | '/api/public/ebay/callback'
@@ -158,6 +169,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/'
     | '/products/$id'
+    | '/products/batch'
     | '/products/new'
     | '/products'
     | '/api/public/ebay/callback'
@@ -173,6 +185,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/'
     | '/_authenticated/products/$id'
+    | '/_authenticated/products/batch'
     | '/_authenticated/products/new'
     | '/_authenticated/products/'
     | '/api/public/ebay/callback'
@@ -258,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsNewRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
+    '/_authenticated/products/batch': {
+      id: '/_authenticated/products/batch'
+      path: '/batch'
+      fullPath: '/products/batch'
+      preLoaderRoute: typeof AuthenticatedProductsBatchRouteImport
+      parentRoute: typeof AuthenticatedProductsRoute
+    }
     '/_authenticated/products/$id': {
       id: '/_authenticated/products/$id'
       path: '/$id'
@@ -284,12 +304,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedProductsRouteChildren {
   AuthenticatedProductsIdRoute: typeof AuthenticatedProductsIdRoute
+  AuthenticatedProductsBatchRoute: typeof AuthenticatedProductsBatchRoute
   AuthenticatedProductsNewRoute: typeof AuthenticatedProductsNewRoute
   AuthenticatedProductsIndexRoute: typeof AuthenticatedProductsIndexRoute
 }
 
 const AuthenticatedProductsRouteChildren: AuthenticatedProductsRouteChildren = {
   AuthenticatedProductsIdRoute: AuthenticatedProductsIdRoute,
+  AuthenticatedProductsBatchRoute: AuthenticatedProductsBatchRoute,
   AuthenticatedProductsNewRoute: AuthenticatedProductsNewRoute,
   AuthenticatedProductsIndexRoute: AuthenticatedProductsIndexRoute,
 }
