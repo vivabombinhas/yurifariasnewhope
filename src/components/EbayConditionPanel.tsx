@@ -68,10 +68,13 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   const selectedValue = selected ? savedValue : "";
   const suggested = conditions.find((c) => c.suggested);
   const safeEnums = INTERNAL_TO_EBAY_ENUMS[internalCondition] ?? [];
+  const semanticMatch = conditions.find((c) => safeEnums.includes(c.conditionEnum));
   const hasSemanticMatch =
     !internalCondition ||
     safeEnums.length === 0 ||
-    conditions.some((c) => safeEnums.includes(c.conditionEnum));
+    !!semanticMatch;
+  const savedInvalid = !!savedValue && !selected;
+  const needsAttention = needsReselection || savedInvalid || (!savedValue && conditions.length > 0);
 
   const saveMut = useMutation({
     mutationFn: async (conditionId: string) => {
@@ -86,8 +89,9 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
         },
       });
     },
-    onSuccess: () => {
-      toast.success("eBay Condition saved");
+    onSuccess: (_d, conditionId) => {
+      const chosen = conditions.find((c) => String(c.conditionId) === conditionId);
+      toast.success(`eBay Condition saved: ${chosen?.displayName ?? conditionId}`);
       qc.invalidateQueries({ queryKey: ["product", product.id] });
       qc.invalidateQueries({ queryKey: ["ebay-readiness", product.id] });
       qc.invalidateQueries({ queryKey: ["ebay-listing", product.id] });
@@ -95,6 +99,22 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to save eBay Condition"),
   });
+
+  // Auto-fix: when the saved condition is invalid for this category (e.g. LIKE_NEW on Frames),
+  // pick the semantically-safe suggestion automatically and notify the user. Only runs once
+  // per (product, category) load.
+  const autoFixedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!categoryId || !conditions.length) return;
+    const key = `${product.id}:${categoryId}`;
+    if (autoFixedRef.current === key) return;
+    if (saveMut.isPending) return;
+    if (selected) return; // already valid
+    const candidate = semanticMatch ?? suggested;
+    if (!candidate) return;
+    autoFixedRef.current = key;
+    saveMut.mutate(String(candidate.conditionId));
+  }, [categoryId, conditions.length, selected, semanticMatch, suggested, product.id, saveMut]);
 
   if (!categoryId) {
     return (
