@@ -71,8 +71,9 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       meta = (refreshedListing.provider_metadata ?? {}) as Record<string, any>;
       offerId = meta.offerId ?? draft.offerId;
     }
-    const activeListing = listing!;
-    const activeOfferId: string = offerId!;
+    if (!offerId) {
+      return { ok: false, errorMessage: "Failed to obtain eBay offer for publish." };
+    }
     if (meta.draftOutdated === true) {
       return {
         ok: false,
