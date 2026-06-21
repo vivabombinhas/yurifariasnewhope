@@ -68,23 +68,17 @@ export const groupPhotosBySimilarity = createServerFn({ method: "POST" })
       urls.length - 1
     } in the order shown. Group them by physical product.`;
 
+    const userContent: any[] = [{ type: "text", text: userText }];
+    urls.forEach((url, i) => {
+      userContent.push({ type: "text", text: `Photo index ${i}:` });
+      userContent.push({ type: "image_url", image_url: { url } });
+    });
+
     const body = {
       model: "google/gemini-3-flash-preview",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: userText },
-            ...urls.map((url, i) => ({
-              type: "text" as const,
-              text: `Photo index ${i}:`,
-            })).flatMap((label, i) => [
-              label,
-              { type: "image_url" as const, image_url: { url: urls[i] } },
-            ]),
-          ],
-        },
+        { role: "user", content: userContent },
       ],
       response_format: {
         type: "json_schema",
