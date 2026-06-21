@@ -157,11 +157,12 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         .eq("id", listing.id);
       return { ok: false, errorMessage: msg };
     }
+    const ebayInventorySku = typeof meta.sku === "string" && meta.sku.trim() ? meta.sku : product.sku!;
 
     // Initial read-only audit (used to decide repair vs publish).
     const { readEbayPublishAuditResources } = await import("./publish-audit.server");
     const readAudit = async (currentOfferId: string) => {
-      const r = await readEbayPublishAuditResources({ sku: product.sku!, offerId: currentOfferId });
+      const r = await readEbayPublishAuditResources({ sku: ebayInventorySku, offerId: currentOfferId });
       const inventoryJson =
         r.inventoryItemRaw.json && typeof r.inventoryItemRaw.json === "object"
           ? r.inventoryItemRaw.json
@@ -208,7 +209,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         message: "Selected eBay Condition is not allowed by the current category policies.",
         publishAttemptId,
         productId: data.productId,
-        sku: product.sku,
+        sku: ebayInventorySku,
+        internalSku: product.sku,
         ebayCategoryId: product.ebay_category_id,
         selectedEbayConditionId: product.ebay_condition_id,
         selectedEbayConditionEnum: product.ebay_condition_enum,
@@ -234,7 +236,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
           "An active listing already exists on eBay for this SKU but is not linked locally. Resolve manually before republishing.",
         publishAttemptId,
         productId: data.productId,
-        sku: product.sku,
+        sku: ebayInventorySku,
+        internalSku: product.sku,
         offers: audit.allOffers.map((o) => ({
           offerId: o?.offerId,
           status: o?.status,
@@ -258,7 +261,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       String(audit.inventoryJson.condition ?? "") !== product.ebay_condition_enum;
     const offerCategoryDrift =
       String(audit.offerJson.categoryId ?? "") !== String(product.ebay_category_id);
-    const offerSkuDrift = String(audit.offerJson.sku ?? "") !== product.sku;
+    const offerSkuDrift = String(audit.offerJson.sku ?? "") !== ebayInventorySku;
     const offerStale =
       !Number.isFinite(audit.offerCreatedAt) || audit.offerCreatedAt <= productUpdatedAt;
     const duplicateUnpublished = audit.unpublishedOfferCount > 1;
@@ -275,7 +278,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     console.log("[ebayPublish] repair decision", {
       publishAttemptId,
       productId: data.productId,
-      sku: product.sku,
+      sku: ebayInventorySku,
+      internalSku: product.sku,
       offerId,
       inventoryDrift,
       offerCategoryDrift,
