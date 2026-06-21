@@ -59,7 +59,9 @@ export const publishEbayListing = createServerFn({ method: "POST" })
 
     const { data: product, error: pErr } = await context.supabase
       .from("products")
-      .select("sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects, updated_at")
+      .select(
+        "sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects, updated_at",
+      )
       .eq("id", data.productId)
       .maybeSingle();
     if (pErr) throw pErr;
