@@ -74,11 +74,10 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   const selectedValue = selected ? savedValue : "";
   const suggested = conditions.find((c) => c.suggested);
   const safeEnums = INTERNAL_TO_EBAY_ENUMS[internalCondition] ?? [];
-  const semanticMatch = conditions.find((c) => safeEnums.includes(c.conditionEnum));
-  const hasSemanticMatch =
-    !internalCondition ||
-    safeEnums.length === 0 ||
-    !!semanticMatch;
+  const semanticMatch = safeEnums
+    .map((conditionEnum) => conditions.find((c) => c.conditionEnum === conditionEnum))
+    .find(Boolean);
+  const hasSemanticMatch = !internalCondition || safeEnums.length === 0 || !!semanticMatch;
   const savedInvalid = !!savedValue && !selected;
   const needsAttention = needsReselection || savedInvalid || (!savedValue && conditions.length > 0);
 
@@ -171,17 +170,16 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
               Previous condition not allowed for this category
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              The saved value (<code>{product.ebay_condition_enum ?? product.ebay_condition_name}</code>)
-              is not in the current category's allowed list. A valid one is being selected
-              automatically — review and adjust below if needed.
+              The saved value (
+              <code>{product.ebay_condition_enum ?? product.ebay_condition_name}</code>) is not in
+              the current category's allowed list. A valid one is being selected automatically —
+              review and adjust below if needed.
             </p>
           </div>
         )}
         {needsReselection && (
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
-            <p className="font-medium text-amber-700 dark:text-amber-400">
-              Reselection required
-            </p>
+            <p className="font-medium text-amber-700 dark:text-amber-400">Reselection required</p>
             <p className="text-xs text-muted-foreground mt-1">
               The previously saved eBay condition was inconsistent (ID and enum did not match) and
               has been cleared. Pick a valid condition for this category to continue.
@@ -222,8 +220,12 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
             </SelectTrigger>
             <SelectContent>
               {conditions.map((c: EbayConditionPolicyDTO) => (
-                <SelectItem key={`${c.conditionId}-${c.conditionEnum}`} value={String(c.conditionId)}>
-                  {c.displayName}{c.suggested ? " · suggested" : ""}
+                <SelectItem
+                  key={`${c.conditionId}-${c.conditionEnum}`}
+                  value={String(c.conditionId)}
+                >
+                  {c.displayName}
+                  {c.suggested ? " · suggested" : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -233,7 +235,7 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
           {selected ? (
             <>
               <Badge variant="outline">ID {selected.conditionId}</Badge>
-              <Badge variant="outline">{selected.conditionEnum}</Badge>
+              <Badge variant="outline">{selected.displayName}</Badge>
             </>
           ) : product.ebay_condition_name ? (
             <Badge variant="outline">Saved value not valid for this category</Badge>

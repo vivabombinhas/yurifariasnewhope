@@ -18,11 +18,7 @@ function aspectsForApi(raw: unknown): Record<string, string[]> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: Record<string, string[]> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    const arr = Array.isArray(v)
-      ? v.map((x) => String(x))
-      : v == null
-        ? []
-        : [String(v)];
+    const arr = Array.isArray(v) ? v.map((x) => String(x)) : v == null ? [] : [String(v)];
     const filtered = arr.map((s) => s.trim()).filter(Boolean);
     if (filtered.length) out[k] = filtered;
   }
@@ -114,6 +110,10 @@ function buildInventoryBody(existing: Record<string, any> | null, input: CreateD
       imageUrls: input.imageUrls,
     },
     condition: input.ebayConditionEnum,
+    conditionDescription:
+      input.ebayConditionName.toLowerCase() === "new"
+        ? undefined
+        : input.description.slice(0, 1000),
   };
 }
 
@@ -158,9 +158,7 @@ async function assertSelectedConditionAllowed(input: CreateDraftInput) {
   assertConditionIdEnumMatch(input.ebayConditionId, input.ebayConditionEnum);
   const policies = await getEbayConditionPolicies(input.categoryId);
   const selected = policies.find(
-    (p) =>
-      p.conditionId === input.ebayConditionId &&
-      p.conditionEnum === input.ebayConditionEnum,
+    (p) => p.conditionId === input.ebayConditionId && p.conditionEnum === input.ebayConditionEnum,
   );
   if (!selected) {
     throw new Error(
@@ -195,7 +193,9 @@ export async function verifyInventoryItemCondition(
     token,
   );
   if (!getRes.ok) {
-    throw new Error(`InventoryItem GET: ${ebayErrorMessage(getRes.status, getRes.json, getRes.text)}`);
+    throw new Error(
+      `InventoryItem GET: ${ebayErrorMessage(getRes.status, getRes.json, getRes.text)}`,
+    );
   }
 
   const getReturnedCondition =
@@ -214,7 +214,8 @@ export async function verifyInventoryItemCondition(
     throw new Error(
       JSON.stringify({
         code: "INVENTORY_CONDITION_DRIFT",
-        message: "eBay stored a different InventoryItem condition than the one sent. Offer/Publish blocked.",
+        message:
+          "eBay stored a different InventoryItem condition than the one sent. Offer/Publish blocked.",
         ...verification,
       }),
     );
@@ -256,16 +257,16 @@ export async function createEbayDraftInSandbox(
     token,
   );
   if (!existingOffersRes.ok) {
-    throw new Error(`List existing offers: ${ebayErrorMessage(existingOffersRes.status, existingOffersRes.json, existingOffersRes.text)}`);
+    throw new Error(
+      `List existing offers: ${ebayErrorMessage(existingOffersRes.status, existingOffersRes.json, existingOffersRes.text)}`,
+    );
   }
   const existingOffers: any[] = existingOffersRes.json?.offers ?? [];
   for (const off of existingOffers) {
     if (!off?.offerId) continue;
     const offerStatus = String(off.status ?? "").toUpperCase();
     const maybePublished =
-      offerStatus === "PUBLISHED" ||
-      !!off.listing?.listingId ||
-      !!off.listingId;
+      offerStatus === "PUBLISHED" || !!off.listing?.listingId || !!off.listingId;
     if (maybePublished) {
       console.warn("[createEbayDraft] skipped published offer cleanup", {
         offerId: off.offerId,
@@ -292,7 +293,9 @@ export async function createEbayDraftInSandbox(
       status: del.status,
     });
     if (!del.ok) {
-      throw new Error(`Delete stale offer ${off.offerId}: ${ebayErrorMessage(del.status, del.json, del.text)}`);
+      throw new Error(
+        `Delete stale offer ${off.offerId}: ${ebayErrorMessage(del.status, del.json, del.text)}`,
+      );
     }
   }
 
@@ -302,9 +305,12 @@ export async function createEbayDraftInSandbox(
     `/sell/inventory/v1/inventory_item/${encodeURIComponent(input.sku)}`,
     token,
   );
-  const currentInventory = currentInventoryRes.ok && currentInventoryRes.json && typeof currentInventoryRes.json === "object"
-    ? currentInventoryRes.json
-    : null;
+  const currentInventory =
+    currentInventoryRes.ok &&
+    currentInventoryRes.json &&
+    typeof currentInventoryRes.json === "object"
+      ? currentInventoryRes.json
+      : null;
 
   // 1. PUT InventoryItem (fully replaces existing inventory item for this SKU)
   // Spread existing first, then write condition last so stale remote condition cannot overwrite the selected enum.
@@ -362,13 +368,16 @@ export async function createEbayDraftInSandbox(
     }
     if (parsedDrift?.code !== "INVENTORY_CONDITION_DRIFT") throw e;
 
-    console.warn("[createEbayDraft] PUT succeeded but GET still returned stale condition; deleting and recreating InventoryItem", {
-      publishAttemptId,
-      productId: input.productId,
-      sku: input.sku,
-      sentCondition: input.ebayConditionEnum,
-      returnedCondition: parsedDrift.getReturnedCondition,
-    });
+    console.warn(
+      "[createEbayDraft] PUT succeeded but GET still returned stale condition; deleting and recreating InventoryItem",
+      {
+        publishAttemptId,
+        productId: input.productId,
+        sku: input.sku,
+        sentCondition: input.ebayConditionEnum,
+        returnedCondition: parsedDrift.getReturnedCondition,
+      },
+    );
     const deleteInventoryRes = await ebayFetch(
       env,
       "DELETE",
@@ -376,7 +385,9 @@ export async function createEbayDraftInSandbox(
       token,
     );
     if (!deleteInventoryRes.ok) {
-      throw new Error(`Delete stale InventoryItem: ${ebayErrorMessage(deleteInventoryRes.status, deleteInventoryRes.json, deleteInventoryRes.text)}`);
+      throw new Error(
+        `Delete stale InventoryItem: ${ebayErrorMessage(deleteInventoryRes.status, deleteInventoryRes.json, deleteInventoryRes.text)}`,
+      );
     }
     inventoryBody = buildInventoryBody(null, input);
     const recreate = await ebayFetchWithDiagnostics(
@@ -393,7 +404,9 @@ export async function createEbayDraftInSandbox(
       ...recreate.diagnostics,
     });
     if (!recreate.res.ok) {
-      throw new Error(`Recreate InventoryItem: ${ebayErrorMessage(recreate.res.status, recreate.res.json, recreate.res.text)}`);
+      throw new Error(
+        `Recreate InventoryItem: ${ebayErrorMessage(recreate.res.status, recreate.res.json, recreate.res.text)}`,
+      );
     }
     const verified = await verifyInventoryItemCondition(env, token, input);
     inventoryItemGet = verified.inventoryItemGet;
@@ -408,7 +421,10 @@ export async function createEbayDraftInSandbox(
     getReturnedCondition: verification.getReturnedCondition,
     response: inventoryItemGet,
   });
-  console.log("[createEbayDraft] inventory condition verified", { publishAttemptId, ...verification });
+  console.log("[createEbayDraft] inventory condition verified", {
+    publishAttemptId,
+    ...verification,
+  });
 
   // 2. POST Offer (UNPUBLISHED — do NOT call /publish)
   const offerBody = {

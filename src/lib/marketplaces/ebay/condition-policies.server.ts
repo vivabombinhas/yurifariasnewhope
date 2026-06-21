@@ -39,7 +39,10 @@ const CONDITION_ID_ENUMS: Record<number, string> = {
 };
 
 function normalize(value: string) {
-  return value.toLowerCase().replace(/[\s_-]+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/[\s_-]+/g, " ")
+    .trim();
 }
 
 export function conditionEnumForPolicy(conditionId: number, displayName: string): string {
@@ -48,7 +51,8 @@ export function conditionEnumForPolicy(conditionId: number, displayName: string)
   const name = normalize(displayName);
   if (name === "new with defects") return "NEW_WITH_DEFECTS";
   if (name === "new" || name === "new with box" || name === "new with tags") return "NEW";
-  if (name === "new other" || name === "new without box" || name === "new without tags") return "NEW_OTHER";
+  if (name === "new other" || name === "new without box" || name === "new without tags")
+    return "NEW_OTHER";
   if (name === "used" || name === "pre owned" || name === "pre-owned") return "USED_GOOD";
   if (name.includes("excellent")) return "USED_EXCELLENT";
   if (name.includes("fair") || name.includes("acceptable")) return "USED_ACCEPTABLE";
@@ -136,11 +140,23 @@ export function suggestEbayConditionPolicy(
 ): EbayConditionPolicy | null {
   if (!policies.length || !internalCondition) return null;
   const text = normalize(`${conditionGrade ?? ""} ${conditionNotes ?? ""}`);
-  const hasDefect = /\b(defect|factory second|irregular|flaw|damaged|damage|stain|hole|tear|scuff|scratch|crack|broken)\b/.test(text);
-  const hasBoxOrTag = /\b(with box|original box|in box|with tags|tag attached|tags attached|new with tags)\b/.test(text);
-  const lacksBoxOrTag = /\b(without box|no box|missing box|without tags|no tags|missing tags)\b/.test(text);
-  const byEnum = (enums: string[]) =>
-    policies.find((p) => enums.includes(p.conditionEnum)) ?? null;
+  const hasDefect =
+    /\b(defect|factory second|irregular|flaw|damaged|damage|stain|hole|tear|scuff|scratch|crack|broken)\b/.test(
+      text,
+    );
+  const hasBoxOrTag =
+    /\b(with box|original box|in box|with tags|tag attached|tags attached|new with tags)\b/.test(
+      text,
+    );
+  const lacksBoxOrTag =
+    /\b(without box|no box|missing box|without tags|no tags|missing tags)\b/.test(text);
+  const byEnum = (enums: string[]) => {
+    for (const conditionEnum of enums) {
+      const match = policies.find((p) => p.conditionEnum === conditionEnum);
+      if (match) return match;
+    }
+    return null;
+  };
   const byName = (names: string[]) =>
     policies.find((p) => names.some((n) => normalize(p.displayName).includes(n))) ?? null;
 
