@@ -19,6 +19,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: "Publish is sandbox-only for now." };
     }
 
+    // ---------- STEP 1: Load product + listing ----------
     const { data: listing, error } = await context.supabase
       .from("marketplace_listings")
       .select("id, status, external_listing_id, listing_url, provider_metadata")
@@ -27,6 +28,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw error;
 
+    // Step 3: short-circuit if an active listing already exists.
     if (listing?.status === "active" && listing.external_listing_id) {
       return {
         ok: true,
@@ -42,16 +44,10 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       };
     }
 
-    const meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
-    const offerId: string | undefined = meta.offerId;
+    let meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
+    let offerId: string | undefined = meta.offerId;
     if (!listing || !offerId) {
       return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
-    }
-    if (meta.draftOutdated) {
-      return {
-        ok: false,
-        errorMessage: "eBay draft is outdated because category or condition changed. Recreate eBay Draft before publishing.",
-      };
     }
 
     const { data: product, error: pErr } = await context.supabase
@@ -60,19 +56,18 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       .eq("id", data.productId)
       .maybeSingle();
     if (pErr) throw pErr;
+
+    // ---------- STEP 2: Non-repairable selection checks ----------
     if (
       !product?.sku ||
       !product.ebay_category_id ||
       !product.ebay_condition_id ||
       !product.ebay_condition_enum ||
-      !product.ebay_condition_name ||
-      meta.categoryId !== product.ebay_category_id ||
-      meta.ebayConditionId !== product.ebay_condition_id ||
-      meta.ebayConditionEnum !== product.ebay_condition_enum
+      !product.ebay_condition_name
     ) {
       return {
         ok: false,
-        errorMessage: "eBay draft does not match the selected category/condition. Recreate eBay Draft before publishing.",
+        errorMessage: "Select eBay category and condition before publishing.",
       };
     }
     const { assertConditionIdEnumMatch } = await import("./condition-policies.server");
@@ -91,49 +86,58 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: msg };
     }
 
+    // Initial read-only audit (used to decide repair vs publish).
     const { readEbayPublishAuditResources } = await import("./publish-audit.server");
-    const auditResources = await readEbayPublishAuditResources({ sku: product.sku, offerId });
-    const inventoryJson = auditResources.inventoryItemRaw.json && typeof auditResources.inventoryItemRaw.json === "object"
-      ? auditResources.inventoryItemRaw.json
-      : {};
-    const offerJson = auditResources.offerRaw?.json && typeof auditResources.offerRaw.json === "object"
-      ? auditResources.offerRaw.json
-      : {};
-    const allOffers = Array.isArray(auditResources.offersForSkuRaw.json?.offers)
-      ? auditResources.offersForSkuRaw.json.offers
-      : [];
-    const unpublishedOfferCount = allOffers.filter((o: any) => String(o?.status ?? "").toUpperCase() === "UNPUBLISHED").length;
-    const hasPublishedListing = !!listing.external_listing_id || allOffers.some((o: any) => !!o?.listingId || !!o?.listing?.listingId || String(o?.status ?? "").toUpperCase() === "PUBLISHED");
-    const offerCreatedAt = new Date(String(offerJson.createdDate ?? offerJson.createdAt ?? 0)).getTime();
-    const productUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
-    const preconditionsOk =
-      String(inventoryJson.sku ?? product.sku) === product.sku &&
-      String(offerJson.sku ?? "") === product.sku &&
-      String(offerJson.categoryId ?? "") === String(product.ebay_category_id) &&
-      String(inventoryJson.condition ?? "") === product.ebay_condition_enum &&
-      auditResources.conditionPoliciesTable.some((p) => p.conditionEnum === product.ebay_condition_enum && p.conditionId === product.ebay_condition_id) &&
-      Number.isFinite(offerCreatedAt) &&
-      Number.isFinite(productUpdatedAt) &&
-      offerCreatedAt > productUpdatedAt &&
-      !hasPublishedListing &&
-      unpublishedOfferCount === 1;
-    if (!preconditionsOk) {
+    const readAudit = async (currentOfferId: string) => {
+      const r = await readEbayPublishAuditResources({ sku: product.sku!, offerId: currentOfferId });
+      const inventoryJson = r.inventoryItemRaw.json && typeof r.inventoryItemRaw.json === "object" ? r.inventoryItemRaw.json : {};
+      const offerJson = r.offerRaw?.json && typeof r.offerRaw.json === "object" ? r.offerRaw.json : {};
+      const allOffers: any[] = Array.isArray(r.offersForSkuRaw.json?.offers) ? r.offersForSkuRaw.json.offers : [];
+      const unpublishedOfferCount = allOffers.filter((o) => String(o?.status ?? "").toUpperCase() === "UNPUBLISHED").length;
+      const hasPublishedListing = allOffers.some((o) => !!o?.listingId || !!o?.listing?.listingId || String(o?.status ?? "").toUpperCase() === "PUBLISHED");
+      const offerCreatedAt = new Date(String(offerJson.createdDate ?? offerJson.createdAt ?? 0)).getTime();
+      return { r, inventoryJson, offerJson, allOffers, unpublishedOfferCount, hasPublishedListing, offerCreatedAt };
+    };
+
+    let audit = await readAudit(offerId);
+
+    // Non-repairable: condition must be allowed by category policies.
+    const conditionAllowed = audit.r.conditionPoliciesTable.some(
+      (p) => p.conditionEnum === product.ebay_condition_enum && p.conditionId === product.ebay_condition_id,
+    );
+    if (!conditionAllowed) {
       const msg = JSON.stringify({
-        code: "EBAY_PUBLISH_PRECONDITIONS_FAILED",
-        message: "Publish blocked because the read-only audit does not satisfy all required criteria.",
+        code: "INVALID_EBAY_CONDITION_FOR_CATEGORY",
+        message: "Selected eBay Condition is not allowed by the current category policies.",
         publishAttemptId,
         productId: data.productId,
         sku: product.sku,
-        inventorySku: inventoryJson.sku ?? null,
-        offerSku: offerJson.sku ?? null,
-        localCategoryId: product.ebay_category_id,
-        offerCategoryId: offerJson.categoryId ?? null,
-        localConditionEnum: product.ebay_condition_enum,
-        inventoryCondition: inventoryJson.condition ?? null,
-        unpublishedOfferCount,
-        hasPublishedListing,
-        offerCreatedAt: offerJson.createdDate ?? offerJson.createdAt ?? null,
-        productUpdatedAt: product.updated_at,
+        ebayCategoryId: product.ebay_category_id,
+        selectedEbayConditionId: product.ebay_condition_id,
+        selectedEbayConditionEnum: product.ebay_condition_enum,
+        allowedConditions: audit.r.conditionPoliciesTable,
+      });
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg.slice(0, 2000),
+          last_failed_step: "condition_for_category",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
+
+    // Non-repairable: another published listing exists on eBay for this SKU
+    // that we don't know about locally. Refuse to touch it.
+    if (audit.hasPublishedListing && !listing.external_listing_id) {
+      const msg = JSON.stringify({
+        code: "PUBLISHED_LISTING_EXISTS_REMOTELY",
+        message: "An active listing already exists on eBay for this SKU but is not linked locally. Resolve manually before republishing.",
+        publishAttemptId,
+        productId: data.productId,
+        sku: product.sku,
+        offers: audit.allOffers.map((o) => ({ offerId: o?.offerId, status: o?.status, listingId: o?.listingId ?? o?.listing?.listingId })),
       });
       await context.supabase
         .from("marketplace_listings")
@@ -146,45 +150,66 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: msg };
     }
 
-    const { verifyEbayInventoryItemCondition } = await import("./draft.server");
-    let inventoryVerification: Awaited<ReturnType<typeof verifyEbayInventoryItemCondition>>;
-    try {
-      inventoryVerification = await verifyEbayInventoryItemCondition({
-        productId: data.productId,
-        publishAttemptId,
-        sku: product.sku,
-        title: product.title ?? "",
-        description: product.description ?? "",
-        priceCents: product.price_cents ?? 0,
-        internalCondition: product.condition ?? null,
-        ebayConditionId: product.ebay_condition_id,
-        ebayConditionEnum: product.ebay_condition_enum,
-        ebayConditionName: product.ebay_condition_name,
-        categoryId: product.ebay_category_id,
-        aspects: product.ebay_aspects,
-        imageUrls: [],
-      });
-    } catch (e: any) {
-      const msg = e?.message ?? String(e);
-      let parsedError: Json;
-      try {
-        parsedError = JSON.parse(msg) as Json;
-      } catch {
-        parsedError = { message: msg, offerId } as Json;
+    // ---------- STEPS 4-9: Repair InventoryItem + Offer if reparable drift exists ----------
+    const productUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
+    const inventoryDrift = String(audit.inventoryJson.condition ?? "") !== product.ebay_condition_enum;
+    const offerCategoryDrift = String(audit.offerJson.categoryId ?? "") !== String(product.ebay_category_id);
+    const offerSkuDrift = String(audit.offerJson.sku ?? "") !== product.sku;
+    const offerStale = !Number.isFinite(audit.offerCreatedAt) || audit.offerCreatedAt <= productUpdatedAt;
+    const duplicateUnpublished = audit.unpublishedOfferCount > 1;
+    const missingUnpublished = audit.unpublishedOfferCount === 0;
+    const needsRepair =
+      inventoryDrift || offerCategoryDrift || offerSkuDrift || offerStale || duplicateUnpublished || missingUnpublished ||
+      meta.draftOutdated === true;
+
+    console.log("[ebayPublish] repair decision", {
+      publishAttemptId,
+      productId: data.productId,
+      sku: product.sku,
+      offerId,
+      inventoryDrift,
+      offerCategoryDrift,
+      offerSkuDrift,
+      offerStale,
+      duplicateUnpublished,
+      missingUnpublished,
+      draftOutdated: meta.draftOutdated === true,
+      needsRepair,
+    });
+
+    if (needsRepair) {
+      // Use the existing createEbayDraft pipeline — it deletes stale UNPUBLISHED
+      // offers, PUT InventoryItem with the selected condition, GET-verifies it
+      // (recreating from scratch if remote condition is still stale), and POSTs
+      // a fresh UNPUBLISHED Offer. Never touches PUBLISHED offers.
+      const { createEbayDraft } = await import("./draft.functions");
+      const draft = await createEbayDraft({ data: { productId: data.productId } });
+      if (!draft.ok || !draft.offerId) {
+        const msg = draft.errorMessage ?? "Failed to repair eBay draft before publish.";
+        await context.supabase
+          .from("marketplace_listings")
+          .update({
+            error_message: msg.slice(0, 2000),
+            last_failed_step: "draft_repair",
+            last_error: JSON.parse(JSON.stringify({ message: msg, previousOfferId: offerId })) as Json,
+          })
+          .eq("id", listing.id);
+        return { ok: false, errorMessage: msg };
       }
-      await context.supabase
+      offerId = draft.offerId;
+
+      // Re-read listing meta after createEbayDraft updated it.
+      const { data: refreshedListing } = await context.supabase
         .from("marketplace_listings")
-        .update({
-          error_message: msg,
-          last_failed_step: "inventory_verify",
-          last_error: parsedError,
-        })
-        .eq("id", listing.id);
-      return { ok: false, errorMessage: msg };
+        .select("provider_metadata")
+        .eq("id", listing.id)
+        .maybeSingle();
+      meta = (refreshedListing?.provider_metadata ?? meta) as Record<string, any>;
+      meta.offerId = offerId;
+      meta.publishAttemptId = publishAttemptId;
     }
 
-    // Ensure the eBay account has a valid Inventory Location (country=US, ENABLED, postalCode or city+state)
-    // and patch the offer to use it. Fixes errorId 25002 "No <Item.Country> exists".
+    // ---------- Ensure merchant location + policies on Offer ----------
     let locationInfo: { merchantLocationKey: string; status: string; country: string; postalCode?: string; city?: string; stateOrProvince?: string; created: boolean };
     try {
       const { ensureValidMerchantLocation, setOfferMerchantLocation } = await import("./seller-setup.server");
@@ -203,12 +228,68 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       return { ok: false, errorMessage: msg };
     }
 
+    // ---------- STEP 10: Final audit (must be perfect to publish) ----------
+    audit = await readAudit(offerId);
+    const finalUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
+    const finalOfferCreatedAt = audit.offerCreatedAt;
+    const finalCheck = {
+      inventorySkuOk: String(audit.inventoryJson.sku ?? product.sku) === product.sku,
+      offerSkuOk: String(audit.offerJson.sku ?? "") === product.sku,
+      offerCategoryOk: String(audit.offerJson.categoryId ?? "") === String(product.ebay_category_id),
+      inventoryConditionOk: String(audit.inventoryJson.condition ?? "") === product.ebay_condition_enum,
+      conditionAllowedOk: audit.r.conditionPoliciesTable.some(
+        (p) => p.conditionEnum === product.ebay_condition_enum && p.conditionId === product.ebay_condition_id,
+      ),
+      offerFresherThanProductOk: Number.isFinite(finalOfferCreatedAt) && finalOfferCreatedAt > finalUpdatedAt,
+      exactlyOneUnpublishedOk: audit.unpublishedOfferCount === 1,
+      noPublishedListingOk: !audit.hasPublishedListing,
+    };
+    const finalOk = Object.values(finalCheck).every(Boolean);
+    if (!finalOk) {
+      const msg = JSON.stringify({
+        code: "EBAY_PUBLISH_FINAL_AUDIT_FAILED",
+        message: "Final audit failed after repair. Publish blocked.",
+        publishAttemptId,
+        productId: data.productId,
+        sku: product.sku,
+        offerId,
+        localCategoryId: product.ebay_category_id,
+        offerCategoryId: audit.offerJson.categoryId ?? null,
+        localConditionEnum: product.ebay_condition_enum,
+        inventoryCondition: audit.inventoryJson.condition ?? null,
+        unpublishedOfferCount: audit.unpublishedOfferCount,
+        hasPublishedListing: audit.hasPublishedListing,
+        offerCreatedAt: audit.offerJson.createdDate ?? audit.offerJson.createdAt ?? null,
+        productUpdatedAt: product.updated_at,
+        finalCheck,
+      });
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg.slice(0, 2000),
+          last_failed_step: "final_audit",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
+
+    // ---------- STEP 11: Publish (single attempt, no retry) ----------
     try {
       const { publishOffer } = await import("./publish.server");
       const result = await publishOffer(offerId, publishAttemptId);
 
       const conditionVerificationJson = JSON.parse(
-        JSON.stringify({ ...inventoryVerification.verification, offerId }),
+        JSON.stringify({
+          internalCondition: product.condition ?? null,
+          ebayCategoryId: product.ebay_category_id,
+          selectedEbayConditionId: product.ebay_condition_id,
+          selectedEbayConditionName: product.ebay_condition_name,
+          selectedEbayConditionEnum: product.ebay_condition_enum,
+          putSentCondition: product.ebay_condition_enum,
+          getReturnedCondition: audit.inventoryJson.condition ?? null,
+          offerId,
+        }),
       ) as Json;
       const publishLastErrorJson = JSON.parse(
         JSON.stringify({
@@ -222,7 +303,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         ...meta,
         marketplace: "ebay",
         offerId,
-          publishAttemptId,
+        publishAttemptId,
         conditionVerification: conditionVerificationJson,
         lastPublishRaw: result.raw,
       };
@@ -266,7 +347,6 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         productId: data.productId,
         sku: product.sku,
         offerId,
-        ...inventoryVerification.verification,
         merchantLocationKey: locationInfo.merchantLocationKey,
         locationStatus: locationInfo.status,
         locationCountry: locationInfo.country,
@@ -274,6 +354,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         ok: result.ok,
         listingId: result.ok ? result.listingId : undefined,
         status: result.raw.status,
+        finalCheck,
       });
 
       return { ok: true, result };
