@@ -16,7 +16,7 @@ import {
   PRODUCT_STATUSES,
   formatPrice,
 } from "@/lib/marketplaces";
-import { PackagePlus, Search } from "lucide-react";
+import { Layers, PackagePlus, Search } from "lucide-react";
 import { useT, tStatus } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
@@ -70,11 +70,18 @@ function ProductsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">{t("products.title")}</h1>
-        <Button asChild size="sm">
-          <Link to="/products/new">
-            <PackagePlus className="h-4 w-4 mr-2" /> {t("nav.new")}
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to="/products/batch">
+              <Layers className="h-4 w-4 mr-2" /> Batch
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link to="/products/new">
+              <PackagePlus className="h-4 w-4 mr-2" /> {t("nav.new")}
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2">
