@@ -113,16 +113,23 @@ export function EbayDraftPanel({ productId }: Props) {
             size="sm"
             variant={isActive ? "outline" : "default"}
             onClick={handleCreate}
-            disabled={!ready || createMut.isPending}
-            title={!ready ? "Pass required eBay setup checks first" : undefined}
+            disabled={createMut.isPending || isActive || (!ready && !isDraft && !isOutdated)}
+            title={
+              isActive
+                ? "Already published"
+                : !ready && !isDraft && !isOutdated
+                  ? "Pass required eBay setup checks first"
+                  : "Recreating syncs the official eBay Condition to the inventory item before publish"
+            }
           >
             {createMut.isPending ? (
               <Loader2 className="h-4 w-4 mr-1 animate-spin" />
             ) : (
               <FileText className="h-4 w-4 mr-1" />
             )}
-            {isActive ? "Already Published" : isDraft ? "Recreate eBay Draft" : "Create eBay Draft"}
+            {isActive ? "Already Published" : isDraft || isOutdated ? "Recreate eBay Draft" : "Create eBay Draft"}
           </Button>
+
         </div>
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
