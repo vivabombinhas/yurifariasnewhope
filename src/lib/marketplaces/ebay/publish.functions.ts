@@ -70,7 +70,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         errorMessage: "Select eBay category and condition before publishing.",
       };
     }
-    const { assertConditionIdEnumMatch } = await import("./condition-policies.server");
+    const { assertConditionIdEnumMatch, getEbayConditionPolicies } = await import("./condition-policies.server");
     try {
       assertConditionIdEnumMatch(product.ebay_condition_id, product.ebay_condition_enum);
     } catch (e: any) {
@@ -80,6 +80,38 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         .update({
           error_message: msg,
           last_failed_step: "condition_validate",
+          last_error: JSON.parse(msg) as Json,
+        })
+        .eq("id", listing.id);
+      return { ok: false, errorMessage: msg };
+    }
+
+    const productCategoryConditionPolicies = await getEbayConditionPolicies(product.ebay_category_id);
+    const productCategoryConditionAllowed = productCategoryConditionPolicies.some(
+      (p) => p.conditionEnum === product.ebay_condition_enum && p.conditionId === product.ebay_condition_id,
+    );
+    if (!productCategoryConditionAllowed) {
+      const msg = JSON.stringify({
+        code: "INVALID_EBAY_CONDITION_FOR_CATEGORY",
+        message: "Selected eBay Condition is not allowed by the current product category. Reselect eBay Condition before publishing.",
+        publishAttemptId,
+        productId: data.productId,
+        sku: product.sku,
+        ebayCategoryId: product.ebay_category_id,
+        selectedEbayConditionId: product.ebay_condition_id,
+        selectedEbayConditionName: product.ebay_condition_name,
+        selectedEbayConditionEnum: product.ebay_condition_enum,
+        allowedConditions: productCategoryConditionPolicies.map((p) => ({
+          conditionId: p.conditionId,
+          conditionName: p.displayName,
+          conditionEnum: p.conditionEnum,
+        })),
+      });
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          error_message: msg.slice(0, 2000),
+          last_failed_step: "condition_for_category",
           last_error: JSON.parse(msg) as Json,
         })
         .eq("id", listing.id);
