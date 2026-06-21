@@ -49,6 +49,13 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     if (!listing || !offerId) {
       return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
     }
+    if (meta.draftOutdated === true) {
+      return {
+        ok: false,
+        errorMessage:
+          "The eBay draft is outdated because the category or official eBay Condition changed. Recreate the eBay draft before publishing.",
+      };
+    }
 
     const { data: product, error: pErr } = await context.supabase
       .from("products")
