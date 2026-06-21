@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Rocket, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from "lucide-react";
 import { publishEbayListing } from "@/lib/marketplaces/ebay/publish.functions";
+import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions";
 
 interface Props {
   productId: string;
@@ -12,6 +13,7 @@ interface Props {
 
 export function EbayPublishPanel({ productId }: Props) {
   const fn = useServerFn(publishEbayListing);
+  const readinessFn = useServerFn(checkEbayReadiness);
   const qc = useQueryClient();
 
   const listing = useQuery({
@@ -31,6 +33,17 @@ export function EbayPublishPanel({ productId }: Props) {
   const meta = (listing.data?.provider_metadata ?? {}) as Record<string, any>;
   const offerId: string | undefined = meta.offerId;
   const draftOutdated = !!meta.draftOutdated;
+
+  const readiness = useQuery({
+    queryKey: ["ebay-readiness", productId],
+    queryFn: () => readinessFn({ data: { productId } }),
+  });
+  const blockingReadinessChecks =
+    readiness.data?.checks.filter(
+      (c) => c.status !== "ok" && c.id !== "inventory_condition_verified",
+    ) ?? [];
+  const readinessBlocked = blockingReadinessChecks.length > 0;
+  const readinessChecking = readiness.isLoading || readiness.isFetching;
 
   const mut = useMutation({
     mutationFn: () => fn({ data: { productId } }),
@@ -67,7 +80,7 @@ export function EbayPublishPanel({ productId }: Props) {
           <Button
             size="sm"
             onClick={() => mut.mutate()}
-            disabled={!offerId || mut.isPending || isActive || draftOutdated}
+            disabled={!offerId || mut.isPending || isActive || draftOutdated || readinessBlocked || readinessChecking}
             title={
               isActive
                 ? "Listing is already active on eBay"
@@ -75,6 +88,10 @@ export function EbayPublishPanel({ productId }: Props) {
                 ? "Recreate the eBay draft before publishing"
                 : !offerId
                 ? "Create an eBay draft first"
+                : readinessBlocked
+                ? "Resolve eBay readiness checks before publishing"
+                : readinessChecking
+                ? "Checking eBay readiness before publishing"
                 : undefined
             }
           >
@@ -97,6 +114,19 @@ export function EbayPublishPanel({ productId }: Props) {
           <p className="text-destructive">
             eBay draft is outdated. Recreate eBay Draft before publishing.
           </p>
+        )}
+        {readinessChecking && (
+          <p className="text-muted-foreground">Checking eBay readiness before publishing…</p>
+        )}
+        {readinessBlocked && (
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-destructive">
+            <div className="font-medium">Publish blocked until eBay setup is valid.</div>
+            <ul className="mt-1 list-disc pl-5 text-xs space-y-1">
+              {blockingReadinessChecks.map((c) => (
+                <li key={c.id}>{c.label}{c.detail ? ` — ${c.detail}` : ""}</li>
+              ))}
+            </ul>
+          </div>
         )}
 
         {data && !data.ok && (
