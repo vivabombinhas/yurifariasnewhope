@@ -28,6 +28,17 @@ const EBAY_MAX_PHOTOS = 12;
 const EBAY_MAX_URL_LEN = 500;
 const EBAY_MAX_TOTAL_LEN = 3975;
 
+function buildEbayInventorySku(internalSku: string, productId: string, attemptId: string) {
+  const safeSku =
+    internalSku
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 30) || "SKU";
+  return `${safeSku}-${productId.slice(0, 8)}-${attemptId.slice(0, 8)}`.slice(0, 50);
+}
+
 export const createEbayDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
@@ -100,6 +111,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           "This eBay listing is already published. Create a separate fresh draft only after explicitly ending or confirming the active listing workflow.",
       };
     }
+    const ebayInventorySku = buildEbayInventorySku(product.sku, data.productId, publishAttemptId);
 
     const { data: photos, error: phErr } = await context.supabase
       .from("product_photos")
@@ -193,7 +205,8 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         payload: {
           publishAttemptId,
           env,
-          sku: product.sku,
+          sku: ebayInventorySku,
+          internalSku: product.sku,
           categoryId: product.ebay_category_id,
           ebayConditionId: product.ebay_condition_id,
           ebayConditionEnum: product.ebay_condition_enum,
@@ -210,7 +223,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         publishAttemptId,
         accountExternalId: account?.external_account_id ?? null,
         accountName: account?.account_name ?? null,
-        sku: product.sku,
+        sku: ebayInventorySku,
         title: product.title,
         description: product.description,
         priceCents: product.price_cents ?? 0,
@@ -249,6 +262,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           offerId: result.offerId,
           publishAttemptId,
           sku: result.sku,
+          internalSku: product.sku,
           env,
           categoryId: product.ebay_category_id,
           ebayConditionId: product.ebay_condition_id,
