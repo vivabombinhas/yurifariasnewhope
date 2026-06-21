@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -13,11 +14,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   PRODUCT_STATUSES,
   formatPrice,
 } from "@/lib/marketplaces";
-import { Layers, PackagePlus, Search } from "lucide-react";
+import { Layers, PackagePlus, Search, Trash2 } from "lucide-react";
 import { useT, tStatus } from "@/lib/i18n";
+import { toast } from "sonner";
 
 import { RouteError } from "@/components/RouteError";
 
@@ -27,10 +40,14 @@ export const Route = createFileRoute("/_authenticated/products/")({
   errorComponent: RouteError,
 });
 
+
 function ProductsPage() {
   const t = useT();
+  const qc = useQueryClient();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["products", { status }],
@@ -65,6 +82,59 @@ function ProductsPage() {
           .toLowerCase();
         return hay.includes(term);
       });
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected =
+    !!filtered?.length && filtered.every((p: any) => selected.has(p.id));
+
+  const toggleAll = () => {
+    if (!filtered) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        filtered.forEach((p: any) => next.delete(p.id));
+      } else {
+        filtered.forEach((p: any) => next.add(p.id));
+      }
+      return next;
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    setDeleting(true);
+    try {
+      // Best-effort: clean up photos from storage
+      const { data: photos } = await supabase
+        .from("product_photos")
+        .select("storage_path")
+        .in("product_id", ids);
+      const paths = (photos ?? [])
+        .map((p: any) => p.storage_path)
+        .filter(Boolean);
+      if (paths.length) {
+        await supabase.storage.from("product-photos").remove(paths);
+      }
+      const { error } = await supabase.from("products").delete().in("id", ids);
+      if (error) throw error;
+      toast.success(`${ids.length} deleted`);
+      setSelected(new Set());
+      qc.invalidateQueries({ queryKey: ["products"] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to delete");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -109,6 +179,50 @@ function ProductsPage() {
         </Select>
       </div>
 
+      {filtered?.length ? (
+        <div className="flex items-center justify-between gap-2 px-1">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+            <Checkbox
+              checked={allVisibleSelected}
+              onCheckedChange={toggleAll}
+            />
+            {selected.size > 0
+              ? `${selected.size} selected`
+              : "Select all"}
+          </label>
+          {selected.size > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button size="sm" variant="destructive" disabled={deleting}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete {selected.size}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Delete {selected.size} product{selected.size > 1 ? "s" : ""}?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the selected products and their
+                    photos. This cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleBulkDelete}
+                    disabled={deleting}
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      ) : null}
+
       <div className="rounded-md border bg-background">
         {isLoading ? (
           <p className="p-6 text-sm text-muted-foreground">{t("common.loading")}</p>
@@ -117,11 +231,19 @@ function ProductsPage() {
         ) : (
           <ul className="divide-y">
             {filtered.map((p: any) => (
-              <li key={p.id}>
+              <li
+                key={p.id}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40"
+              >
+                <Checkbox
+                  checked={selected.has(p.id)}
+                  onCheckedChange={() => toggle(p.id)}
+                  aria-label="Select product"
+                />
                 <Link
                   to="/products/$id"
                   params={{ id: p.id }}
-                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40"
+                  className="flex flex-1 items-center justify-between gap-3 min-w-0"
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium truncate">
@@ -151,3 +273,4 @@ function ProductsPage() {
     </div>
   );
 }
+
