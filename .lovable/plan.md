@@ -1,67 +1,53 @@
-# Simplificar painel eBay (V1)
+# Modo Fila (Batch) — Cadastro em massa
 
-## Objetivo
+Nova página `/products/batch` que permite cadastrar muitos produtos de uma vez, com IA agrupando fotos automaticamente e analisando em lote com 3 análises paralelas.
 
-Reduzir os 9 sub-painéis atuais a **4 etapas lineares** que guiam o usuário do começo ao fim, e garantir que qualquer alteração relevante no produto marque o draft como desatualizado.
+## Fluxo do usuário
 
-## Etapas finais
+1. **Upload em massa**: usuário solta/seleciona N fotos (de vários produtos misturados).
+2. **Agrupar com IA**: clica em "Agrupar fotos" → IA visualiza todas as fotos e retorna grupos por produto (ex: fotos 1,3,7 = produto A; fotos 2,5 = produto B…).
+3. **Ajuste manual** (caso IA erre): usuário pode arrastar fotos entre grupos, mesclar grupos ou separar.
+4. **Analisar lote**: clica em "Analisar todos" → cria drafts (1 por grupo), faz upload das fotos, e roda `analyzeProductWithAI` com concorrência máx. 3.
+5. **Revisão inline**: tabela com 1 linha por produto mostrando capa + título/marca/categoria/condição/preço editáveis + status (`pending → uploading → analyzing → ready → error`).
+6. **Salvar tudo**: confirma os drafts em massa e leva para `/products`.
 
-```text
-1. Setup        → conta conectada + categoria + condição oficial
-2. Listing Data → aspects (item specifics) + readiness consolidado
-3. Draft        → criar/recriar draft no eBay (com diagnóstico embutido)
-4. Publish      → seller setup automático + publish (com audit embutido)
-```
+## Mudanças técnicas
 
-Cada etapa mostra: status (ok / pendente / erro), um botão de ação primário e, quando útil, um "Detalhes" colapsado com o conteúdo técnico atual (preflight/audit raw) para debug — sem poluir a UI.
+### Backend (server functions)
 
-## Mapeamento dos painéis atuais
+**`src/lib/batch-grouping.functions.ts`** (novo)
+- `groupPhotosBySimilarity({ photoIds: string[] })` — recebe IDs de fotos já em um bucket de staging (`product-photos`, em path `staging/{userId}/...`), gera URLs assinadas, e chama Lovable AI (`google/gemini-3-flash-preview`) com `Output.object` pedindo `{ groups: number[][] }`. Retorna agrupamento por índices.
+- Usa `requireSupabaseAuth`.
 
-| Hoje                          | Vai para           |
-|-------------------------------|--------------------|
-| EbayCategoryPanel             | Etapa 1 (Setup)    |
-| EbayConditionPanel            | Etapa 1 (Setup)    |
-| EbayAspectsPanel              | Etapa 2 (Listing)  |
-| EbayReadinessPanel            | Etapa 2 (Listing)  |
-| EbayDraftPanel                | Etapa 3 (Draft)    |
-| EbaySellerSetupPanel          | Etapa 4 (collapsed)|
-| EbayPublishPreflightPanel     | Etapa 4 (collapsed)|
-| EbayPublishAuditPanel         | Etapa 4 (collapsed)|
-| EbayPublishPanel              | Etapa 4 (Publish)  |
+**Staging de fotos**: reutiliza bucket `product-photos` com prefixo `staging/{userId}/{sessionId}/`. Quando um draft é criado a partir do grupo, fotos são movidas para `{productId}/`. Se sessão for descartada, é feito cleanup.
 
-Nenhum painel é removido — eles viram conteúdo interno das 4 etapas. Lógica de servidor (`*.functions.ts` / `*.server.ts`) fica intocada.
+### Frontend
 
-## Mark draft outdated em edições de produto
+**`src/routes/_authenticated/products.batch.tsx`** (novo)
+- Estado local: `photos: StagedPhoto[]`, `groups: { id: string; photoIndexes: number[] }[]`, `drafts: BatchDraft[]`.
+- Concorrência: helper `runWithConcurrency(tasks, 3)` que processa fila de 3 em 3.
+- Componentes inline (no mesmo arquivo, simples): `PhotoGrid`, `GroupCard` (com botão "separar"/"mesclar com..."), `DraftRow` (editável).
 
-Hoje só `saveEbayCategory` e `saveEbayCondition` chamam `markEbayDraftOutdated`. Vamos estender para:
+**`src/lib/concurrency.ts`** (novo, pequeno)
+- `runWithConcurrency<T,R>(items: T[], limit: number, fn: (item:T, i:number) => Promise<R>): Promise<R[]>` — utilitário genérico.
 
-- edição de título, descrição, preço, condição interna (form de produto)
-- adição / remoção / reordenação de fotos
+**`src/routes/_authenticated/products.index.tsx`**
+- Adicionar botão secundário "Cadastro em lote" ao lado do "+ Novo", apontando para `/products/batch`.
 
-Implementação: helper único `markEbayDraftOutdatedForProduct(productId)` chamado nos pontos de mutação do produto/fotos. Quando o draft está outdated, a etapa 3 mostra "Recreate draft" como ação primária e a etapa 4 fica bloqueada.
+### i18n
+Adicionar chaves em `src/lib/i18n.tsx`: `batch.title`, `batch.upload`, `batch.group`, `batch.grouping`, `batch.analyze`, `batch.analyzing`, `batch.saveAll`, `batch.status.pending|uploading|analyzing|ready|error`, etc.
 
-## Arquivos a criar
+## Escopo desta entrega (V1)
 
-- `src/components/ebay/EbayWorkflowPanel.tsx` — container das 4 etapas (stepper vertical).
-- `src/components/ebay/steps/StepSetup.tsx`
-- `src/components/ebay/steps/StepListingData.tsx`
-- `src/components/ebay/steps/StepDraft.tsx`
-- `src/components/ebay/steps/StepPublish.tsx`
+- ✅ Upload em massa + agrupamento por IA
+- ✅ Ajuste manual de grupos (mover/mesclar/separar)
+- ✅ Análise em lote com 3 paralelos
+- ✅ Edição inline + salvar tudo
+- ❌ **Não inclui**: publicar no eBay em lote (continua 1 por 1 na página do produto). Isso fica para próxima iteração se você quiser.
+- ❌ Não inclui: progresso persistido (se fechar a aba, perde a sessão). Mantido simples para V1.
 
-## Arquivos a editar
+## Por que essa abordagem
 
-- `src/components/MarketplacePublishingPanel.tsx` — trocar 9 sub-painéis por `<EbayWorkflowPanel />`.
-- `src/routes/_authenticated/products.$id.tsx` — chamar `markEbayDraftOutdatedForProduct` no save de produto e mutações de fotos.
-- Criar `src/lib/marketplaces/ebay/mark-outdated.functions.ts` expondo a função.
-
-## Não-mudanças
-
-- Nenhuma alteração em `publish.functions.ts`, `draft.server.ts`, `taxonomy.*`, `seller-setup.*`, `publish-audit.*`. Comportamento idêntico, só apresentação.
-- Painéis antigos permanecem nos arquivos (não deletar) caso queiramos voltar — apenas deixam de ser renderizados.
-
-## Critério de aceite
-
-1. No detalhe de um produto, a seção eBay mostra exatamente 4 etapas numeradas com status visual.
-2. Cada etapa tem 1 ação primária visível; detalhes técnicos ficam atrás de "Detalhes".
-3. Editar título/descrição/preço/condição interna OU mexer em fotos marca `draftOutdated=true` e a etapa Draft pede recriação.
-4. Fluxo completo (categoria → condição → aspects → draft → publish) continua funcionando no Sandbox como hoje.
+- **Reaproveita** `analyzeProductWithAI`, `prepareImageForUpload`, bucket `product-photos`, schema atual — zero migração de banco.
+- **Modular**: agrupamento e concorrência ficam em arquivos próprios, não poluem a página existente.
+- **Sem regressão**: página `/products/new` (1 produto) continua intacta.
