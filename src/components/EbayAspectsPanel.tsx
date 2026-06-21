@@ -34,7 +34,9 @@ interface Props {
 }
 
 // Aspects that should always show up if not returned by API
-const ALWAYS_SHOW = ["Brand", "US Shoe Size", "Color", "Style", "Department", "Type", "Condition"];
+// "Condition" intentionally excluded — eBay receives it via InventoryItem.condition,
+// and including it as an aspect triggers warning 25401 ("Dropped condition from Item specifics").
+const ALWAYS_SHOW = ["Brand", "US Shoe Size", "Color", "Style", "Department", "Type"];
 
 function modeBadge(mode: EbayAspectDTO["mode"]) {
   if (mode === "REQUIRED") return <Badge variant="destructive">Required</Badge>;
