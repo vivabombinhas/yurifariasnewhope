@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   analyzeProductWithAI,
@@ -45,6 +45,32 @@ export function AiSuggestionPanel({
   const [suggestion, setSuggestion] = useState<AiSuggestion | null>(null);
   const [researchResult, setResearchResult] = useState<AiResearchResult | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Load the latest stored AI suggestion (e.g. one generated in batch) so it
+  // pre-fills the editor instead of forcing the user to click "Generate listing" again.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from("ai_suggestions")
+        .select("suggestion, accepted")
+        .eq("product_id", product.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error) {
+        console.warn("[AI panel] load latest suggestion failed", error);
+        return;
+      }
+      if (data?.suggestion && !data.accepted) {
+        setSuggestion(data.suggestion as unknown as AiSuggestion);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
 
   const run = useMutation({
     mutationFn: async () => {
