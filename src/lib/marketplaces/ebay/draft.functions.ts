@@ -270,6 +270,7 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           ebayConditionEnum: product.ebay_condition_enum,
           conditionVerification: conditionVerificationJson,
           draftOutdated: false,
+          draftCreatedAt: new Date().toISOString(),
         },
       };
 
