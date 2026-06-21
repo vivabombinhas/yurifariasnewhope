@@ -241,6 +241,9 @@ function PhotosSection({
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const t = useT();
+  const markOutdated = useServerFn(markEbayDraftOutdatedForProduct);
+  const flagOutdated = (reason: string) =>
+    markOutdated({ data: { productId, reason } }).catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
