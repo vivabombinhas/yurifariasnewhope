@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Save, ShieldCheck } from "lucide-react";
+import { Save, ShieldCheck, AlertTriangle } from "lucide-react";
 import {
   fetchEbayConditionPoliciesForCategory,
   saveEbayCondition,
@@ -67,10 +68,13 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   const selectedValue = selected ? savedValue : "";
   const suggested = conditions.find((c) => c.suggested);
   const safeEnums = INTERNAL_TO_EBAY_ENUMS[internalCondition] ?? [];
+  const semanticMatch = conditions.find((c) => safeEnums.includes(c.conditionEnum));
   const hasSemanticMatch =
     !internalCondition ||
     safeEnums.length === 0 ||
-    conditions.some((c) => safeEnums.includes(c.conditionEnum));
+    !!semanticMatch;
+  const savedInvalid = !!savedValue && !selected;
+  const needsAttention = needsReselection || savedInvalid || (!savedValue && conditions.length > 0);
 
   const saveMut = useMutation({
     mutationFn: async (conditionId: string) => {
@@ -85,8 +89,9 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
         },
       });
     },
-    onSuccess: () => {
-      toast.success("eBay Condition saved");
+    onSuccess: (_d, conditionId) => {
+      const chosen = conditions.find((c) => String(c.conditionId) === conditionId);
+      toast.success(`eBay Condition saved: ${chosen?.displayName ?? conditionId}`);
       qc.invalidateQueries({ queryKey: ["product", product.id] });
       qc.invalidateQueries({ queryKey: ["ebay-readiness", product.id] });
       qc.invalidateQueries({ queryKey: ["ebay-listing", product.id] });
@@ -94,6 +99,22 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to save eBay Condition"),
   });
+
+  // Auto-fix: when the saved condition is invalid for this category (e.g. LIKE_NEW on Frames),
+  // pick the semantically-safe suggestion automatically and notify the user. Only runs once
+  // per (product, category) load.
+  const autoFixedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!categoryId || !conditions.length) return;
+    const key = `${product.id}:${categoryId}`;
+    if (autoFixedRef.current === key) return;
+    if (saveMut.isPending) return;
+    if (selected) return; // already valid
+    const candidate = semanticMatch ?? suggested;
+    if (!candidate) return;
+    autoFixedRef.current = key;
+    saveMut.mutate(String(candidate.conditionId));
+  }, [categoryId, conditions.length, selected, semanticMatch, suggested, product.id, saveMut]);
 
   if (!categoryId) {
     return (
@@ -111,14 +132,35 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   }
 
   return (
-    <Card>
+    <Card className={needsAttention ? "border-amber-500/70 ring-1 ring-amber-500/40" : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4" /> eBay Condition
+          {needsAttention ? (
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          ) : (
+            <ShieldCheck className="h-4 w-4" />
+          )}
+          eBay Condition (official)
         </CardTitle>
         <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
       </CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          This is the real condition sent to eBay for the listing. It is independent from the
+          "Condition" field inside eBay Item Specifics below.
+        </p>
+        {savedInvalid && (
+          <div className="rounded-md border border-amber-500/60 bg-amber-500/10 p-3 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Previous condition not allowed for this category
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              The saved value (<code>{product.ebay_condition_enum ?? product.ebay_condition_name}</code>)
+              is not in the current category's allowed list. A valid one is being selected
+              automatically — review and adjust below if needed.
+            </p>
+          </div>
+        )}
         {needsReselection && (
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
             <p className="font-medium text-amber-700 dark:text-amber-400">

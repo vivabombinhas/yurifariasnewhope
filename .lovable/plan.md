@@ -1,53 +1,24 @@
-## Objetivo
+Pela gravação, você não está errando: a tela mostra que a condição eBay ficou escondida/indireta. O sistema está mostrando “Condition mapped to eBay: LIKE_NEW” no readiness, mas não há um painel claro para trocar isso para “Used”. Além disso, o campo “Condition” dentro de “eBay Item Specifics” não é a condição real do eBay; ele é só um item specific, por isso digitar “Used” ali não corrige o erro de publicação.
 
-Estruturar a descrição dos anúncios para combinar dados ricos (item specifics, condição, frete) com uma descrição enxuta (≤900 chars). Cada marketplace renderiza o output do seu jeito.
+Plano de ajuste:
 
-## Mudanças
+1. Tornar a condição eBay visível e editável
+- Adicionar ou reposicionar um painel claro chamado “eBay Condition”.
+- Mostrar as opções válidas da categoria selecionada, por exemplo “New” e “Used” para Frames.
+- Permitir selecionar “Used” e salvar antes de sincronizar/publicar.
 
-### 1. Schema (migration)
-Adicionar à tabela `products`:
-- `item_specifics` jsonb (array de `{name, value}`) — vira `aspects` na API do eBay
-- `condition_grade` text — rótulo curto ("Used – Acceptable", "Like New", etc.)
-- `condition_notes` text — detalhes ("split no canto superior direito…")
-- `shipping_notes` text — origem, embalagem, manuseio
+2. Evitar confusão com “Condition” em Item Specifics
+- Marcar melhor que “eBay Item Specifics > Condition” não é a condição oficial da listagem.
+- Se possível, não deixar esse campo sobrescrever ou confundir a condição eBay real.
 
-Campo `description` continua existindo, agora com limite **900 chars** (validado no frontend e na server function).
+3. Bloquear publicação quando a condição não for válida para a categoria
+- Se a categoria Frames não aceita LIKE_NEW, o readiness deve mostrar erro/aviso, não check verde.
+- O botão de publish deve exigir uma condição válida antes de enviar para o eBay.
 
-### 2. IA — novo schema de saída
-`analyzeProductWithAI` passa a devolver também:
-- `item_specifics: [{name, value}]` (5–12 itens relevantes)
-- `condition_grade`
-- `condition_notes`
-- `shipping_notes`
-- `description` reescrita para ≤900 chars (parágrafo enxuto + "Please review photos…")
+4. Automatizar a sugestão correta
+- Quando a categoria só aceitar New/Used e o produto interno estiver Like New/Good/Acceptable/For parts, sugerir automaticamente “Used”.
+- Ainda manter revisão humana antes de publicar.
 
-Título, brand, category, tags, preço — **inalterados**.
-
-### 3. UI — formulário do produto
-Nas páginas `products.new`, `products.$id` e `intake`:
-- Bloco "Item Specifics" — lista editável (add/remove linhas nome/valor)
-- Campos `condition_grade`, `condition_notes`, `shipping_notes` (textarea curtos)
-- Campo `description` ganha contador `xxx / 900` e bloqueia salvar acima do limite
-- Botão "Generate with AI" preenche todos os campos novos junto com os atuais
-
-### 4. Renderer por marketplace
-Novo arquivo por provider em `src/lib/marketplaces/<id>/render.ts` com `renderListing(product)` retornando `{ title, description, aspects? }`:
-- **eBay**: `aspects` = `item_specifics`; `description` = HTML simples com seções (Description, Condition Details, Shipping) montado a partir dos campos
-- **Etsy / Poshmark / Depop / Facebook**: concatena tudo em texto plano (sem campo `aspects`)
-
-O `PublishPanel`/`publishToMarketplace` passa a chamar o renderer correto antes de registrar a intenção.
-
-## Fora de escopo
-- Conectar API real do eBay (já planejado em etapas futuras)
-- Mudar título / brand / category / preço
-- Validações específicas por categoria do eBay (aspects obrigatórios variam por categoria — fica para a etapa de category mapping)
-
-## Arquivos tocados
-- migration nova (products)
-- `src/lib/ai-suggestions.functions.ts` (schema + prompt)
-- `src/routes/_authenticated/products.new.tsx`
-- `src/routes/_authenticated/products.$id.tsx`
-- `src/routes/_authenticated/intake.tsx`
-- `src/lib/marketplaces/{ebay,etsy,facebook,poshmark,depop}/render.ts` (novos)
-- `src/lib/marketplaces/publish.functions.ts` (usar renderer)
-- `src/lib/i18n.tsx` (rótulos novos en/es)
+5. Próximo passo depois disso
+- Depois desse ajuste, o fluxo fica mais simples: escolher categoria, revisar item specifics, confirmar condição eBay, sync/publish.
+- Em seguida podemos começar a Phase 2 para transformar esses passos em um assistente/fluxo único mais automático.
