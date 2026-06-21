@@ -358,8 +358,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     const finalUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
     const finalOfferCreatedAt = audit.offerCreatedAt;
     const finalCheck = {
-      inventorySkuOk: String(audit.inventoryJson.sku ?? product.sku) === product.sku,
-      offerSkuOk: String(audit.offerJson.sku ?? "") === product.sku,
+      inventorySkuOk: String(audit.inventoryJson.sku ?? ebayInventorySku) === ebayInventorySku,
+      offerSkuOk: String(audit.offerJson.sku ?? "") === ebayInventorySku,
       offerCategoryOk:
         String(audit.offerJson.categoryId ?? "") === String(product.ebay_category_id),
       inventoryConditionOk:
@@ -381,7 +381,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         message: "Final audit failed after repair. Publish blocked.",
         publishAttemptId,
         productId: data.productId,
-        sku: product.sku,
+        sku: ebayInventorySku,
+        internalSku: product.sku,
         offerId,
         localCategoryId: product.ebay_category_id,
         offerCategoryId: audit.offerJson.categoryId ?? null,
@@ -433,6 +434,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         ...meta,
         marketplace: "ebay",
         offerId,
+        sku: ebayInventorySku,
+        internalSku: product.sku,
         publishAttemptId,
         conditionVerification: conditionVerificationJson,
         lastPublishRaw: result.raw,
@@ -475,7 +478,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       console.log("[ebayPublish]", {
         publishAttemptId,
         productId: data.productId,
-        sku: product.sku,
+        sku: ebayInventorySku,
+        internalSku: product.sku,
         offerId,
         merchantLocationKey: locationInfo.merchantLocationKey,
         locationStatus: locationInfo.status,
