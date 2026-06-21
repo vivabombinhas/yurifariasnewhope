@@ -132,14 +132,35 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
   }
 
   return (
-    <Card>
+    <Card className={needsAttention ? "border-amber-500/70 ring-1 ring-amber-500/40" : undefined}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4" /> eBay Condition
+          {needsAttention ? (
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+          ) : (
+            <ShieldCheck className="h-4 w-4" />
+          )}
+          eBay Condition (official)
         </CardTitle>
         <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
       </CardHeader>
       <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">
+          This is the real condition sent to eBay for the listing. It is independent from the
+          "Condition" field inside eBay Item Specifics below.
+        </p>
+        {savedInvalid && (
+          <div className="rounded-md border border-amber-500/60 bg-amber-500/10 p-3 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400">
+              Previous condition not allowed for this category
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              The saved value (<code>{product.ebay_condition_enum ?? product.ebay_condition_name}</code>)
+              is not in the current category's allowed list. A valid one is being selected
+              automatically — review and adjust below if needed.
+            </p>
+          </div>
+        )}
         {needsReselection && (
           <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
             <p className="font-medium text-amber-700 dark:text-amber-400">
