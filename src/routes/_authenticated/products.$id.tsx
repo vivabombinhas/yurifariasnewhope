@@ -281,6 +281,7 @@ function PhotosSection({
           is_cover: photos.length === 0 && i === 0,
         });
       }
+      flagOutdated("photos_changed");
       onChange();
     } catch (e: any) {
       console.error("[product detail] photo upload failed", e);
@@ -291,12 +292,14 @@ function PhotosSection({
   async function remove(photo: { id: string; storage_path: string }) {
     await supabase.storage.from("product-photos").remove([photo.storage_path]);
     await supabase.from("product_photos").delete().eq("id", photo.id);
+    flagOutdated("photos_changed");
     onChange();
   }
 
   async function setCover(photoId: string) {
     await supabase.from("product_photos").update({ is_cover: false }).eq("product_id", productId);
     await supabase.from("product_photos").update({ is_cover: true }).eq("id", photoId);
+    flagOutdated("photos_changed");
     onChange();
   }
 
@@ -309,6 +312,7 @@ function PhotosSection({
     await supabase.from("product_photos").update({ position: -1 }).eq("id", a.id);
     await supabase.from("product_photos").update({ position: a.position }).eq("id", b.id);
     await supabase.from("product_photos").update({ position: b.position }).eq("id", a.id);
+    flagOutdated("photos_changed");
     onChange();
   }
 
