@@ -303,6 +303,10 @@ function BatchIntakePage() {
                 s.suggested_price_cents != null
                   ? (s.suggested_price_cents / 100).toFixed(2)
                   : "",
+              condition_grade: s.condition_grade ?? "",
+              condition_notes: s.condition_notes ?? "",
+              shipping_notes: s.shipping_notes ?? "",
+              item_specifics: Array.isArray(s.item_specifics) ? s.item_specifics : [],
             }
           : d,
       ),
