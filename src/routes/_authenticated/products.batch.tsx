@@ -57,6 +57,8 @@ type DraftStatus =
   | "ready"
   | "error";
 
+type ItemSpecific = { name: string; value: string };
+
 type BatchDraft = {
   id: string; // local id
   photoIds: string[];
@@ -70,6 +72,10 @@ type BatchDraft = {
   category: string;
   condition: string;
   price: string; // dollars
+  condition_grade: string;
+  condition_notes: string;
+  shipping_notes: string;
+  item_specifics: ItemSpecific[];
 };
 
 function rid() {
@@ -193,6 +199,10 @@ function BatchIntakePage() {
       category: "",
       condition: "",
       price: "",
+      condition_grade: "",
+      condition_notes: "",
+      shipping_notes: "",
+      item_specifics: [],
     };
   }
 
@@ -293,6 +303,10 @@ function BatchIntakePage() {
                 s.suggested_price_cents != null
                   ? (s.suggested_price_cents / 100).toFixed(2)
                   : "",
+              condition_grade: s.condition_grade ?? "",
+              condition_notes: s.condition_notes ?? "",
+              shipping_notes: s.shipping_notes ?? "",
+              item_specifics: Array.isArray(s.item_specifics) ? s.item_specifics : [],
             }
           : d,
       ),
@@ -372,6 +386,9 @@ function BatchIntakePage() {
         const price_cents = d.price
           ? Math.round(parseFloat(d.price) * 100)
           : null;
+        const cleanSpecs = (d.item_specifics || [])
+          .map((s) => ({ name: (s.name || "").trim(), value: (s.value || "").trim() }))
+          .filter((s) => s.name && s.value);
         const { error } = await supabase
           .from("products")
           .update({
@@ -382,6 +399,10 @@ function BatchIntakePage() {
             condition: (d.condition || null) as any,
             price_cents,
             status: "draft" as any,
+            condition_grade: d.condition_grade.trim() || null,
+            condition_notes: d.condition_notes.trim() || null,
+            shipping_notes: d.shipping_notes.trim() || null,
+            item_specifics: cleanSpecs as any,
           })
           .eq("id", d.productId!);
         if (error) throw error;
@@ -766,6 +787,100 @@ function DraftCard({
               onChange={(e) => onUpdate({ price: e.target.value })}
               disabled={!isEditable}
             />
+          </div>
+
+          <div className="sm:col-span-2 space-y-1">
+            <Label className="text-xs">Condition grade</Label>
+            <Input
+              value={draft.condition_grade}
+              onChange={(e) => onUpdate({ condition_grade: e.target.value })}
+              disabled={!isEditable}
+              placeholder='e.g. "Used – Very Good"'
+            />
+          </div>
+          <div className="sm:col-span-2 space-y-1">
+            <Label className="text-xs">Condition notes</Label>
+            <Textarea
+              rows={2}
+              value={draft.condition_notes}
+              onChange={(e) => onUpdate({ condition_notes: e.target.value })}
+              disabled={!isEditable}
+              placeholder="Visible flaws, locations, wear…"
+            />
+          </div>
+          <div className="sm:col-span-2 space-y-1">
+            <Label className="text-xs">Shipping notes</Label>
+            <Textarea
+              rows={2}
+              value={draft.shipping_notes}
+              onChange={(e) => onUpdate({ shipping_notes: e.target.value })}
+              disabled={!isEditable}
+              placeholder="Packaging plan, handling…"
+            />
+          </div>
+
+          <div className="sm:col-span-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Item specifics ({draft.item_specifics.length})</Label>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={!isEditable}
+                onClick={() =>
+                  onUpdate({
+                    item_specifics: [...draft.item_specifics, { name: "", value: "" }],
+                  })
+                }
+              >
+                + Add
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {draft.item_specifics.map((sp, i) => (
+                <div key={i} className="flex gap-1">
+                  <Input
+                    className="h-8 text-xs flex-1"
+                    placeholder="Name"
+                    value={sp.name}
+                    disabled={!isEditable}
+                    onChange={(e) => {
+                      const next = [...draft.item_specifics];
+                      next[i] = { ...next[i], name: e.target.value };
+                      onUpdate({ item_specifics: next });
+                    }}
+                  />
+                  <Input
+                    className="h-8 text-xs flex-1"
+                    placeholder="Value"
+                    value={sp.value}
+                    disabled={!isEditable}
+                    onChange={(e) => {
+                      const next = [...draft.item_specifics];
+                      next[i] = { ...next[i], value: e.target.value };
+                      onUpdate({ item_specifics: next });
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2"
+                    disabled={!isEditable}
+                    onClick={() =>
+                      onUpdate({
+                        item_specifics: draft.item_specifics.filter((_, j) => j !== i),
+                      })
+                    }
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              {draft.item_specifics.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">No specifics yet.</p>
+              )}
+            </div>
           </div>
         </div>
       )}
