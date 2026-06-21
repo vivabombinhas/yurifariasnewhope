@@ -386,6 +386,9 @@ function BatchIntakePage() {
         const price_cents = d.price
           ? Math.round(parseFloat(d.price) * 100)
           : null;
+        const cleanSpecs = (d.item_specifics || [])
+          .map((s) => ({ name: (s.name || "").trim(), value: (s.value || "").trim() }))
+          .filter((s) => s.name && s.value);
         const { error } = await supabase
           .from("products")
           .update({
@@ -396,6 +399,10 @@ function BatchIntakePage() {
             condition: (d.condition || null) as any,
             price_cents,
             status: "draft" as any,
+            condition_grade: d.condition_grade.trim() || null,
+            condition_notes: d.condition_notes.trim() || null,
+            shipping_notes: d.shipping_notes.trim() || null,
+            item_specifics: cleanSpecs as any,
           })
           .eq("id", d.productId!);
         if (error) throw error;
