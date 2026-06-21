@@ -42,8 +42,14 @@ const INTERNAL_TO_EBAY_ENUMS: Record<string, string[]> = {
   excellent: ["PRE_OWNED_EXCELLENT", "USED_EXCELLENT", "USED_VERY_GOOD"],
   very_good: ["USED_VERY_GOOD", "USED_EXCELLENT", "USED_GOOD"],
   good: ["USED_GOOD", "USED_VERY_GOOD"],
-  acceptable: ["USED_ACCEPTABLE"],
-  for_parts: ["FOR_PARTS_OR_NOT_WORKING"],
+  acceptable: [
+    "USED_ACCEPTABLE",
+    "PRE_OWNED_FAIR",
+    "USED_GOOD",
+    "USED_VERY_GOOD",
+    "USED_EXCELLENT",
+  ],
+  for_parts: ["FOR_PARTS_OR_NOT_WORKING", "USED_ACCEPTABLE", "USED_GOOD"],
 };
 
 export function EbayConditionPanel({ product, onSaved }: Props) {
@@ -109,12 +115,22 @@ export function EbayConditionPanel({ product, onSaved }: Props) {
     const key = `${product.id}:${categoryId}`;
     if (autoFixedRef.current === key) return;
     if (saveMut.isPending) return;
-    if (selected) return; // already valid
+    if (selected && !needsReselection) return; // already valid
     const candidate = semanticMatch ?? suggested;
+    if (selected && String(selected.conditionId) === String(candidate?.conditionId)) return;
     if (!candidate) return;
     autoFixedRef.current = key;
     saveMut.mutate(String(candidate.conditionId));
-  }, [categoryId, conditions.length, selected, semanticMatch, suggested, product.id, saveMut]);
+  }, [
+    categoryId,
+    conditions.length,
+    selected,
+    semanticMatch,
+    suggested,
+    product.id,
+    saveMut,
+    needsReselection,
+  ]);
 
   if (!categoryId) {
     return (

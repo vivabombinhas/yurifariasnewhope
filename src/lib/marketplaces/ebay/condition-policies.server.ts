@@ -153,10 +153,33 @@ export function suggestEbayConditionPolicy(
   }
 
   if (internalCondition === "like_new") {
-    return byEnum(["LIKE_NEW", "PRE_OWNED_EXCELLENT", "USED_EXCELLENT", "PRE_OWNED"]);
+    return byEnum([
+      "LIKE_NEW",
+      "PRE_OWNED_EXCELLENT",
+      "USED_EXCELLENT",
+      "USED_VERY_GOOD",
+      "USED_GOOD",
+      "PRE_OWNED",
+    ]);
   }
-  if (["very_good", "good", "acceptable", "for_parts"].includes(internalCondition)) {
-    return byEnum(["PRE_OWNED", "USED_EXCELLENT", "USED_VERY_GOOD", "USED_GOOD", "USED_ACCEPTABLE", "FOR_PARTS_OR_NOT_WORKING"]);
+  if (internalCondition === "very_good") {
+    return byEnum(["USED_VERY_GOOD", "USED_GOOD", "USED_EXCELLENT", "PRE_OWNED"]);
+  }
+  if (internalCondition === "good") {
+    return byEnum(["USED_GOOD", "USED_VERY_GOOD", "USED_EXCELLENT", "PRE_OWNED"]);
+  }
+  if (internalCondition === "acceptable") {
+    return byEnum([
+      "USED_ACCEPTABLE",
+      "PRE_OWNED_FAIR",
+      "USED_GOOD",
+      "USED_VERY_GOOD",
+      "USED_EXCELLENT",
+      "PRE_OWNED",
+    ]);
+  }
+  if (internalCondition === "for_parts") {
+    return byEnum(["FOR_PARTS_OR_NOT_WORKING", "USED_ACCEPTABLE", "USED_GOOD"]);
   }
   return null;
 }

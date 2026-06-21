@@ -39,9 +39,7 @@ export function EbayPublishPanel({ productId }: Props) {
     queryFn: () => readinessFn({ data: { productId } }),
   });
   const blockingReadinessChecks =
-    readiness.data?.checks.filter(
-      (c) => c.status !== "ok" && c.id !== "inventory_condition_verified",
-    ) ?? [];
+    readiness.data?.checks.filter((c) => c.status !== "ok") ?? [];
   const readinessBlocked = blockingReadinessChecks.length > 0;
   const readinessChecking = readiness.isLoading || readiness.isFetching;
 
