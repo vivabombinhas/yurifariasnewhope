@@ -74,9 +74,29 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       !product.ebay_condition_enum ||
       !product.ebay_condition_name
     ) {
+      await context.supabase
+        .from("marketplace_listings")
+        .update({
+          provider_metadata: {
+            ...meta,
+            draftOutdated: true,
+            draftOutdatedReason: "missing_official_ebay_condition",
+            draftOutdatedAt: new Date().toISOString(),
+          },
+          error_message: "Select the official eBay Condition and recreate the eBay draft before publishing.",
+          last_failed_step: "condition_validate",
+          last_error: JSON.parse(JSON.stringify({
+            code: "MISSING_OFFICIAL_EBAY_CONDITION",
+            message: "Official eBay Condition is missing locally, so an existing draft cannot be safely published.",
+            productId: data.productId,
+            sku: product?.sku ?? null,
+            offerId,
+          })) as Json,
+        })
+        .eq("id", listing.id);
       return {
         ok: false,
-        errorMessage: "Select eBay category and condition before publishing.",
+        errorMessage: "Select the official eBay Condition and recreate the eBay draft before publishing.",
       };
     }
     const { assertConditionIdEnumMatch, getEbayConditionPolicies } = await import("./condition-policies.server");
