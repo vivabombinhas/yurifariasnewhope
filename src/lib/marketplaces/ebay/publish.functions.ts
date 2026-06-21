@@ -46,8 +46,29 @@ export const publishEbayListing = createServerFn({ method: "POST" })
 
     let meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
     let offerId: string | undefined = meta.offerId;
+
+    // Auto-create draft if missing — single-click publish flow.
     if (!listing || !offerId) {
-      return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
+      const { createEbayDraft } = await import("./draft.functions");
+      const draft = await createEbayDraft({ data: { productId: data.productId } });
+      if (!draft.ok || !draft.offerId) {
+        return {
+          ok: false,
+          errorMessage: draft.errorMessage ?? "Failed to create eBay draft before publish.",
+        };
+      }
+      const { data: refreshedListing } = await context.supabase
+        .from("marketplace_listings")
+        .select("id, status, external_listing_id, listing_url, provider_metadata")
+        .eq("product_id", data.productId)
+        .eq("marketplace", "ebay")
+        .maybeSingle();
+      if (!refreshedListing) {
+        return { ok: false, errorMessage: "Draft created but listing record not found." };
+      }
+      (listing as any) = refreshedListing;
+      meta = (refreshedListing.provider_metadata ?? {}) as Record<string, any>;
+      offerId = meta.offerId ?? draft.offerId;
     }
     if (meta.draftOutdated === true) {
       return {
