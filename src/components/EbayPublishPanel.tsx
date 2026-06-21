@@ -103,9 +103,9 @@ export function EbayPublishPanel({ productId }: Props) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {!offerId && (
+        {!offerId && !isActive && (
           <p className="text-muted-foreground">
-            Create an eBay draft first; publish needs the offerId.
+            No draft yet — it will be created automatically when you click Publish.
           </p>
         )}
         {draftOutdated && (
