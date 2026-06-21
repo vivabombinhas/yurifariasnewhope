@@ -71,7 +71,7 @@ function ProductsPage() {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">{t("products.title")}</h1>
         <Button asChild size="sm">
-          <Link to="/intake">
+          <Link to="/products/new">
             <PackagePlus className="h-4 w-4 mr-2" /> {t("nav.new")}
           </Link>
         </Button>

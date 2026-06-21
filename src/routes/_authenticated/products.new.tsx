@@ -1,8 +1,11 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getUnsupportedImageMessage, prepareImageForUpload } from "@/lib/image-convert";
+import { withTimeout } from "@/lib/async-timeout";
+import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,7 +23,7 @@ import {
   PRODUCT_STATUSES,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { CheckCircle2, ImagePlus, Plus, X } from "lucide-react";
+import { ImagePlus, Plus, Sparkles, Wand2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
@@ -32,21 +35,12 @@ export const Route = createFileRoute("/_authenticated/products/new")({
   errorComponent: RouteError,
 });
 
-type SavedInfo = {
-  id: string;
-  sku: string;
-  basic: {
-    locationId: string;
-    category: string;
-    brand: string;
-    condition: string;
-  };
-};
-
 function NewProductPage() {
   const navigate = useNavigate();
   const t = useT();
   const qc = useQueryClient();
+  const analyze = useServerFn(analyzeProductWithAI);
+
   const [photos, setPhotos] = useState<File[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -56,7 +50,11 @@ function NewProductPage() {
   const [price, setPrice] = useState("");
   const [locationId, setLocationId] = useState<string>("");
   const [status, setStatus] = useState<string>("received");
-  const [saved, setSaved] = useState<SavedInfo | null>(null);
+  const [verification, setVerification] = useState<string[]>([]);
+  const [draftProductId, setDraftProductId] = useState<string | null>(null);
+  const [draftSku, setDraftSku] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
 
@@ -106,14 +104,137 @@ function NewProductPage() {
     return data.id;
   }
 
-  const create = useMutation({
+  async function uploadPhotosFor(productId: string, files: File[]) {
+    const uploadedPaths: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const path = `${productId}/${crypto.randomUUID()}-${file.name}`;
+      const { error: upErr } = await supabase.storage
+        .from("product-photos")
+        .upload(path, file, { contentType: file.type });
+      if (upErr) {
+        if (uploadedPaths.length) await supabase.storage.from("product-photos").remove(uploadedPaths);
+        throw upErr;
+      }
+      uploadedPaths.push(path);
+      const { error: photoErr } = await supabase.from("product_photos").insert({
+        product_id: productId,
+        storage_path: path,
+        position: i,
+        is_cover: i === 0,
+      });
+      if (photoErr) {
+        if (uploadedPaths.length) await supabase.storage.from("product-photos").remove(uploadedPaths);
+        throw photoErr;
+      }
+    }
+    return uploadedPaths;
+  }
+
+  async function createDraftWithPhotos(): Promise<{ id: string; sku: string }> {
+    const prepared = await Promise.all(photos.map((p) => prepareImageForUpload(p)));
+    const { data: product, error } = await supabase
+      .from("products")
+      .insert({
+        title: title.trim(),
+        description: "",
+        location_id: locationId || null,
+        status: "received" as any,
+        sku: "",
+      })
+      .select("id, sku")
+      .single();
+    if (error) throw error;
+    try {
+      await uploadPhotosFor(product.id, prepared);
+    } catch (e) {
+      await supabase.from("products").delete().eq("id", product.id);
+      throw e;
+    }
+    return product;
+  }
+
+  function applySuggestion(s: AiSuggestion) {
+    if (!title) setTitle(s.title);
+    if (!description) setDescription(s.description);
+    if (!brand) setBrand(s.brand);
+    if (!category) setCategory(s.category);
+    if (!condition) setCondition(s.condition);
+    if (!price && s.suggested_price_cents != null)
+      setPrice((s.suggested_price_cents / 100).toFixed(2));
+    setVerification(s.verification_needed ?? []);
+  }
+
+  async function runAnalyze() {
+    if (analyzing) return;
+    if (photos.length === 0) {
+      toast.error(t("intake.addPhotoFirst"));
+      return;
+    }
+    setAnalyzing(true);
+    let createdForAnalyze: { id: string; sku: string } | null = null;
+    try {
+      let id = draftProductId;
+      let sku = draftSku;
+      if (!id) {
+        const p = await createDraftWithPhotos();
+        createdForAnalyze = p;
+        id = p.id;
+        sku = p.sku;
+        setDraftProductId(id);
+        setDraftSku(sku);
+      }
+      const s = await withTimeout(
+        analyze({ data: { productId: id! } }),
+        55_000,
+        "AI analysis timed out. You can still save this item manually.",
+      );
+      applySuggestion(s);
+      toast.success(t("intake.aiReady"));
+    } catch (e: any) {
+      console.error("[new product] AI failed", e);
+      if (createdForAnalyze) {
+        const { data: rows } = await supabase
+          .from("product_photos")
+          .select("storage_path")
+          .eq("product_id", createdForAnalyze.id);
+        const paths = (rows ?? []).map((r) => r.storage_path);
+        if (paths.length) await supabase.storage.from("product-photos").remove(paths);
+        await supabase.from("products").delete().eq("id", createdForAnalyze.id);
+        setDraftProductId(null);
+        setDraftSku(null);
+      }
+      toast.error(e?.message ?? "AI failed. You can still save manually.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  const save = useMutation({
     mutationFn: async () => {
-      console.log("[new product] save started", { photoCount: photos.length });
       const brand_id = await ensureBrand(brand);
       const category_id = await ensureCategory(category);
       const price_cents = price ? Math.round(parseFloat(price) * 100) : null;
-      const preparedPhotos = await Promise.all(photos.map((photo) => prepareImageForUpload(photo)));
 
+      if (draftProductId) {
+        const { error } = await supabase
+          .from("products")
+          .update({
+            title: title.trim(),
+            description: description.trim(),
+            brand_id,
+            category_id,
+            condition: (condition || null) as any,
+            price_cents,
+            location_id: locationId || null,
+            status: status as any,
+          })
+          .eq("id", draftProductId);
+        if (error) throw error;
+        return { id: draftProductId, sku: draftSku ?? "" };
+      }
+
+      const preparedPhotos = await Promise.all(photos.map((p) => prepareImageForUpload(p)));
       const { data: product, error } = await supabase
         .from("products")
         .insert({
@@ -131,76 +252,30 @@ function NewProductPage() {
         .single();
       if (error) throw error;
 
-      const uploadedPaths: string[] = [];
       try {
-        for (let i = 0; i < preparedPhotos.length; i++) {
-          const file = preparedPhotos[i];
-          const path = `${product.id}/${crypto.randomUUID()}-${file.name}`;
-          const { error: upErr } = await supabase.storage
-            .from("product-photos")
-            .upload(path, file, { contentType: file.type });
-          if (upErr) throw upErr;
-          uploadedPaths.push(path);
-          const { error: photoErr } = await supabase.from("product_photos").insert({
-            product_id: product.id,
-            storage_path: path,
-            position: i,
-            is_cover: i === 0,
-          });
-          if (photoErr) throw photoErr;
-        }
+        await uploadPhotosFor(product.id, preparedPhotos);
       } catch (e) {
-        console.error("[new product] photo upload failed; cleaning up product", e);
-        if (uploadedPaths.length) await supabase.storage.from("product-photos").remove(uploadedPaths);
         await supabase.from("products").delete().eq("id", product.id);
         throw e;
       }
-
       return product;
     },
     onSuccess: (product) => {
       toast.success(`Created ${product.sku}`);
       qc.invalidateQueries({ queryKey: ["products"] });
-      setSaved({
-        id: product.id,
-        sku: product.sku,
-        basic: { locationId, category, brand, condition },
-      });
+      navigate({ to: "/products/$id", params: { id: product.id } });
     },
     onError: (e: any) => toast.error(e.message ?? t("auth.failed")),
   });
-
-  function resetForm(keep: { location?: boolean; basic?: boolean }) {
-    setPhotos([]);
-    setTitle("");
-    setDescription("");
-    setPrice("");
-    setStatus("received");
-    if (!keep.location && !keep.basic) {
-      setLocationId("");
-      setBrand("");
-      setCategory("");
-      setCondition("");
-    } else if (keep.basic) {
-      // keep location, category, brand, condition as-is
-    } else if (keep.location) {
-      setBrand("");
-      setCategory("");
-      setCondition("");
-    }
-    setSaved(null);
-  }
 
   async function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (!files.length) return;
     try {
-      console.log("[new product] preparing selected photos", files.map((f) => ({ name: f.name, type: f.type })));
       const prepared = await Promise.all(files.map((file) => prepareImageForUpload(file)));
       setPhotos((cur) => [...cur, ...prepared]);
     } catch (e: any) {
-      console.error("[new product] photo preparation failed", e);
       toast.error(e?.message ?? getUnsupportedImageMessage());
     }
   }
@@ -208,61 +283,21 @@ function NewProductPage() {
     setPhotos((cur) => cur.filter((_, idx) => idx !== i));
   }
 
-  if (saved) {
-    return (
-      <div className="space-y-6 max-w-2xl">
-        <Card>
-          <CardContent className="pt-6 space-y-4 text-center">
-            <CheckCircle2 className="h-12 w-12 mx-auto text-primary" />
-            <div>
-              <h2 className="text-xl font-semibold">{t("newProduct.saved")}</h2>
-              <p className="text-sm text-muted-foreground">{saved.sku}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
-              <Button
-                size="lg"
-                className="h-12 text-base"
-                asChild
-              >
-                <Link to="/products/$id" params={{ id: saved.id }}>{t("newProduct.view")}</Link>
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-12 text-base"
-                onClick={() => resetForm({ location: true })}
-              >
-                {t("newProduct.addAnother")}
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-12 text-base"
-                onClick={() => resetForm({ basic: true })}
-              >
-                {t("newProduct.duplicate")}
-              </Button>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/products" })}>
-              {t("newProduct.backToProducts")}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const photosLocked = !!draftProductId;
 
   return (
     <div className="space-y-6 max-w-2xl">
       <h1 className="text-2xl font-semibold">{t("newProduct.title")}</h1>
 
+      {/* Photos */}
       <Card>
         <CardContent className="pt-6 space-y-3">
           <Label className="text-base">{t("common.photos")}</Label>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10"
+              disabled={photosLocked}
+              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10 disabled:opacity-50"
               onClick={() => cameraRef.current?.click()}
             >
               <ImagePlus className="h-6 w-6" />
@@ -271,56 +306,71 @@ function NewProductPage() {
             </button>
             <button
               type="button"
-              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10"
+              disabled={photosLocked}
+              className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-primary/40 bg-primary/5 p-4 text-primary hover:bg-primary/10 disabled:opacity-50"
               onClick={() => libraryRef.current?.click()}
             >
               <ImagePlus className="h-6 w-6" />
               <span className="text-sm font-medium">{t("newProduct.chooseFromLibrary")}</span>
               <span className="text-xs text-muted-foreground">{t("newProduct.gallery")}</span>
             </button>
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              multiple
-              capture="environment"
-              className="hidden"
-              onChange={onPickFiles}
-            />
-            <input
-              ref={libraryRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={onPickFiles}
-            />
+            <input ref={cameraRef} type="file" accept="image/*" multiple capture="environment" className="hidden" onChange={onPickFiles} />
+            <input ref={libraryRef} type="file" accept="image/*" multiple className="hidden" onChange={onPickFiles} />
           </div>
           {photos.length > 0 && (
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {photos.map((file, i) => (
                 <div key={i} className="relative aspect-square overflow-hidden rounded-md border bg-muted">
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
+                  <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
                   {i === 0 && (
                     <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
                       Cover
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => removePhoto(i)}
-                    className="absolute top-1 right-1 rounded-full bg-black/60 p-1.5 text-white"
-                    aria-label="Remove"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  {!photosLocked && (
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 rounded-full bg-black/60 p-1.5 text-white"
+                      aria-label="Remove"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
+          )}
+          {draftSku && (
+            <p className="text-[11px] text-muted-foreground">
+              {t("intake.photosUploaded")} {draftSku}.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* AI Analyze */}
+      <Card>
+        <CardContent className="pt-6 space-y-2">
+          <Label className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" /> {t("intake.stepAnalyze")}
+            <span className="text-xs font-normal text-muted-foreground">
+              {t("common.optional")}
+            </span>
+          </Label>
+          <Button
+            type="button"
+            className="h-12 text-base w-full"
+            onClick={runAnalyze}
+            disabled={analyzing || photos.length === 0}
+          >
+            <Wand2 className="h-4 w-4 mr-2" />
+            {analyzing ? t("intake.analyzing") : t("intake.analyze")}
+          </Button>
+          {verification.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              {t("intake.verify")}: {verification.join(", ")}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -328,7 +378,7 @@ function NewProductPage() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          create.mutate();
+          save.mutate();
         }}
         className="space-y-4"
       >
@@ -436,8 +486,8 @@ function NewProductPage() {
           <Button type="button" variant="outline" className="h-12 text-base" onClick={() => navigate({ to: "/products" })}>
             {t("common.cancel")}
           </Button>
-          <Button type="submit" disabled={create.isPending} className="h-12 text-base flex-1">
-            {create.isPending ? t("common.saving") : t("newProduct.saveProduct")}
+          <Button type="submit" disabled={save.isPending} className="h-12 text-base flex-1">
+            {save.isPending ? t("common.saving") : t("newProduct.saveProduct")}
           </Button>
         </div>
       </form>
@@ -487,8 +537,8 @@ function NewLocationDialog({ onCreated }: { onCreated: (id: string) => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="icon" className="h-12 w-12" aria-label="New location">
-          <Plus className="h-5 w-5" />
+        <Button type="button" variant="outline" size="icon" className="h-12 w-12 shrink-0" aria-label="New location">
+          <Plus className="h-4 w-4" />
         </Button>
       </DialogTrigger>
       <DialogContent>
@@ -497,23 +547,21 @@ function NewLocationDialog({ onCreated }: { onCreated: (id: string) => void }) {
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label>Area</Label>
-            <Input className="h-12 text-base" value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Garage" />
+            <Label htmlFor="area">Area</Label>
+            <Input id="area" value={area} onChange={(e) => setArea(e.target.value)} placeholder="Garage" />
           </div>
           <div className="space-y-2">
-            <Label>Shelf</Label>
-            <Input className="h-12 text-base" value={shelf} onChange={(e) => setShelf(e.target.value)} placeholder="e.g. A2" />
+            <Label htmlFor="shelf">Shelf</Label>
+            <Input id="shelf" value={shelf} onChange={(e) => setShelf(e.target.value)} placeholder="A" />
           </div>
           <div className="space-y-2">
-            <Label>Box</Label>
-            <Input className="h-12 text-base" value={box} onChange={(e) => setBox(e.target.value)} placeholder="e.g. 14" />
+            <Label htmlFor="box">Box</Label>
+            <Input id="box" value={box} onChange={(e) => setBox(e.target.value)} placeholder="01" />
           </div>
         </div>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button type="button" onClick={submit} disabled={saving}>
-            {saving ? "Saving…" : "Create"}
-          </Button>
+          <Button type="button" onClick={submit} disabled={saving}>{saving ? "Saving…" : "Create"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
