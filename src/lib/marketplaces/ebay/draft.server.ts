@@ -154,6 +154,24 @@ export function ebayErrorMessage(status: number, json: any, text: string): strin
   return `eBay ${status}: ${text.slice(0, 500)}`;
 }
 
+function isNoOffersForSkuResponse(res: { status: number; json: any | null; text: string }) {
+  const errors = Array.isArray(res.json?.errors) ? res.json.errors : [];
+  const joinedErrorText = [
+    res.text,
+    ...errors.flatMap((e: any) => [e?.errorId, e?.message, e?.longMessage]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return (
+    res.status === 404 ||
+    errors.some((e: any) => Number(e?.errorId) === 25713) ||
+    joinedErrorText.includes("25713") ||
+    joinedErrorText.includes("this offer is not available")
+  );
+}
+
 async function assertSelectedConditionAllowed(input: CreateDraftInput) {
   assertConditionIdEnumMatch(input.ebayConditionId, input.ebayConditionEnum);
   const policies = await getEbayConditionPolicies(input.categoryId);
@@ -258,18 +276,21 @@ export async function createEbayDraftInSandbox(
   );
   // eBay returns 404 + errorId 25713 ("This Offer is not available") when
   // there are simply no offers for the SKU yet. Treat that as an empty list.
-  const noOffersForSku =
-    existingOffersRes.status === 404 ||
-    (Array.isArray(existingOffersRes.json?.errors) &&
-      existingOffersRes.json.errors.some((e: any) => Number(e?.errorId) === 25713));
+  const noOffersForSku = isNoOffersForSkuResponse(existingOffersRes);
   if (!existingOffersRes.ok && !noOffersForSku) {
-    throw new Error(
-      `List existing offers: ${ebayErrorMessage(existingOffersRes.status, existingOffersRes.json, existingOffersRes.text)}`,
-    );
+    console.warn("[createEbayDraft] optional offer cleanup skipped", {
+      publishAttemptId,
+      productId: input.productId,
+      sku: input.sku,
+      status: existingOffersRes.status,
+      error: ebayErrorMessage(existingOffersRes.status, existingOffersRes.json, existingOffersRes.text),
+    });
   }
   const existingOffers: any[] = noOffersForSku
     ? []
-    : (existingOffersRes.json?.offers ?? []);
+    : existingOffersRes.ok
+      ? (existingOffersRes.json?.offers ?? [])
+      : [];
   for (const off of existingOffers) {
     if (!off?.offerId) continue;
     const offerStatus = String(off.status ?? "").toUpperCase();
