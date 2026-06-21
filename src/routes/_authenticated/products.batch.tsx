@@ -199,6 +199,10 @@ function BatchIntakePage() {
       category: "",
       condition: "",
       price: "",
+      condition_grade: "",
+      condition_notes: "",
+      shipping_notes: "",
+      item_specifics: [],
     };
   }
 
