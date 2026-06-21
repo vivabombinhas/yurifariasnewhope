@@ -29,6 +29,8 @@ import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImageP
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 
 import { MarketplacePublishingPanel } from "@/components/MarketplacePublishingPanel";
+import { markEbayDraftOutdatedForProduct } from "@/lib/marketplaces/ebay/mark-outdated.functions";
+import { useServerFn } from "@tanstack/react-start";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
