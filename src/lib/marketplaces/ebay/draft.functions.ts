@@ -62,6 +62,12 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       .maybeSingle();
     if (pErr) throw pErr;
     if (!product) return { ok: false, errorMessage: "Product not found" };
+    if (!product.ebay_category_id || !product.ebay_condition_id || !product.ebay_condition_enum || !product.ebay_condition_name) {
+      return {
+        ok: false,
+        errorMessage: "Select the official eBay Condition before creating the eBay draft.",
+      };
+    }
 
     const [{ data: currentListing, error: listingErr }, { data: account, error: accountErr }] = await Promise.all([
       context.supabase
@@ -226,6 +232,8 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         status: "draft" as const,
         external_listing_id: null,
         error_message: null,
+        last_failed_step: null,
+        last_error: null,
         provider_metadata: {
           offerId: result.offerId,
           publishAttemptId,
