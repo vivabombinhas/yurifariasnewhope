@@ -290,6 +290,10 @@ export async function syncOfferWithSellerSetup(offerId: string): Promise<{
     throw new Error("Seller setup incomplete; create all four resources first.");
   }
 
+  // Ensure the Fulfillment Policy actually has a shipping service (eBay errorId 25007 guard)
+  const fulfillment = await ensureValidFulfillmentPolicy();
+  d.fulfillmentPolicyId = fulfillment.id;
+
   // Fetch existing offer
   const offerRes = await ebayFetch(
     env,
