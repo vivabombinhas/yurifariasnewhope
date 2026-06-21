@@ -157,7 +157,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         .eq("id", listing.id);
       return { ok: false, errorMessage: msg };
     }
-    const ebayInventorySku = typeof meta.sku === "string" && meta.sku.trim() ? meta.sku : product.sku!;
+    let ebayInventorySku = typeof meta.sku === "string" && meta.sku.trim() ? meta.sku : product.sku!;
 
     // Initial read-only audit (used to decide repair vs publish).
     const { readEbayPublishAuditResources } = await import("./publish-audit.server");
@@ -313,6 +313,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         return { ok: false, errorMessage: msg };
       }
       offerId = draft.offerId;
+      ebayInventorySku = draft.sku ?? ebayInventorySku;
 
       // Re-read listing meta after createEbayDraft updated it.
       const { data: refreshedListing } = await context.supabase
