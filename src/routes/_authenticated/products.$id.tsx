@@ -29,6 +29,8 @@ import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImageP
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 
 import { MarketplacePublishingPanel } from "@/components/MarketplacePublishingPanel";
+import { markEbayDraftOutdatedForProduct } from "@/lib/marketplaces/ebay/mark-outdated.functions";
+import { useServerFn } from "@tanstack/react-start";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
 import { RouteError } from "@/components/RouteError";
@@ -239,6 +241,9 @@ function PhotosSection({
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const t = useT();
+  const markOutdated = useServerFn(markEbayDraftOutdatedForProduct);
+  const flagOutdated = (reason: string) =>
+    markOutdated({ data: { productId, reason } }).catch(() => {});
 
   useEffect(() => {
     let cancelled = false;
@@ -276,6 +281,7 @@ function PhotosSection({
           is_cover: photos.length === 0 && i === 0,
         });
       }
+      flagOutdated("photos_changed");
       onChange();
     } catch (e: any) {
       console.error("[product detail] photo upload failed", e);
@@ -286,12 +292,14 @@ function PhotosSection({
   async function remove(photo: { id: string; storage_path: string }) {
     await supabase.storage.from("product-photos").remove([photo.storage_path]);
     await supabase.from("product_photos").delete().eq("id", photo.id);
+    flagOutdated("photos_changed");
     onChange();
   }
 
   async function setCover(photoId: string) {
     await supabase.from("product_photos").update({ is_cover: false }).eq("product_id", productId);
     await supabase.from("product_photos").update({ is_cover: true }).eq("id", photoId);
+    flagOutdated("photos_changed");
     onChange();
   }
 
@@ -304,6 +312,7 @@ function PhotosSection({
     await supabase.from("product_photos").update({ position: -1 }).eq("id", a.id);
     await supabase.from("product_photos").update({ position: a.position }).eq("id", b.id);
     await supabase.from("product_photos").update({ position: b.position }).eq("id", a.id);
+    flagOutdated("photos_changed");
     onChange();
   }
 
@@ -461,6 +470,7 @@ function CopyActions({ product }: { product: any }) {
 function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const qc = useQueryClient();
   const tr = useT();
+  const markOutdated = useServerFn(markEbayDraftOutdatedForProduct);
   const [title, setTitle] = useState(product.title ?? "");
   const [description, setDescription] = useState(product.description ?? "");
   const [brand, setBrand] = useState(product.brand?.name ?? "");
@@ -535,8 +545,11 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
     },
     onSuccess: () => {
       toast.success(tr("detail.saved"));
+      markOutdated({ data: { productId: product.id, reason: "product_edited" } }).catch(() => {});
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["history", product.id] });
+      qc.invalidateQueries({ queryKey: ["ebay-listing", product.id] });
+      qc.invalidateQueries({ queryKey: ["ebay-readiness", product.id] });
       onSaved();
     },
     onError: (e: any) => toast.error(e.message),

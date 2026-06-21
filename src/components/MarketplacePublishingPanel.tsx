@@ -13,15 +13,7 @@ import {
 import { CheckCircle2, Plug, Send, Settings2, AlertCircle } from "lucide-react";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
 import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions";
-import { EbayCategoryPanel } from "@/components/EbayCategoryPanel";
-import { EbayConditionPanel } from "@/components/EbayConditionPanel";
-import { EbayAspectsPanel } from "@/components/EbayAspectsPanel";
-import { EbayReadinessPanel } from "@/components/EbayReadinessPanel";
-import { EbayDraftPanel } from "@/components/EbayDraftPanel";
-import { EbayPublishPreflightPanel } from "@/components/EbayPublishPreflightPanel";
-import { EbaySellerSetupPanel } from "@/components/EbaySellerSetupPanel";
-import { EbayPublishPanel } from "@/components/EbayPublishPanel";
-import { EbayPublishAuditPanel } from "@/components/EbayPublishAuditPanel";
+import { EbayWorkflowPanel } from "@/components/ebay/EbayWorkflowPanel";
 
 interface Props {
   productId: string;
@@ -57,16 +49,12 @@ export function MarketplacePublishingPanel({ productId, product, onSaved }: Prop
               />
               <AccordionContent>
                 {m.id === "ebay" ? (
-                  <div className="space-y-4 pt-2">
-                    <EbayCategoryPanel product={product} onSaved={onSaved} />
-                    <EbayConditionPanel product={product} onSaved={onSaved} />
-                    <EbayAspectsPanel product={product} onSaved={onSaved} />
-                    <EbayReadinessPanel productId={productId} />
-                    <EbayDraftPanel productId={productId} />
-                    <EbaySellerSetupPanel productId={productId} />
-                    <EbayPublishPreflightPanel productId={productId} />
-                    <EbayPublishAuditPanel productId={productId} />
-                    <EbayPublishPanel productId={productId} />
+                  <div className="pt-2">
+                    <EbayWorkflowPanel
+                      productId={productId}
+                      product={product}
+                      onSaved={onSaved}
+                    />
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground p-3">
