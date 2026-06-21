@@ -139,8 +139,13 @@ export function suggestEbayConditionPolicy(
   const hasDefect = /\b(defect|factory second|irregular|flaw|damaged|damage|stain|hole|tear|scuff|scratch|crack|broken)\b/.test(text);
   const hasBoxOrTag = /\b(with box|original box|in box|with tags|tag attached|tags attached|new with tags)\b/.test(text);
   const lacksBoxOrTag = /\b(without box|no box|missing box|without tags|no tags|missing tags)\b/.test(text);
-  const byEnum = (enums: string[]) =>
-    policies.find((p) => enums.includes(p.conditionEnum)) ?? null;
+  const byEnum = (enums: string[]) => {
+    for (const conditionEnum of enums) {
+      const match = policies.find((p) => p.conditionEnum === conditionEnum);
+      if (match) return match;
+    }
+    return null;
+  };
   const byName = (names: string[]) =>
     policies.find((p) => names.some((n) => normalize(p.displayName).includes(n))) ?? null;
 
