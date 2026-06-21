@@ -43,7 +43,9 @@ export const createEbayDraft = createServerFn({ method: "POST" })
     // Run readiness check first
     const { checkEbayReadiness } = await import("./readiness.functions");
     const readiness = await checkEbayReadiness({ data: { productId: data.productId } });
-    const blockingChecks = readiness.checks.filter((c) => c.status !== "ok" && c.id !== "inventory_condition_verified");
+    const blockingChecks = readiness.checks.filter(
+      (c) => c.status !== "ok" && c.id !== "inventory_condition_verified",
+    );
     if (blockingChecks.length) {
       const missing = readiness.checks
         .filter((c) => c.status !== "ok" && c.id !== "inventory_condition_verified")
@@ -62,27 +64,33 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       .maybeSingle();
     if (pErr) throw pErr;
     if (!product) return { ok: false, errorMessage: "Product not found" };
-    if (!product.ebay_category_id || !product.ebay_condition_id || !product.ebay_condition_enum || !product.ebay_condition_name) {
+    if (
+      !product.ebay_category_id ||
+      !product.ebay_condition_id ||
+      !product.ebay_condition_enum ||
+      !product.ebay_condition_name
+    ) {
       return {
         ok: false,
         errorMessage: "Select the official eBay Condition before creating the eBay draft.",
       };
     }
 
-    const [{ data: currentListing, error: listingErr }, { data: account, error: accountErr }] = await Promise.all([
-      context.supabase
-        .from("marketplace_listings")
-        .select("id, status, external_listing_id, provider_metadata")
-        .eq("product_id", data.productId)
-        .eq("marketplace", "ebay")
-        .maybeSingle(),
-      context.supabase
-        .from("marketplace_accounts")
-        .select("account_name, external_account_id")
-        .eq("marketplace", "ebay")
-        .eq("environment", env)
-        .maybeSingle(),
-    ]);
+    const [{ data: currentListing, error: listingErr }, { data: account, error: accountErr }] =
+      await Promise.all([
+        context.supabase
+          .from("marketplace_listings")
+          .select("id, status, external_listing_id, provider_metadata")
+          .eq("product_id", data.productId)
+          .eq("marketplace", "ebay")
+          .maybeSingle(),
+        context.supabase
+          .from("marketplace_accounts")
+          .select("account_name, external_account_id")
+          .eq("marketplace", "ebay")
+          .eq("environment", env)
+          .maybeSingle(),
+      ]);
     if (listingErr) throw listingErr;
     if (accountErr) throw accountErr;
     if (currentListing?.status === "active" || currentListing?.external_listing_id) {
@@ -114,7 +122,10 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       };
     }
     if (!/^https:\/\//i.test(publicOrigin)) {
-      return { ok: false, errorMessage: `PUBLIC_APP_ORIGIN must start with https:// (got ${publicOrigin})` };
+      return {
+        ok: false,
+        errorMessage: `PUBLIC_APP_ORIGIN must start with https:// (got ${publicOrigin})`,
+      };
     }
 
     const candidateUrls: string[] = [];
@@ -303,7 +314,11 @@ export const createEbayDraft = createServerFn({ method: "POST" })
       } catch {
         parsedError = { message: msg };
       }
-      console.error("[createEbayDraft] failed", { publishAttemptId, productId: data.productId, error: msg });
+      console.error("[createEbayDraft] failed", {
+        publishAttemptId,
+        productId: data.productId,
+        error: msg,
+      });
       await context.supabase
         .from("publishing_jobs")
         .update({
@@ -318,7 +333,10 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         .from("marketplace_listings")
         .update({
           error_message: msg,
-          last_failed_step: parsedError?.code === "INVENTORY_CONDITION_DRIFT" ? "inventory_verify" : "inventory_upsert",
+          last_failed_step:
+            parsedError?.code === "INVENTORY_CONDITION_DRIFT"
+              ? "inventory_verify"
+              : "inventory_upsert",
           last_error: parsedError,
         })
         .eq("product_id", data.productId)
