@@ -78,18 +78,18 @@ export function EbayPublishPanel({ productId }: Props) {
           <Button
             size="sm"
             onClick={() => mut.mutate()}
-            disabled={!offerId || mut.isPending || isActive || draftOutdated || readinessBlocked || readinessChecking}
+            disabled={mut.isPending || isActive || draftOutdated || readinessBlocked || readinessChecking}
             title={
               isActive
                 ? "Listing is already active on eBay"
                 : draftOutdated
                 ? "Recreate the eBay draft before publishing"
-                : !offerId
-                ? "Create an eBay draft first"
                 : readinessBlocked
                 ? "Resolve eBay readiness checks before publishing"
                 : readinessChecking
                 ? "Checking eBay readiness before publishing"
+                : !offerId
+                ? "Draft will be created automatically before publish"
                 : undefined
             }
           >
