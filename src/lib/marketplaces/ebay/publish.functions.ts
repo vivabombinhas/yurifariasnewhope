@@ -262,8 +262,15 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     const offerCategoryDrift =
       String(audit.offerJson.categoryId ?? "") !== String(product.ebay_category_id);
     const offerSkuDrift = String(audit.offerJson.sku ?? "") !== ebayInventorySku;
+    const draftCreatedAtMsPre = new Date(String(meta.draftCreatedAt ?? 0)).getTime();
+    const effectiveOfferCreatedAt =
+      Number.isFinite(audit.offerCreatedAt) && audit.offerCreatedAt > 0
+        ? audit.offerCreatedAt
+        : draftCreatedAtMsPre;
     const offerStale =
-      !Number.isFinite(audit.offerCreatedAt) || audit.offerCreatedAt <= productUpdatedAt;
+      !Number.isFinite(effectiveOfferCreatedAt) ||
+      effectiveOfferCreatedAt <= 0 ||
+      effectiveOfferCreatedAt < productUpdatedAt;
     const duplicateUnpublished = audit.unpublishedOfferCount > 1;
     const missingUnpublished = audit.unpublishedOfferCount === 0;
     const needsRepair =
