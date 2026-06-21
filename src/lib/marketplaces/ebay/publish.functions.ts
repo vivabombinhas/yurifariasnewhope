@@ -256,21 +256,15 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     }
 
     // ---------- STEPS 4-9: Repair InventoryItem + Offer if reparable drift exists ----------
-    const productUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
     const inventoryDrift =
       String(audit.inventoryJson.condition ?? "") !== product.ebay_condition_enum;
     const offerCategoryDrift =
       String(audit.offerJson.categoryId ?? "") !== String(product.ebay_category_id);
     const offerSkuDrift = String(audit.offerJson.sku ?? "") !== ebayInventorySku;
-    const draftCreatedAtMsPre = new Date(String(meta.draftCreatedAt ?? 0)).getTime();
-    const effectiveOfferCreatedAt =
-      Number.isFinite(audit.offerCreatedAt) && audit.offerCreatedAt > 0
-        ? audit.offerCreatedAt
-        : draftCreatedAtMsPre;
-    const offerStale =
-      !Number.isFinite(effectiveOfferCreatedAt) ||
-      effectiveOfferCreatedAt <= 0 ||
-      effectiveOfferCreatedAt < productUpdatedAt;
+    // eBay Sandbox does not reliably return createdDate for GET /offer/{id}.
+    // Do not infer staleness from missing timestamps; explicit draftOutdated
+    // is the source of truth when category/condition changes require a new draft.
+    const offerStale = meta.draftOutdated === true;
     const duplicateUnpublished = audit.unpublishedOfferCount > 1;
     const missingUnpublished = audit.unpublishedOfferCount === 0;
     const needsRepair =
@@ -363,9 +357,8 @@ export const publishEbayListing = createServerFn({ method: "POST" })
 
     // ---------- STEP 10: Final audit (must be perfect to publish) ----------
     audit = await readAudit(offerId);
-    const finalUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
-    // eBay sandbox often omits createdDate on getOffer; fall back to the
-    // draftCreatedAt we persist locally when (re)creating the draft.
+    // eBay Sandbox often omits createdDate on getOffer; keep the effective
+    // value only for diagnostics, not as a hard publish blocker.
     const draftCreatedAtMs = new Date(String(meta.draftCreatedAt ?? 0)).getTime();
     const finalOfferCreatedAt = Number.isFinite(audit.offerCreatedAt) && audit.offerCreatedAt > 0
       ? audit.offerCreatedAt
@@ -382,8 +375,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
           p.conditionEnum === product.ebay_condition_enum &&
           p.conditionId === product.ebay_condition_id,
       ),
-      offerFresherThanProductOk:
-        Number.isFinite(finalOfferCreatedAt) && finalOfferCreatedAt >= finalUpdatedAt,
+      offerFresherThanProductOk: meta.draftOutdated !== true,
       exactlyOneUnpublishedOk: audit.unpublishedOfferCount === 1,
       noPublishedListingOk: !audit.hasPublishedListing,
     };
@@ -404,6 +396,10 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         unpublishedOfferCount: audit.unpublishedOfferCount,
         hasPublishedListing: audit.hasPublishedListing,
         offerCreatedAt: audit.offerJson.createdDate ?? audit.offerJson.createdAt ?? null,
+        effectiveOfferCreatedAt: Number.isFinite(finalOfferCreatedAt)
+          ? new Date(finalOfferCreatedAt).toISOString()
+          : null,
+        draftCreatedAt: meta.draftCreatedAt ?? null,
         productUpdatedAt: product.updated_at,
         finalCheck,
       });
