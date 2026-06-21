@@ -20,7 +20,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     }
 
     // ---------- STEP 1: Load product + listing ----------
-    const { data: listing, error } = await context.supabase
+    const { data: initialListing, error } = await context.supabase
       .from("marketplace_listings")
       .select("id, status, external_listing_id, listing_url, provider_metadata")
       .eq("product_id", data.productId)
@@ -29,21 +29,22 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     if (error) throw error;
 
     // Step 3: short-circuit if an active listing already exists.
-    if (listing?.status === "active" && listing.external_listing_id) {
+    if (initialListing?.status === "active" && initialListing.external_listing_id) {
       return {
         ok: true,
         result: {
           ok: true,
-          listingId: listing.external_listing_id,
+          listingId: initialListing.external_listing_id,
           raw: {
             status: 200,
-            json: { existing: true, listingUrl: listing.listing_url },
+            json: { existing: true, listingUrl: initialListing.listing_url },
             text: "existing active listing",
           },
         },
       };
     }
 
+    let listing = initialListing;
     let meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
     let offerId: string | undefined = meta.offerId;
 
@@ -66,10 +67,12 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       if (!refreshedListing) {
         return { ok: false, errorMessage: "Draft created but listing record not found." };
       }
-      (listing as any) = refreshedListing;
+      listing = refreshedListing;
       meta = (refreshedListing.provider_metadata ?? {}) as Record<string, any>;
       offerId = meta.offerId ?? draft.offerId;
     }
+    const activeListing = listing!;
+    const activeOfferId: string = offerId!;
     if (meta.draftOutdated === true) {
       return {
         ok: false,
