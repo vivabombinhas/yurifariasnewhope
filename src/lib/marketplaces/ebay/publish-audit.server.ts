@@ -85,10 +85,12 @@ export async function readEbayPublishAuditResources(input: {
     }
     conditionPoliciesRaw = { ok: res.ok, status: res.status, json, text };
 
-    const policy =
-      (json?.itemConditionPolicies ?? []).find(
-        (p: any) => String(p?.categoryId) === offerCategoryId,
-      ) ?? json?.itemConditionPolicies?.[0];
+    // Exact-category match only — never fall back to itemConditionPolicies[0],
+    // which belongs to another category and lets invalid conditionIds pass
+    // pre-audit (eBay then rejects /publish with errorId 25059).
+    const policy = (json?.itemConditionPolicies ?? []).find(
+      (p: any) => String(p?.categoryId) === offerCategoryId,
+    );
     conditionPoliciesTable = (policy?.itemConditions ?? []).map((c: any) => {
       const conditionId = Number(c.conditionId);
       const conditionDisplayName =
