@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,29 +48,33 @@ export function AiSuggestionPanel({
 
   // Load the latest stored AI suggestion (e.g. one generated in batch) so it
   // pre-fills the editor instead of forcing the user to click "Generate listing" again.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const storedQuery = useQuery({
+    queryKey: ["ai_suggestion_latest", product.id],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("ai_suggestions")
-        .select("suggestion, accepted")
+        .select("suggestion, accepted, created_at")
         .eq("product_id", product.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (cancelled) return;
       if (error) {
         console.warn("[AI panel] load latest suggestion failed", error);
-        return;
+        return null;
       }
-      if (data?.suggestion && !data.accepted) {
-        setSuggestion(data.suggestion as unknown as AiSuggestion);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [product.id]);
+      console.log("[AI panel] loaded stored suggestion", { hasData: !!data, accepted: data?.accepted });
+      return data ?? null;
+    },
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    const data = storedQuery.data;
+    if (!data) return;
+    if (suggestion) return; // don't override a freshly generated one
+    if (data.accepted) return; // already applied, don't reopen the editor
+    setSuggestion(data.suggestion as unknown as AiSuggestion);
+  }, [storedQuery.data, suggestion]);
 
   const run = useMutation({
     mutationFn: async () => {
