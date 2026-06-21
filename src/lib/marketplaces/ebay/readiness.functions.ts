@@ -24,7 +24,7 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
     const checks: ReadinessCheck[] = [];
 
-    const [productRes, photosRes, accountRes, listingRes] = await Promise.all([
+    const [productRes, photosRes, accountRes] = await Promise.all([
       context.supabase
         .from("products")
         .select(
@@ -41,12 +41,6 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
         .select("status")
         .eq("marketplace", "ebay")
         .eq("environment", env)
-        .maybeSingle(),
-      context.supabase
-        .from("marketplace_listings")
-        .select("status, external_listing_id, provider_metadata")
-        .eq("product_id", data.productId)
-        .eq("marketplace", "ebay")
         .maybeSingle(),
     ]);
 
