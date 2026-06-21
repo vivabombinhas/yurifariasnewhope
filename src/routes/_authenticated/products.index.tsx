@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -13,11 +14,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   PRODUCT_STATUSES,
   formatPrice,
 } from "@/lib/marketplaces";
-import { Layers, PackagePlus, Search } from "lucide-react";
+import { Layers, PackagePlus, Search, Trash2 } from "lucide-react";
 import { useT, tStatus } from "@/lib/i18n";
+import { toast } from "sonner";
 
 import { RouteError } from "@/components/RouteError";
 
@@ -26,6 +39,7 @@ export const Route = createFileRoute("/_authenticated/products/")({
   component: ProductsPage,
   errorComponent: RouteError,
 });
+
 
 function ProductsPage() {
   const t = useT();
