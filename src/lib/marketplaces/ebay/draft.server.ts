@@ -256,12 +256,20 @@ export async function createEbayDraftInSandbox(
     `/sell/inventory/v1/offer?sku=${encodeURIComponent(input.sku)}`,
     token,
   );
-  if (!existingOffersRes.ok) {
+  // eBay returns 404 + errorId 25713 ("This Offer is not available") when
+  // there are simply no offers for the SKU yet. Treat that as an empty list.
+  const noOffersForSku =
+    existingOffersRes.status === 404 ||
+    (Array.isArray(existingOffersRes.json?.errors) &&
+      existingOffersRes.json.errors.some((e: any) => Number(e?.errorId) === 25713));
+  if (!existingOffersRes.ok && !noOffersForSku) {
     throw new Error(
       `List existing offers: ${ebayErrorMessage(existingOffersRes.status, existingOffersRes.json, existingOffersRes.text)}`,
     );
   }
-  const existingOffers: any[] = existingOffersRes.json?.offers ?? [];
+  const existingOffers: any[] = noOffersForSku
+    ? []
+    : (existingOffersRes.json?.offers ?? []);
   for (const off of existingOffers) {
     if (!off?.offerId) continue;
     const offerStatus = String(off.status ?? "").toUpperCase();
