@@ -106,9 +106,13 @@ export async function getEbayConditionPolicies(categoryId: string): Promise<Ebay
     }>;
   };
 
-  const policy =
-    (json.itemConditionPolicies ?? []).find((p) => String(p.categoryId) === String(categoryId)) ??
-    json.itemConditionPolicies?.[0];
+  // Only accept a policy whose categoryId exactly matches. Falling back to
+  // itemConditionPolicies[0] returns a sibling category's policy and lets
+  // invalid conditionIds (e.g. 2750 LIKE_NEW for cat 95672) pass pre-audit
+  // only to be rejected by /publish with errorId 25059.
+  const policy = (json.itemConditionPolicies ?? []).find(
+    (p) => String(p.categoryId) === String(categoryId),
+  );
 
   return (policy?.itemConditions ?? []).map((c) => {
     const conditionId = Number(c.conditionId);
