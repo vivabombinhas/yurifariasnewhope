@@ -45,6 +45,7 @@ export function EbayDraftPanel({ productId }: Props) {
       console.log("[EbayDraftPanel] mutation result", res);
       if (res.ok) {
         toast.success(`eBay draft created (offerId: ${res.offerId})`);
+        qc.invalidateQueries({ queryKey: ["ebay-readiness", productId] });
         qc.invalidateQueries({ queryKey: ["ebay-listing", productId] });
         qc.invalidateQueries({ queryKey: ["listings", productId] });
         qc.invalidateQueries({ queryKey: ["publishing-jobs"] });
