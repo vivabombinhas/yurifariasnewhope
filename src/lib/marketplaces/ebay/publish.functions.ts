@@ -357,7 +357,12 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     // ---------- STEP 10: Final audit (must be perfect to publish) ----------
     audit = await readAudit(offerId);
     const finalUpdatedAt = new Date(String(product.updated_at ?? 0)).getTime();
-    const finalOfferCreatedAt = audit.offerCreatedAt;
+    // eBay sandbox often omits createdDate on getOffer; fall back to the
+    // draftCreatedAt we persist locally when (re)creating the draft.
+    const draftCreatedAtMs = new Date(String(meta.draftCreatedAt ?? 0)).getTime();
+    const finalOfferCreatedAt = Number.isFinite(audit.offerCreatedAt) && audit.offerCreatedAt > 0
+      ? audit.offerCreatedAt
+      : draftCreatedAtMs;
     const finalCheck = {
       inventorySkuOk: String(audit.inventoryJson.sku ?? ebayInventorySku) === ebayInventorySku,
       offerSkuOk: String(audit.offerJson.sku ?? "") === ebayInventorySku,
@@ -371,7 +376,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
           p.conditionId === product.ebay_condition_id,
       ),
       offerFresherThanProductOk:
-        Number.isFinite(finalOfferCreatedAt) && finalOfferCreatedAt > finalUpdatedAt,
+        Number.isFinite(finalOfferCreatedAt) && finalOfferCreatedAt >= finalUpdatedAt,
       exactlyOneUnpublishedOk: audit.unpublishedOfferCount === 1,
       noPublishedListingOk: !audit.hasPublishedListing,
     };
