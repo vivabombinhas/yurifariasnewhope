@@ -470,6 +470,7 @@ function CopyActions({ product }: { product: any }) {
 function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const qc = useQueryClient();
   const tr = useT();
+  const markOutdated = useServerFn(markEbayDraftOutdatedForProduct);
   const [title, setTitle] = useState(product.title ?? "");
   const [description, setDescription] = useState(product.description ?? "");
   const [brand, setBrand] = useState(product.brand?.name ?? "");
@@ -544,8 +545,11 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
     },
     onSuccess: () => {
       toast.success(tr("detail.saved"));
+      markOutdated({ data: { productId: product.id, reason: "product_edited" } }).catch(() => {});
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["history", product.id] });
+      qc.invalidateQueries({ queryKey: ["ebay-listing", product.id] });
+      qc.invalidateQueries({ queryKey: ["ebay-readiness", product.id] });
       onSaved();
     },
     onError: (e: any) => toast.error(e.message),
