@@ -171,9 +171,10 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
       textOrNull(meta.offerId) ??
       textOrNull(lastError.offerId) ??
       textOrNull(lastError?.conditionVerification?.offerId);
-    const sku = textOrNull(product.sku);
+    const internalSku = textOrNull(product.sku);
+    const sku = textOrNull(meta.sku) ?? internalSku;
 
-    if (!sku) throw new Error("Product has no SKU; audit cannot query eBay InventoryItem.");
+    if (!sku) throw new Error("Product has no eBay inventory SKU; audit cannot query eBay InventoryItem.");
 
     const { readEbayPublishAuditResources } = await import("./publish-audit.server");
     const resources = await readEbayPublishAuditResources({ sku, offerId });
@@ -275,7 +276,7 @@ export const generateEbayPublishAudit = createServerFn({ method: "POST" })
       generatedAt: new Date().toISOString(),
       localProduct: {
         productId: product.id,
-        sku,
+        sku: internalSku,
         internalCondition: textOrNull(product.condition),
         ebayCategoryId: dbCategoryId,
         ebayCategoryName: textOrNull(product.ebay_category_name),

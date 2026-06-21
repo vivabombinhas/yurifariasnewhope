@@ -197,6 +197,8 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
     ) {
       try {
         const meta = (listingRes.data?.provider_metadata ?? {}) as Record<string, any>;
+        const ebayInventorySku =
+          typeof meta.sku === "string" && meta.sku.trim() ? meta.sku : p.sku;
         if (!meta.offerId && listingRes.data?.status !== "active") {
           checks.push({
             id: "inventory_condition_verified",
@@ -208,7 +210,7 @@ export const checkEbayReadiness = createServerFn({ method: "POST" })
         } else {
           const { verifyEbayInventoryItemCondition } = await import("./draft.server");
           const verified = await verifyEbayInventoryItemCondition({
-            sku: p.sku,
+            sku: ebayInventorySku,
             title: p.title ?? "",
             description: p.description ?? "",
             priceCents: p.price_cents ?? 0,
