@@ -20,7 +20,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     }
 
     // ---------- STEP 1: Load product + listing ----------
-    const { data: listing, error } = await context.supabase
+    const { data: initialListing, error } = await context.supabase
       .from("marketplace_listings")
       .select("id, status, external_listing_id, listing_url, provider_metadata")
       .eq("product_id", data.productId)
@@ -29,25 +29,50 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     if (error) throw error;
 
     // Step 3: short-circuit if an active listing already exists.
-    if (listing?.status === "active" && listing.external_listing_id) {
+    if (initialListing?.status === "active" && initialListing.external_listing_id) {
       return {
         ok: true,
         result: {
           ok: true,
-          listingId: listing.external_listing_id,
+          listingId: initialListing.external_listing_id,
           raw: {
             status: 200,
-            json: { existing: true, listingUrl: listing.listing_url },
+            json: { existing: true, listingUrl: initialListing.listing_url },
             text: "existing active listing",
           },
         },
       };
     }
 
+    let listing = initialListing;
     let meta = (listing?.provider_metadata ?? {}) as Record<string, any>;
     let offerId: string | undefined = meta.offerId;
+
+    // Auto-create draft if missing — single-click publish flow.
     if (!listing || !offerId) {
-      return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
+      const { createEbayDraft } = await import("./draft.functions");
+      const draft = await createEbayDraft({ data: { productId: data.productId } });
+      if (!draft.ok || !draft.offerId) {
+        return {
+          ok: false,
+          errorMessage: draft.errorMessage ?? "Failed to create eBay draft before publish.",
+        };
+      }
+      const { data: refreshedListing } = await context.supabase
+        .from("marketplace_listings")
+        .select("id, status, external_listing_id, listing_url, provider_metadata")
+        .eq("product_id", data.productId)
+        .eq("marketplace", "ebay")
+        .maybeSingle();
+      if (!refreshedListing) {
+        return { ok: false, errorMessage: "Draft created but listing record not found." };
+      }
+      listing = refreshedListing;
+      meta = (refreshedListing.provider_metadata ?? {}) as Record<string, any>;
+      offerId = meta.offerId ?? draft.offerId;
+    }
+    if (!offerId) {
+      return { ok: false, errorMessage: "Failed to obtain eBay offer for publish." };
     }
     if (meta.draftOutdated === true) {
       return {
