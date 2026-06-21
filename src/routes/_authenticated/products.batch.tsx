@@ -57,6 +57,8 @@ type DraftStatus =
   | "ready"
   | "error";
 
+type ItemSpecific = { name: string; value: string };
+
 type BatchDraft = {
   id: string; // local id
   photoIds: string[];
@@ -70,6 +72,10 @@ type BatchDraft = {
   category: string;
   condition: string;
   price: string; // dollars
+  condition_grade: string;
+  condition_notes: string;
+  shipping_notes: string;
+  item_specifics: ItemSpecific[];
 };
 
 function rid() {
