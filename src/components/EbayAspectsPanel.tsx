@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,6 +73,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
 
   const [values, setValues] = useState<Record<string, string[]>>(initial);
   useEffect(() => setValues(initial), [initial]);
+  const autoAutofillRef = useRef(false);
 
   const aspects: EbayAspectDTO[] = useMemo(() => {
     const fromApi = aspectsQ.data?.aspects ?? [];
