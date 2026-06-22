@@ -540,7 +540,8 @@ export async function ensureValidMerchantLocation(
     await supabase
       .from("marketplace_accounts")
       .update({ merchant_location_key: candidate.key })
-      .eq("marketplace", "ebay");
+      .eq("marketplace", "ebay")
+      .eq("environment", env);
   }
 
   const addr = candidate.loc.location?.address ?? candidate.loc.address ?? {};
