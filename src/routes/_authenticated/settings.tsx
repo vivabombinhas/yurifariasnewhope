@@ -32,6 +32,7 @@ function SettingsPage() {
       <h1 className="text-2xl font-semibold">{t("settings.title")}</h1>
 
       <MarketplaceConnections />
+      <EbayOrdersSyncPanel />
 
       <Card>
         <CardHeader>
