@@ -155,6 +155,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
         return;
       }
       let applied = 0;
+      let nextValues: Record<string, string[]> | null = null;
       setValues((prev) => {
         const next = { ...prev };
         for (const s of kept) {
@@ -163,6 +164,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           next[s.name] = s.values;
           applied++;
         }
+        nextValues = next;
         return next;
       });
       const parts: string[] = [];
@@ -171,6 +173,20 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
       toast.success(
         `Auto-filled ${applied} aspect(s)${parts.length ? ` (${parts.join(", ")})` : ""}. Please review before saving.`,
       );
+
+      // Auto-save if every required aspect now has a value.
+      const requiredNames = (aspectsQ.data?.aspects ?? [])
+        .filter((a) => a.required)
+        .map((a) => a.name);
+      const allRequiredFilled =
+        nextValues !== null &&
+        requiredNames.every((n) =>
+          (nextValues as Record<string, string[]>)[n]?.some((v) => v.trim().length > 0),
+        );
+      if (allRequiredFilled && requiredNames.length > 0) {
+        console.log("[EbayAspectsPanel] auto-saving — all required filled by autofill");
+        setTimeout(() => saveMut.mutate(), 0);
+      }
     },
 
     onError: (e: any) => toast.error(e?.message ?? "Autofill failed"),
