@@ -192,7 +192,7 @@ function ProductDetail() {
 
       <CopyActions product={p} />
 
-      <EditForm product={p} onSaved={() => product.refetch()} />
+      <OperationalCard product={p} onSaved={() => product.refetch()} />
 
       <MarketplacePublishingPanel
         productId={id}
