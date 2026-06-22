@@ -465,7 +465,8 @@ function SuggestionEditor({
           .eq("id", latest.id);
       }
 
-      toast.success("Applied to product");
+      toast.success("Saved");
+      markEbayDraftOutdatedForProduct({ data: { productId: product.id, reason: "product_edited" } }).catch(() => {});
       onApplied();
     } catch (e: any) {
       toast.error(e.message ?? "Failed to apply");
