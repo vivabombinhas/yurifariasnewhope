@@ -69,7 +69,7 @@ export function EbayPublishPanel({ productId }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <Rocket className="h-4 w-4" /> Publish eBay Listing (Sandbox)
+          <Rocket className="h-4 w-4" /> Publish eBay Listing
         </CardTitle>
         <div className="flex items-center gap-2">
           {isActive && listingId && (
@@ -98,7 +98,7 @@ export function EbayPublishPanel({ productId }: Props) {
             ) : (
               <Rocket className="h-4 w-4 mr-1" />
             )}
-            {isActive ? "Already Published" : "Publish eBay Listing (Sandbox)"}
+            {isActive ? "Already Published" : "Publish eBay Listing"}
           </Button>
         </div>
       </CardHeader>
@@ -147,7 +147,7 @@ export function EbayPublishPanel({ productId }: Props) {
                   className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
                 >
                   <ExternalLink className="h-3 w-3" />
-                  Open on eBay Sandbox
+                  Open on eBay
                 </a>
               )}
             </div>

@@ -104,7 +104,7 @@ export function EbayDraftPanel({ productId }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <FileText className="h-4 w-4" /> eBay Draft (Sandbox)
+          <FileText className="h-4 w-4" /> eBay Draft
         </CardTitle>
         <div className="flex items-center gap-2">
           {isDraft && <Badge variant="secondary">Draft created</Badge>}

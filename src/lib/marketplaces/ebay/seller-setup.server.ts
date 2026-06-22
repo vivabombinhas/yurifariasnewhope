@@ -443,6 +443,7 @@ export async function ensureValidMerchantLocation(
     .from("marketplace_accounts")
     .select("id, merchant_location_key")
     .eq("marketplace", "ebay")
+    .eq("environment", env)
     .maybeSingle();
   if (accErr) throw accErr;
 
@@ -518,7 +519,8 @@ export async function ensureValidMerchantLocation(
     const { error: upErr } = await supabase
       .from("marketplace_accounts")
       .update({ merchant_location_key: newKey })
-      .eq("marketplace", "ebay");
+      .eq("marketplace", "ebay")
+      .eq("environment", env);
     if (upErr) throw upErr;
 
     const addr = verify.json.location?.address ?? {};
@@ -538,7 +540,8 @@ export async function ensureValidMerchantLocation(
     await supabase
       .from("marketplace_accounts")
       .update({ merchant_location_key: candidate.key })
-      .eq("marketplace", "ebay");
+      .eq("marketplace", "ebay")
+      .eq("environment", env);
   }
 
   const addr = candidate.loc.location?.address ?? candidate.loc.address ?? {};

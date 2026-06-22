@@ -146,7 +146,7 @@ export function EbayWorkflowPanel({ productId, product, onSaved }: Props) {
         key: "draft",
         number: 3,
         title: "Draft",
-        hint: "Cria a oferta não publicada no eBay (Sandbox).",
+        hint: "Cria a oferta não publicada no eBay.",
         status: draftStatus,
         statusLabel:
           draftStatus === "blocked"
