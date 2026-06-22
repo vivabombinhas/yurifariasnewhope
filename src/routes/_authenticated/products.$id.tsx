@@ -192,7 +192,7 @@ function ProductDetail() {
 
       <CopyActions product={p} />
 
-      <EditForm product={p} onSaved={() => product.refetch()} />
+      <OperationalCard product={p} onSaved={() => product.refetch()} />
 
       <MarketplacePublishingPanel
         productId={id}
@@ -809,6 +809,81 @@ function SpecificsList({
         + Add specific
       </Button>
     </div>
+  );
+}
+
+function OperationalCard({ product, onSaved }: { product: any; onSaved: () => void }) {
+  const tr = useT();
+  const [locationId, setLocationId] = useState<string>(product.location_id ?? "");
+  const [status, setStatus] = useState<string>(product.status);
+
+  const locations = useQuery({
+    queryKey: ["locations"],
+    queryFn: async () =>
+      (await supabase.from("locations").select("id, label").order("area")).data ?? [],
+  });
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("products")
+        .update({ location_id: locationId || null, status: status as any })
+        .eq("id", product.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(tr("detail.saved"));
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const dirty =
+    (locationId || "") !== (product.location_id ?? "") || status !== product.status;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{tr("common.location")} & {tr("common.status")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <div className="space-y-2">
+            <Label>{tr("common.location")}</Label>
+            <Select value={locationId} onValueChange={setLocationId}>
+              <SelectTrigger>
+                <SelectValue placeholder={tr("newProduct.selectLocation")} />
+              </SelectTrigger>
+              <SelectContent>
+                {locations.data?.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>{tr("common.status")}</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRODUCT_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {tStatus(tr, s)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
+            {save.isPending ? tr("common.saving") : tr("detail.saveChanges")}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
