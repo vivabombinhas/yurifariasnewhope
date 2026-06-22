@@ -193,6 +193,23 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
     onError: (e: any) => toast.error(e?.message ?? "Autofill failed"),
   });
 
+  // Auto-trigger autofill once when category set + aspects loaded + no values yet.
+  useEffect(() => {
+    if (autoAutofillRef.current) return;
+    if (!categoryId) return;
+    if (!aspectsQ.data?.aspects?.length) return;
+    if (autofillMut.isPending || saveMut.isPending) return;
+    const hasAnyValue = Object.values(values).some((v) =>
+      v.some((s) => s.trim().length > 0),
+    );
+    if (hasAnyValue) return;
+    autoAutofillRef.current = true;
+    console.log("[EbayAspectsPanel] auto-triggering autofill (empty aspects)");
+    autofillMut.mutate();
+  }, [categoryId, aspectsQ.data, values, autofillMut, saveMut.isPending]);
+
+
+
 
   if (!categoryId) {
     return (
