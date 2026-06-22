@@ -14,6 +14,7 @@ interface Props {
 
 export function EbayPublishPanel({ productId }: Props) {
   const fn = useServerFn(publishEbayListing);
+  const endFn = useServerFn(endEbayListing);
   const readinessFn = useServerFn(checkEbayReadiness);
   const qc = useQueryClient();
 
