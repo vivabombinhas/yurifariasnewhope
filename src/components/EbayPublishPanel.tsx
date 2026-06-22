@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Rocket, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from "lucide-react";
+import { Loader2, Rocket, CheckCircle2, XCircle, ExternalLink, AlertTriangle, PowerOff } from "lucide-react";
 import { publishEbayListing } from "@/lib/marketplaces/ebay/publish.functions";
 import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions";
+import { endEbayListing } from "@/lib/marketplaces/ebay/end-listing.functions";
 
 interface Props {
   productId: string;
