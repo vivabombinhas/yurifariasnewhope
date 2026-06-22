@@ -443,6 +443,7 @@ export async function ensureValidMerchantLocation(
     .from("marketplace_accounts")
     .select("id, merchant_location_key")
     .eq("marketplace", "ebay")
+    .eq("environment", env)
     .maybeSingle();
   if (accErr) throw accErr;
 
