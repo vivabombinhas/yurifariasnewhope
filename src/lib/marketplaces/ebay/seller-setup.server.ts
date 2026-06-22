@@ -519,7 +519,8 @@ export async function ensureValidMerchantLocation(
     const { error: upErr } = await supabase
       .from("marketplace_accounts")
       .update({ merchant_location_key: newKey })
-      .eq("marketplace", "ebay");
+      .eq("marketplace", "ebay")
+      .eq("environment", env);
     if (upErr) throw upErr;
 
     const addr = verify.json.location?.address ?? {};
