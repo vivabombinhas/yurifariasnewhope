@@ -363,10 +363,14 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       created: boolean;
     };
     try {
-      const { ensureValidMerchantLocation, setOfferMerchantLocation } =
+      const { ensureValidMerchantLocation, setOfferMerchantLocation, syncOfferWithSellerSetup } =
         await import("./seller-setup.server");
       locationInfo = await ensureValidMerchantLocation(context.supabase);
       await setOfferMerchantLocation(offerId, locationInfo.merchantLocationKey);
+      // Always (re)apply listingPolicies — fulfillment/payment/return — to the
+      // unpublished Offer. Also repairs the Fulfillment Policy if it is missing
+      // a valid shipping service (eBay errorId 25007).
+      await syncOfferWithSellerSetup(offerId);
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       await context.supabase

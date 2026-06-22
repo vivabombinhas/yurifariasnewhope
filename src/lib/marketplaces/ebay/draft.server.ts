@@ -97,8 +97,12 @@ function apiUrl(env: string, path: string) {
 }
 
 function buildInventoryBody(existing: Record<string, any> | null, input: CreateDraftInput) {
+  // eBay rejects conditionDescription for any NEW-family condition
+  // (NEW, NEW_OTHER, NEW_WITH_DEFECTS) — warning errorId 25021.
+  const isNewFamily = (input.ebayConditionEnum ?? "").toUpperCase().startsWith("NEW");
+  const { conditionDescription: _drop, ...rest } = existing ?? {};
   return {
-    ...(existing ?? {}),
+    ...rest,
     availability: existing?.availability ?? {
       shipToLocationAvailability: { quantity: 1 },
     },
@@ -110,10 +114,9 @@ function buildInventoryBody(existing: Record<string, any> | null, input: CreateD
       imageUrls: input.imageUrls,
     },
     condition: input.ebayConditionEnum,
-    conditionDescription:
-      input.ebayConditionName.toLowerCase() === "new"
-        ? undefined
-        : input.description.slice(0, 1000),
+    ...(isNewFamily
+      ? {}
+      : { conditionDescription: input.description.slice(0, 1000) }),
   };
 }
 
