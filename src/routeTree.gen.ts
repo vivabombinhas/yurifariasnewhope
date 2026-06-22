@@ -21,6 +21,7 @@ import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
 import { Route as AuthenticatedProductsBatchRouteImport } from './routes/_authenticated/products.batch'
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
+import { Route as ApiPublicEbaySyncOrdersRouteImport } from './routes/api/public/ebay/sync-orders'
 import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
 import { Route as ApiPublicEbayImagePhotoIdRouteImport } from './routes/api/public/ebay/image.$photoId'
 
@@ -86,6 +87,11 @@ const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AuthenticatedProductsRoute,
 } as any)
+const ApiPublicEbaySyncOrdersRoute = ApiPublicEbaySyncOrdersRouteImport.update({
+  id: '/api/public/ebay/sync-orders',
+  path: '/api/public/ebay/sync-orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicEbayCallbackRoute = ApiPublicEbayCallbackRouteImport.update({
   id: '/api/public/ebay/callback',
   path: '/api/public/ebay/callback',
@@ -111,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products/': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
+  '/api/public/ebay/sync-orders': typeof ApiPublicEbaySyncOrdersRoute
   '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
 }
 export interface FileRoutesByTo {
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
+  '/api/public/ebay/sync-orders': typeof ApiPublicEbaySyncOrdersRoute
   '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
 }
 export interface FileRoutesById {
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
+  '/api/public/ebay/sync-orders': typeof ApiPublicEbaySyncOrdersRoute
   '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
 }
 export interface FileRouteTypes {
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/'
     | '/api/public/ebay/callback'
+    | '/api/public/ebay/sync-orders'
     | '/api/public/ebay/image/$photoId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products'
     | '/api/public/ebay/callback'
+    | '/api/public/ebay/sync-orders'
     | '/api/public/ebay/image/$photoId'
   id:
     | '__root__'
@@ -189,6 +200,7 @@ export interface FileRouteTypes {
     | '/_authenticated/products/new'
     | '/_authenticated/products/'
     | '/api/public/ebay/callback'
+    | '/api/public/ebay/sync-orders'
     | '/api/public/ebay/image/$photoId'
   fileRoutesById: FileRoutesById
 }
@@ -196,6 +208,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicEbayCallbackRoute: typeof ApiPublicEbayCallbackRoute
+  ApiPublicEbaySyncOrdersRoute: typeof ApiPublicEbaySyncOrdersRoute
   ApiPublicEbayImagePhotoIdRoute: typeof ApiPublicEbayImagePhotoIdRoute
 }
 
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIdRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
+    '/api/public/ebay/sync-orders': {
+      id: '/api/public/ebay/sync-orders'
+      path: '/api/public/ebay/sync-orders'
+      fullPath: '/api/public/ebay/sync-orders'
+      preLoaderRoute: typeof ApiPublicEbaySyncOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ebay/callback': {
       id: '/api/public/ebay/callback'
       path: '/api/public/ebay/callback'
@@ -346,18 +366,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiPublicEbayCallbackRoute: ApiPublicEbayCallbackRoute,
+  ApiPublicEbaySyncOrdersRoute: ApiPublicEbaySyncOrdersRoute,
   ApiPublicEbayImagePhotoIdRoute: ApiPublicEbayImagePhotoIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
