@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,6 +100,18 @@ export function EbayDraftPanel({ productId }: Props) {
     }
     createMut.mutate();
   };
+
+  // Auto-create draft once when readiness is 100% green, no draft yet, and not active.
+  const autoTriedRef = useRef(false);
+  useEffect(() => {
+    if (autoTriedRef.current) return;
+    if (!readiness.data) return;
+    if (createMut.isPending || createMut.data || createMut.error) return;
+    if (!ready || isDraft || isActive || isOutdated) return;
+    autoTriedRef.current = true;
+    console.log("[EbayDraftPanel] auto-creating draft (readiness green)");
+    createMut.mutate();
+  }, [ready, isDraft, isActive, isOutdated, readiness.data, createMut]);
 
   return (
     <Card>
