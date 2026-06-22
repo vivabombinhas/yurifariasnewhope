@@ -143,10 +143,15 @@ export type Database = {
           error_message: string | null
           external_account_id: string | null
           id: string
+          last_orders_sync_at: string | null
+          last_orders_sync_attempt_at: string | null
+          last_orders_sync_error: Json | null
+          last_orders_sync_status: string | null
           last_refresh_at: string | null
           marketplace: Database["public"]["Enums"]["marketplace"]
           merchant_location_key: string | null
           metadata: Json
+          orders_sync_lock_at: string | null
           refresh_token: string
           scopes: string[]
           status: string
@@ -163,10 +168,15 @@ export type Database = {
           error_message?: string | null
           external_account_id?: string | null
           id?: string
+          last_orders_sync_at?: string | null
+          last_orders_sync_attempt_at?: string | null
+          last_orders_sync_error?: Json | null
+          last_orders_sync_status?: string | null
           last_refresh_at?: string | null
           marketplace: Database["public"]["Enums"]["marketplace"]
           merchant_location_key?: string | null
           metadata?: Json
+          orders_sync_lock_at?: string | null
           refresh_token: string
           scopes?: string[]
           status?: string
@@ -183,10 +193,15 @@ export type Database = {
           error_message?: string | null
           external_account_id?: string | null
           id?: string
+          last_orders_sync_at?: string | null
+          last_orders_sync_attempt_at?: string | null
+          last_orders_sync_error?: Json | null
+          last_orders_sync_status?: string | null
           last_refresh_at?: string | null
           marketplace?: Database["public"]["Enums"]["marketplace"]
           merchant_location_key?: string | null
           metadata?: Json
+          orders_sync_lock_at?: string | null
           refresh_token?: string
           scopes?: string[]
           status?: string
@@ -199,7 +214,9 @@ export type Database = {
         Row: {
           created_at: string
           error_message: string | null
+          external_line_item_id: string | null
           external_listing_id: string | null
+          external_order_id: string | null
           id: string
           last_error: Json | null
           last_failed_step: string | null
@@ -218,7 +235,9 @@ export type Database = {
         Insert: {
           created_at?: string
           error_message?: string | null
+          external_line_item_id?: string | null
           external_listing_id?: string | null
+          external_order_id?: string | null
           id?: string
           last_error?: Json | null
           last_failed_step?: string | null
@@ -237,7 +256,9 @@ export type Database = {
         Update: {
           created_at?: string
           error_message?: string | null
+          external_line_item_id?: string | null
           external_listing_id?: string | null
+          external_order_id?: string | null
           id?: string
           last_error?: Json | null
           last_failed_step?: string | null
@@ -256,6 +277,97 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "marketplace_listings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_sales: {
+        Row: {
+          created_at: string
+          external_line_item_id: string
+          external_listing_id: string | null
+          external_order_id: string
+          fulfillment_status: string | null
+          id: string
+          marketplace: string
+          marketplace_account_id: string
+          marketplace_listing_id: string | null
+          matched_at: string | null
+          order_created_at: string | null
+          order_modified_at: string | null
+          payment_status: string | null
+          processed_at: string
+          processing_error: Json | null
+          processing_status: string
+          product_id: string | null
+          quantity: number | null
+          raw_order_redacted: Json | null
+          sku: string | null
+        }
+        Insert: {
+          created_at?: string
+          external_line_item_id: string
+          external_listing_id?: string | null
+          external_order_id: string
+          fulfillment_status?: string | null
+          id?: string
+          marketplace: string
+          marketplace_account_id: string
+          marketplace_listing_id?: string | null
+          matched_at?: string | null
+          order_created_at?: string | null
+          order_modified_at?: string | null
+          payment_status?: string | null
+          processed_at?: string
+          processing_error?: Json | null
+          processing_status?: string
+          product_id?: string | null
+          quantity?: number | null
+          raw_order_redacted?: Json | null
+          sku?: string | null
+        }
+        Update: {
+          created_at?: string
+          external_line_item_id?: string
+          external_listing_id?: string | null
+          external_order_id?: string
+          fulfillment_status?: string | null
+          id?: string
+          marketplace?: string
+          marketplace_account_id?: string
+          marketplace_listing_id?: string | null
+          matched_at?: string | null
+          order_created_at?: string | null
+          order_modified_at?: string | null
+          payment_status?: string | null
+          processed_at?: string
+          processing_error?: Json | null
+          processing_status?: string
+          product_id?: string | null
+          quantity?: number | null
+          raw_order_redacted?: Json | null
+          sku?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_sales_marketplace_account_id_fkey"
+            columns: ["marketplace_account_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_sales_marketplace_listing_id_fkey"
+            columns: ["marketplace_listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_sales_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
@@ -510,8 +622,37 @@ export type Database = {
         Args: { _condition_id: number }
         Returns: string
       }
+      record_marketplace_sale: {
+        Args: {
+          _external_line_item_id: string
+          _external_listing_id: string
+          _external_order_id: string
+          _fulfillment_status: string
+          _marketplace: string
+          _marketplace_account_id: string
+          _marketplace_listing_id: string
+          _order_created_at: string
+          _order_modified_at: string
+          _payment_status: string
+          _processing_error: Json
+          _processing_status: string
+          _product_id: string
+          _quantity: number
+          _raw_order_redacted: Json
+          _sku: string
+        }
+        Returns: Json
+      }
+      release_orders_sync_lock: {
+        Args: { _account_id: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      try_acquire_orders_sync_lock: {
+        Args: { _account_id: string; _ttl_seconds?: number }
+        Returns: boolean
+      }
     }
     Enums: {
       listing_status: "draft" | "active" | "sold" | "ended" | "removed"
