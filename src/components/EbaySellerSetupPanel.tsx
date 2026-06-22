@@ -20,7 +20,7 @@ interface Props {
 type ResourceKey = "location" | "fulfillmentPolicy" | "paymentPolicy" | "returnPolicy";
 
 const CREATE_LABEL: Record<ResourceKey, string> = {
-  location: "Create Sandbox Location",
+  location: "Create Location",
   fulfillmentPolicy: "Create Fulfillment Policy",
   paymentPolicy: "Create Payment Policy",
   returnPolicy: "Create Return Policy",
