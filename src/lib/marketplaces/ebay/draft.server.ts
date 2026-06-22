@@ -254,8 +254,8 @@ export async function createEbayDraftInSandbox(
 ): Promise<CreateDraftResult> {
   const publishAttemptId = input.publishAttemptId ?? crypto.randomUUID();
   const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
-  if (env !== "sandbox") {
-    throw new Error("Draft creation is restricted to sandbox environment.");
+  if (env !== "sandbox" && env !== "production") {
+    throw new Error(`Unknown EBAY_ENV: ${env}`);
   }
   if (!input.ebayConditionEnum || !input.ebayConditionId || !input.ebayConditionName) {
     throw new Error("Select a valid eBay Condition before creating the draft.");

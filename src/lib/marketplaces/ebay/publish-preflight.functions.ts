@@ -12,8 +12,8 @@ export const checkEbayPublishPreflight = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ productId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }): Promise<EbayPublishPreflightDTO> => {
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
-    if (env !== "sandbox") {
-      return { ok: false, errorMessage: "Publish preflight is sandbox-only for now." };
+    if (env !== "sandbox" && env !== "production") {
+      return { ok: false, errorMessage: `Unknown EBAY_ENV: ${env}` };
     }
 
     const { data: listing, error } = await context.supabase

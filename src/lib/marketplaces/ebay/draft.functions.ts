@@ -46,9 +46,8 @@ export const createEbayDraft = createServerFn({ method: "POST" })
     const publishAttemptId = crypto.randomUUID();
     console.log("[createEbayDraft] started", { publishAttemptId, productId: data.productId });
     const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
-    if (env !== "sandbox") {
-      console.warn("[createEbayDraft] aborted: non-sandbox env", { env });
-      return { ok: false, errorMessage: "Draft creation is restricted to sandbox environment." };
+    if (env !== "sandbox" && env !== "production") {
+      return { ok: false, errorMessage: `Unknown EBAY_ENV: ${env}` };
     }
 
     // Run readiness check first
