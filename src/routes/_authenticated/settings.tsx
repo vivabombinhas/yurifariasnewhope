@@ -16,6 +16,7 @@ import {
 } from "@/lib/i18n";
 import { RouteError } from "@/components/RouteError";
 import { MarketplaceConnections } from "@/components/MarketplaceConnections";
+import { EbayOrdersSyncPanel } from "@/components/EbayOrdersSyncPanel";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Inventory" }] }),
