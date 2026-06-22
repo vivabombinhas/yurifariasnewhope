@@ -823,7 +823,7 @@ function QualityChecklist({ title, description }: { title: string; description: 
         ))}
       </ul>
       <p className="text-[11px] text-muted-foreground">
-        Quick local check — review manually before clicking <b>Apply to product</b>.
+        Quick local check — review manually before clicking <b>Save changes</b>.
       </p>
     </div>
   );
