@@ -97,9 +97,12 @@ function apiUrl(env: string, path: string) {
 }
 
 function buildInventoryBody(existing: Record<string, any> | null, input: CreateDraftInput) {
-  // eBay rejects conditionDescription for any NEW-family condition
-  // (NEW, NEW_OTHER, NEW_WITH_DEFECTS) — warning errorId 25021.
-  const isNewFamily = (input.ebayConditionEnum ?? "").toUpperCase().startsWith("NEW");
+  // eBay's conditionDescription must ONLY describe the item's physical condition.
+  // Reusing the full listing description triggers errorId 25019
+  // (SPx_ItemConditionField_IrrelventTerms — brand/promo/shipping/returns/payment text).
+  // We don't have a dedicated condition-notes field flowing into this builder,
+  // so we omit conditionDescription entirely (it is optional for all conditions)
+  // and also strip any value inherited from an existing offer.
   const { conditionDescription: _drop, ...rest } = existing ?? {};
   return {
     ...rest,
@@ -114,9 +117,6 @@ function buildInventoryBody(existing: Record<string, any> | null, input: CreateD
       imageUrls: input.imageUrls,
     },
     condition: input.ebayConditionEnum,
-    ...(isNewFamily
-      ? {}
-      : { conditionDescription: input.description.slice(0, 1000) }),
   };
 }
 
