@@ -128,6 +128,7 @@ export function EbayPublishPanel({ productId }: Props) {
               End Listing
             </Button>
           )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!offerId && !isActive && (
