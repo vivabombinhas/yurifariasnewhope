@@ -52,6 +52,13 @@ export function EbayPublishPanel({ productId }: Props) {
     },
   });
 
+  const endMut = useMutation({
+    mutationFn: () => endFn({ data: { productId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ebay-listing", productId] });
+    },
+  });
+
   const data = mut.data;
   const result = data?.ok ? data.result : null;
 
