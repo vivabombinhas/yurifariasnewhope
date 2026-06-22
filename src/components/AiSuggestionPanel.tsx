@@ -696,7 +696,7 @@ function SuggestionEditor({
 
       <div className="flex gap-2">
         <Button onClick={apply} disabled={saving}>
-          {saving ? "Applying…" : "Apply to product"}
+          {saving ? "Saving…" : "Save changes"}
         </Button>
       </div>
     </div>
