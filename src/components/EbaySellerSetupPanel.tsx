@@ -101,7 +101,7 @@ export function EbaySellerSetupPanel({ productId }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base flex items-center gap-2">
-          <Store className="h-4 w-4" /> eBay Seller Setup (Sandbox)
+          <Store className="h-4 w-4" /> eBay Seller Setup
         </CardTitle>
         <div className="flex items-center gap-2">
           {status && (
