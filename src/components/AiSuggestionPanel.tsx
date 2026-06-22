@@ -148,23 +148,52 @@ export function AiSuggestionPanel({
 
   const errorMsg = run.isError ? (run.error as any)?.message ?? "AI failed" : null;
 
+  const baseSuggestion: AiSuggestion = useMemo(
+    () => ({
+      title: product.title ?? "",
+      description: product.description ?? "",
+      brand: product.brand?.name ?? "",
+      category: product.category?.name ?? "",
+      condition: (product.condition ?? "good") as AiSuggestion["condition"],
+      tags: [],
+      suggested_price_cents: product.price_cents ?? null,
+      confidence_notes: "",
+      verification_needed: [],
+      item_specifics: Array.isArray(product.item_specifics) ? product.item_specifics : [],
+      condition_grade: product.condition_grade ?? "",
+      condition_notes: product.condition_notes ?? "",
+      shipping_notes: product.shipping_notes ?? "",
+      possible_brand: "",
+      possible_model: "",
+      visual_clues: [],
+      search_keywords: [],
+      recommended_research_queries: [],
+      price_confidence: "medium",
+      potentially_valuable: false,
+    }),
+    [product],
+  );
+
+  const effective = suggestion ?? baseSuggestion;
+
   return (
     <div className="space-y-4">
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="text-base flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" /> Quick listing
+          <Sparkles className="h-4 w-4 text-primary" /> Listing
         </CardTitle>
 
         <div className="flex gap-2 flex-wrap">
           <Button
             size="sm"
+            variant={suggestion ? "outline" : "default"}
             onClick={startAnalyze}
             disabled={run.isPending || !hasPhotos}
             aria-busy={run.isPending}
           >
             <Wand2 className="h-4 w-4 mr-1" />
-            {run.isPending ? "Generating…" : suggestion ? "Regenerate listing" : "Generate listing"}
+            {run.isPending ? "Generating…" : suggestion ? "Regenerate with AI" : "Generate with AI"}
           </Button>
         </div>
       </CardHeader>
@@ -182,26 +211,21 @@ export function AiSuggestionPanel({
               : `${unsupportedCount} photos are in an unsupported format (e.g. AVIF/HEIC) and cannot be analyzed by AI. Please re-upload them as JPEG, PNG, WebP, or GIF.`}
           </div>
         )}
-        {!hasPhotos ? (
-          <p className="text-sm text-muted-foreground">
-            Add at least one photo to enable AI analysis.
-          </p>
-        ) : !suggestion ? (
-          <p className="text-sm text-muted-foreground">
-            Click <b>Generate listing</b> to create a ready-to-publish marketplace draft.
-            Nothing is saved until you click <b>Apply to product</b>.
-          </p>
-        ) : (
-          <SuggestionEditor
-            product={product}
-            initial={suggestion}
-            onApplied={() => {
-              qc.invalidateQueries({ queryKey: ["product", product.id] });
-              qc.invalidateQueries({ queryKey: ["products"] });
-              onApplied();
-            }}
-          />
+        {!hasPhotos && !suggestion && (
+          <div className="mb-3 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+            Add a photo and click <b>Generate with AI</b> to auto-fill this listing. You can also edit fields manually below.
+          </div>
         )}
+        <SuggestionEditor
+          key={suggestion ? "ai" : `prod-${product.updated_at ?? product.id}`}
+          product={product}
+          initial={effective}
+          onApplied={() => {
+            qc.invalidateQueries({ queryKey: ["product", product.id] });
+            qc.invalidateQueries({ queryKey: ["products"] });
+            onApplied();
+          }}
+        />
       </CardContent>
     </Card>
 
