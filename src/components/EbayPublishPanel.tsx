@@ -109,7 +109,25 @@ export function EbayPublishPanel({ productId }: Props) {
             )}
             {isActive ? "Already Published" : "Publish eBay Listing"}
           </Button>
-        </div>
+          {isActive && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                if (confirm("End this eBay listing? It will be removed from eBay but can be republished later.")) {
+                  endMut.mutate();
+                }
+              }}
+              disabled={endMut.isPending}
+            >
+              {endMut.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <PowerOff className="h-4 w-4 mr-1" />
+              )}
+              End Listing
+            </Button>
+          )}
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         {!offerId && !isActive && (
