@@ -721,12 +721,14 @@ function ListingsSection({
       <CardContent className="space-y-3">
         {MARKETPLACES.map((m) => {
           const row = rows.find((r) => r.marketplace === m.id);
+          const isEbay = m.id === "ebay";
           return (
             <div key={m.id} className="flex flex-col sm:flex-row gap-2 sm:items-center border rounded-md p-3">
               <div className="w-40 font-medium text-sm">{m.label}</div>
               <Select
                 value={row?.status ?? "draft"}
                 onValueChange={(v) => upsert(m.id, { status: v })}
+                disabled={isEbay}
               >
                 <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -743,6 +745,7 @@ function ListingsSection({
                   if (v !== (row?.listing_url ?? "")) upsert(m.id, { listing_url: v || null });
                 }}
                 className="flex-1"
+                disabled={isEbay}
               />
               {row?.listing_url && (
                 <Button size="sm" variant="ghost" asChild>
@@ -751,14 +754,20 @@ function ListingsSection({
                   </a>
                 </Button>
               )}
-              {row && (
+              {row && !isEbay && (
                 <Button size="sm" variant="ghost" onClick={() => remove(row.id)} aria-label="Clear">
                   <X className="h-4 w-4" />
                 </Button>
               )}
+              {isEbay && (
+                <div className="text-[11px] text-muted-foreground sm:ml-2">
+                  Managed by Publish / End Listing above
+                </div>
+              )}
             </div>
           );
         })}
+
       </CardContent>
     </Card>
   );
