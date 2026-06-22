@@ -44,8 +44,8 @@ export interface SellerSetupStatus {
 
 async function ensureSandbox() {
   const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
-  if (env !== "sandbox") {
-    throw new Error("Seller setup is restricted to sandbox.");
+  if (env !== "sandbox" && env !== "production") {
+    throw new Error(`Unknown EBAY_ENV: ${env}`);
   }
   return env;
 }
