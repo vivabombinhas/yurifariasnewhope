@@ -16,6 +16,7 @@ import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions"
 import { EbayWorkflowPanel } from "@/components/ebay/EbayWorkflowPanel";
 import { AssistedPublishPanel } from "@/components/AssistedPublishPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { Tag, ShoppingBag } from "lucide-react";
 
 const ASSISTED: MarketplaceId[] = ["facebook_marketplace", "poshmark", "depop"];
 
