@@ -10,10 +10,15 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle, AlertCircle, Clock, Lock } from "lucide-react";
 import {
   syncEbayOrdersNow,
   getEbayOrdersSyncStatus,
 } from "@/lib/marketplaces/ebay/sync-orders.functions";
+
+const STALE_MS = 30 * 60 * 1000; // 30 min
+const LOCK_TTL_MS = 10 * 60 * 1000; // 10 min
 
 function fmt(ts?: string | null) {
   if (!ts) return "—";
