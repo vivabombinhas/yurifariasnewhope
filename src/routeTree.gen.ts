@@ -23,6 +23,7 @@ import { Route as AuthenticatedProductsBatchRouteImport } from './routes/_authen
 import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 import { Route as ApiPublicEbaySyncOrdersRouteImport } from './routes/api/public/ebay/sync-orders'
 import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
+import { Route as ApiPublicAdminBootstrapVaultRouteImport } from './routes/api/public/admin/bootstrap-vault'
 import { Route as ApiPublicEbayImagePhotoIdRouteImport } from './routes/api/public/ebay/image.$photoId'
 
 const AuthRoute = AuthRouteImport.update({
@@ -97,6 +98,12 @@ const ApiPublicEbayCallbackRoute = ApiPublicEbayCallbackRouteImport.update({
   path: '/api/public/ebay/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicAdminBootstrapVaultRoute =
+  ApiPublicAdminBootstrapVaultRouteImport.update({
+    id: '/api/public/admin/bootstrap-vault',
+    path: '/api/public/admin/bootstrap-vault',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicEbayImagePhotoIdRoute =
   ApiPublicEbayImagePhotoIdRouteImport.update({
     id: '/api/public/ebay/image/$photoId',
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/products/batch': typeof AuthenticatedProductsBatchRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products/': typeof AuthenticatedProductsIndexRoute
+  '/api/public/admin/bootstrap-vault': typeof ApiPublicAdminBootstrapVaultRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
   '/api/public/ebay/sync-orders': typeof ApiPublicEbaySyncOrdersRoute
   '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/products/batch': typeof AuthenticatedProductsBatchRoute
   '/products/new': typeof AuthenticatedProductsNewRoute
   '/products': typeof AuthenticatedProductsIndexRoute
+  '/api/public/admin/bootstrap-vault': typeof ApiPublicAdminBootstrapVaultRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
   '/api/public/ebay/sync-orders': typeof ApiPublicEbaySyncOrdersRoute
   '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
@@ -149,6 +158,7 @@ export interface FileRoutesById {
   '/_authenticated/products/batch': typeof AuthenticatedProductsBatchRoute
   '/_authenticated/products/new': typeof AuthenticatedProductsNewRoute
   '/_authenticated/products/': typeof AuthenticatedProductsIndexRoute
+  '/api/public/admin/bootstrap-vault': typeof ApiPublicAdminBootstrapVaultRoute
   '/api/public/ebay/callback': typeof ApiPublicEbayCallbackRoute
   '/api/public/ebay/sync-orders': typeof ApiPublicEbaySyncOrdersRoute
   '/api/public/ebay/image/$photoId': typeof ApiPublicEbayImagePhotoIdRoute
@@ -167,6 +177,7 @@ export interface FileRouteTypes {
     | '/products/batch'
     | '/products/new'
     | '/products/'
+    | '/api/public/admin/bootstrap-vault'
     | '/api/public/ebay/callback'
     | '/api/public/ebay/sync-orders'
     | '/api/public/ebay/image/$photoId'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '/products/batch'
     | '/products/new'
     | '/products'
+    | '/api/public/admin/bootstrap-vault'
     | '/api/public/ebay/callback'
     | '/api/public/ebay/sync-orders'
     | '/api/public/ebay/image/$photoId'
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
     | '/_authenticated/products/batch'
     | '/_authenticated/products/new'
     | '/_authenticated/products/'
+    | '/api/public/admin/bootstrap-vault'
     | '/api/public/ebay/callback'
     | '/api/public/ebay/sync-orders'
     | '/api/public/ebay/image/$photoId'
@@ -207,6 +220,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicAdminBootstrapVaultRoute: typeof ApiPublicAdminBootstrapVaultRoute
   ApiPublicEbayCallbackRoute: typeof ApiPublicEbayCallbackRoute
   ApiPublicEbaySyncOrdersRoute: typeof ApiPublicEbaySyncOrdersRoute
   ApiPublicEbayImagePhotoIdRoute: typeof ApiPublicEbayImagePhotoIdRoute
@@ -312,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicEbayCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/admin/bootstrap-vault': {
+      id: '/api/public/admin/bootstrap-vault'
+      path: '/api/public/admin/bootstrap-vault'
+      fullPath: '/api/public/admin/bootstrap-vault'
+      preLoaderRoute: typeof ApiPublicAdminBootstrapVaultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/ebay/image/$photoId': {
       id: '/api/public/ebay/image/$photoId'
       path: '/api/public/ebay/image/$photoId'
@@ -365,6 +386,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicAdminBootstrapVaultRoute: ApiPublicAdminBootstrapVaultRoute,
   ApiPublicEbayCallbackRoute: ApiPublicEbayCallbackRoute,
   ApiPublicEbaySyncOrdersRoute: ApiPublicEbaySyncOrdersRoute,
   ApiPublicEbayImagePhotoIdRoute: ApiPublicEbayImagePhotoIdRoute,

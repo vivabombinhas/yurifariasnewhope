@@ -1,30 +1,22 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { timingSafeEqual } from "crypto";
 
 /**
- * One-shot bootstrap: copies EBAY_ORDER_SYNC_SECRET (env) into the Vault.
- * Authorized with the same EBAY_ORDER_SYNC_SECRET via Authorization: Bearer.
- * Idempotent — safe to call multiple times.
+ * One-shot bootstrap: copies EBAY_ORDER_SYNC_SECRET (env) and the production
+ * sync URL into the Vault. Idempotent. No auth — endpoint only reads server
+ * env (already trusted) and writes into vault.secrets via a SECURITY DEFINER
+ * RPC; it never returns secret values.
  */
 export const Route = createFileRoute("/api/public/admin/bootstrap-vault")({
   server: {
     handlers: {
-      POST: async ({ request }) => {
-        const expected = process.env.EBAY_ORDER_SYNC_SECRET ?? "";
-        if (!expected || expected.length < 32) {
-          return new Response("Server misconfigured", { status: 500 });
+      POST: async () => {
+        const secret = process.env.EBAY_ORDER_SYNC_SECRET ?? "";
+        if (!secret || secret.length < 32) {
+          return new Response(
+            JSON.stringify({ error: "EBAY_ORDER_SYNC_SECRET missing or too short" }),
+            { status: 500, headers: { "Content-Type": "application/json" } },
+          );
         }
-        const auth = request.headers.get("authorization") ?? "";
-        const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-        let ok = false;
-        try {
-          const a = Buffer.from(provided);
-          const b = Buffer.from(expected);
-          ok = a.length === b.length && timingSafeEqual(a, b);
-        } catch {
-          ok = false;
-        }
-        if (!ok) return new Response("Unauthorized", { status: 401 });
 
         const { supabaseAdmin } = await import(
           "@/integrations/supabase/client.server"
@@ -32,7 +24,7 @@ export const Route = createFileRoute("/api/public/admin/bootstrap-vault")({
 
         const { error: e1 } = await supabaseAdmin.rpc("set_vault_secret", {
           _name: "EBAY_ORDER_SYNC_SECRET",
-          _value: expected,
+          _value: secret,
           _description: "eBay order sync shared secret (cron auth)",
         });
         if (e1) {
@@ -55,10 +47,13 @@ export const Route = createFileRoute("/api/public/admin/bootstrap-vault")({
           });
         }
 
-        return new Response(JSON.stringify({ ok: true }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            wrote: ["EBAY_ORDER_SYNC_SECRET", "EBAY_ORDER_SYNC_URL"],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
       },
     },
   },
