@@ -60,14 +60,6 @@ export function MarketplacePublishingPanel({ productId, product, onSaved }: Prop
                       onSaved={onSaved}
                     />
                   </div>
-                {m.id === "ebay" ? (
-                  <div className="pt-2">
-                    <EbayWorkflowPanel
-                      productId={productId}
-                      product={product}
-                      onSaved={onSaved}
-                    />
-                  </div>
                 ) : ASSISTED.includes(m.id) ? (
                   <AssistedPublishPanel
                     marketplace={m.id}
