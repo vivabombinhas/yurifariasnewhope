@@ -14,6 +14,11 @@ import { CheckCircle2, Plug, Send, Settings2, AlertCircle } from "lucide-react";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
 import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions";
 import { EbayWorkflowPanel } from "@/components/ebay/EbayWorkflowPanel";
+import { AssistedPublishPanel } from "@/components/AssistedPublishPanel";
+import { supabase } from "@/integrations/supabase/client";
+import { Tag, ShoppingBag } from "lucide-react";
+
+const ASSISTED: MarketplaceId[] = ["facebook_marketplace", "poshmark", "depop"];
 
 interface Props {
   productId: string;
@@ -56,6 +61,12 @@ export function MarketplacePublishingPanel({ productId, product, onSaved }: Prop
                       onSaved={onSaved}
                     />
                   </div>
+                ) : ASSISTED.includes(m.id) ? (
+                  <AssistedPublishPanel
+                    marketplace={m.id}
+                    productId={productId}
+                    onSaved={onSaved}
+                  />
                 ) : (
                   <div className="text-sm text-muted-foreground p-3">
                     {m.label} integration is not implemented yet.
@@ -81,7 +92,7 @@ function MarketplaceRow({
   productId: string;
   isOpen: boolean;
 }) {
-  // Only eBay has a real readiness check for now
+  // eBay has a real readiness check; assisted marketplaces use the listing row.
   const readinessFn = useServerFn(checkEbayReadiness);
   const readiness = useQuery({
     enabled: marketplace === "ebay",
@@ -90,42 +101,70 @@ function MarketplaceRow({
     staleTime: 30_000,
   });
 
-  let status: "not_connected" | "missing" | "ready" | "loading" = "not_connected";
-  let missingCount = 0;
+  const isAssisted = ASSISTED.includes(marketplace);
+  const assistedListing = useQuery({
+    enabled: isAssisted,
+    queryKey: ["assisted-listing-status", marketplace, productId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("marketplace_listings")
+        .select("status, listing_url")
+        .eq("product_id", productId)
+        .eq("marketplace", marketplace)
+        .maybeSingle();
+      return data;
+    },
+    staleTime: 10_000,
+  });
 
-  if (marketplace === "ebay") {
-    if (readiness.isLoading) status = "loading";
-    else if (readiness.data) {
+  const badge = (() => {
+    if (marketplace === "ebay") {
+      if (readiness.isLoading) return <Badge variant="outline">Checking…</Badge>;
+      if (!readiness.data) return null;
       const missing = readiness.data.checks.filter((c) => c.status !== "ok");
-      missingCount = missing.length;
       const accountMissing = readiness.data.checks.find(
         (c) => c.id === "account" && c.status !== "ok",
       );
-      if (accountMissing) status = "not_connected";
-      else status = missingCount === 0 ? "ready" : "missing";
-    }
-  }
-
-  const badge = (() => {
-    if (status === "loading") return <Badge variant="outline">Checking…</Badge>;
-    if (status === "not_connected")
-      return (
-        <Badge variant="outline" className="gap-1">
-          <Plug className="h-3 w-3" /> Not connected
-        </Badge>
-      );
-    if (status === "ready")
-      return (
-        <Badge variant="default" className="gap-1">
-          <CheckCircle2 className="h-3 w-3" /> Ready
-        </Badge>
-      );
-    if (status === "missing")
+      if (accountMissing)
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Plug className="h-3 w-3" /> Not connected
+          </Badge>
+        );
+      if (missing.length === 0)
+        return (
+          <Badge variant="default" className="gap-1">
+            <CheckCircle2 className="h-3 w-3" /> Ready
+          </Badge>
+        );
       return (
         <Badge variant="destructive" className="gap-1">
-          <AlertCircle className="h-3 w-3" /> {missingCount} missing
+          <AlertCircle className="h-3 w-3" /> {missing.length} missing
         </Badge>
       );
+    }
+    if (isAssisted) {
+      const s = assistedListing.data?.status;
+      if (s === "sold")
+        return (
+          <Badge variant="secondary" className="gap-1">
+            <ShoppingBag className="h-3 w-3" /> Sold
+          </Badge>
+        );
+      if (s === "active")
+        return (
+          <Badge variant="default" className="gap-1">
+            <CheckCircle2 className="h-3 w-3" /> Published
+          </Badge>
+        );
+      if (s === "draft")
+        return (
+          <Badge variant="outline" className="gap-1">
+            <Tag className="h-3 w-3" /> Ready to post
+          </Badge>
+        );
+      return <Badge variant="outline">Not prepared</Badge>;
+    }
     return null;
   })();
 
