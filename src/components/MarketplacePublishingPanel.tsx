@@ -14,6 +14,10 @@ import { CheckCircle2, Plug, Send, Settings2, AlertCircle } from "lucide-react";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
 import { checkEbayReadiness } from "@/lib/marketplaces/ebay/readiness.functions";
 import { EbayWorkflowPanel } from "@/components/ebay/EbayWorkflowPanel";
+import { AssistedPublishPanel } from "@/components/AssistedPublishPanel";
+import { supabase } from "@/integrations/supabase/client";
+
+const ASSISTED: MarketplaceId[] = ["facebook_marketplace", "poshmark", "depop"];
 
 interface Props {
   productId: string;
