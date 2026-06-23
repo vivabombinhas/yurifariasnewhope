@@ -117,7 +117,7 @@ export function EbayOrdersSyncPanel() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Last sync failed</AlertTitle>
             <AlertDescription>
-              {data.lastError?.message ?? "See raw error below."}
+              {(data.lastError as { message?: string } | null)?.message ?? "See raw error below."}
             </AlertDescription>
           </Alert>
         ) : null}
