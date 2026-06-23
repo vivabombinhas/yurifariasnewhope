@@ -647,6 +647,10 @@ export type Database = {
         Args: { _account_id: string }
         Returns: undefined
       }
+      set_vault_secret: {
+        Args: { _description?: string; _name: string; _value: string }
+        Returns: undefined
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       try_acquire_orders_sync_lock: {
