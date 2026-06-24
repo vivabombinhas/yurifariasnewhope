@@ -42,11 +42,11 @@ export function EbayShippingOriginPanel() {
   const loadError = q.data && !q.data.ok ? q.data.errorMessage : null;
 
   const [form, setForm] = useState({
-    name: "",
-    addressLine1: "",
-    city: "",
-    stateOrProvince: "",
-    postalCode: "",
+    name: "Main Warehouse",
+    addressLine1: "711 Shetland Trl",
+    city: "Cartersville",
+    stateOrProvince: "Georgia",
+    postalCode: "30121-1705",
   });
   const [hydrated, setHydrated] = useState(false);
   if (view && view.configured && !hydrated) {
