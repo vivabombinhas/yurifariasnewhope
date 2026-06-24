@@ -322,9 +322,43 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
           </Button>
         </div>
       )}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
+
+function MobileLauncher({
+  marketplace,
+  productId,
+  onSaved,
+}: {
+  marketplace: MarketplaceId;
+  productId: string;
+  onSaved?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={() => setOpen(true)}
+      >
+        <Smartphone className="mr-2 h-4 w-4" />
+        Start mobile posting
+      </Button>
+      <MobilePostingWizard
+        open={open}
+        onOpenChange={setOpen}
+        marketplace={marketplace}
+        productId={productId}
+        onSaved={onSaved}
+      />
+    </>
+  );
+}
+
 
 function FieldRow({
   label,
