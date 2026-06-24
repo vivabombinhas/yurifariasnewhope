@@ -370,6 +370,11 @@ export function MobilePostingWizard({
     setConfirmReset(false);
     try {
       await saveFn({ data: { productId, marketplace, progress: {}, reset: true } });
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {/* ignore */}
+      pendingPatch.current = {};
+      latestRef.current = {};
       setStep(0);
       setCopied([]);
       setPhotosPrepared(false);
@@ -381,6 +386,7 @@ export function MobilePostingWizard({
       toast.error((e as Error).message);
     }
   };
+
 
   return (
     <>
