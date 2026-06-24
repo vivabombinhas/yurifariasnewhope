@@ -8,12 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
   Copy,
   ExternalLink,
   Image as ImageIcon,
   Loader2,
+  Smartphone,
   ShoppingBag,
   Tag,
 } from "lucide-react";
@@ -24,6 +31,8 @@ import {
   markAssistedSold,
 } from "@/lib/marketplaces/assisted.functions";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
+import { MobilePostingWizard } from "@/components/MobilePostingWizard";
+
 
 interface Props {
   marketplace: MarketplaceId;
