@@ -128,7 +128,19 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
   const isSold = status === "sold";
 
   return (
-    <div className="space-y-4 p-3">
+    <div className="space-y-3 p-3">
+      {/* Mobile wizard launcher — primary action */}
+      <MobileLauncher marketplace={marketplace} productId={productId} onSaved={onSaved} />
+
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
+            Advanced manual posting
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-3">
+
       {/* Status row */}
       <div className="flex flex-wrap items-center gap-2">
         {isSold ? (
