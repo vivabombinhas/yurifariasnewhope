@@ -200,6 +200,18 @@ export function MobilePostingWizard({
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, [open]);
 
+  const publish = useMutation({
+    mutationFn: (listingUrl: string) =>
+      publishFn({ data: { productId, marketplace, listingUrl } }),
+    onSuccess: () => {
+      toast.success("Marked as published");
+      qc.invalidateQueries({ queryKey });
+      qc.invalidateQueries({ queryKey: ["assisted-listing-status", marketplace, productId] });
+      onSaved?.();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (!open) return null;
 
   const fields = q.data?.payload.fields ?? [];
@@ -241,17 +253,6 @@ export function MobilePostingWizard({
     void persist({ checklist: next }, true);
   };
 
-  const publish = useMutation({
-    mutationFn: (listingUrl: string) =>
-      publishFn({ data: { productId, marketplace, listingUrl } }),
-    onSuccess: () => {
-      toast.success("Marked as published");
-      qc.invalidateQueries({ queryKey });
-      qc.invalidateQueries({ queryKey: ["assisted-listing-status", marketplace, productId] });
-      onSaved?.();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const validateUrl = (raw: string): { ok: true; url: string } | { ok: false; reason: string } => {
     try {
