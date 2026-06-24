@@ -17,6 +17,7 @@ import {
 import { RouteError } from "@/components/RouteError";
 import { MarketplaceConnections } from "@/components/MarketplaceConnections";
 import { EbayOrdersSyncPanel } from "@/components/EbayOrdersSyncPanel";
+import { EbayShippingOriginPanel } from "@/components/EbayShippingOriginPanel";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Inventory" }] }),
@@ -32,6 +33,7 @@ function SettingsPage() {
       <h1 className="text-2xl font-semibold">{t("settings.title")}</h1>
 
       <MarketplaceConnections />
+      <EbayShippingOriginPanel />
       <EbayOrdersSyncPanel />
 
       <Card>
