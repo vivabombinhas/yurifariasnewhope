@@ -462,77 +462,11 @@ export async function ensureValidMerchantLocation(
     if (found) candidate = { key: found.merchantLocationKey, loc: found };
   }
 
-  // Still nothing — create a fresh location with a new key
+  // No valid location configured — DO NOT auto-create a generic warehouse.
   if (!candidate || !locationIsValid(candidate.loc, expectedCountry)) {
-    const newKey = `loc_${Date.now()}`;
-    const body = {
-      location: {
-        address: {
-          country: "US",
-          city: "San Jose",
-          stateOrProvince: "CA",
-          postalCode: "95125",
-          addressLine1: "2025 Hamilton Ave",
-        },
-      },
-      locationInstructions: "Items ship from here",
-      name: "Default Warehouse",
-      merchantLocationStatus: "ENABLED",
-      locationTypes: ["WAREHOUSE"],
-    };
-    const createRes = await ebayFetch(
-      env,
-      "POST",
-      `/sell/inventory/v1/location/${encodeURIComponent(newKey)}`,
-      token,
-      body,
+    throw new Error(
+      "Configure your eBay shipping origin in Settings before publishing.",
     );
-    if (!createRes.ok && createRes.status !== 409) {
-      throw new Error(
-        `INVALID_MERCHANT_LOCATION: failed to create location ${newKey}: ${ebayErrorMessage(createRes.status, createRes.json, createRes.text)}`,
-      );
-    }
-    // Ensure enabled (best-effort)
-    await ebayFetch(
-      env,
-      "POST",
-      `/sell/inventory/v1/location/${encodeURIComponent(newKey)}/enable`,
-      token,
-    );
-    const verify = await fetchLocation(env, token, newKey);
-    if (!verify.ok || !verify.json || !locationIsValid(verify.json, expectedCountry)) {
-      const addr = verify.json?.location?.address ?? {};
-      throw new Error(
-        `INVALID_MERCHANT_LOCATION: ${JSON.stringify({
-          merchantLocationKey: newKey,
-          status: verify.json?.merchantLocationStatus,
-          country: addr.country,
-          postalCode: addr.postalCode,
-          city: addr.city,
-          stateOrProvince: addr.stateOrProvince,
-        })}`,
-      );
-    }
-    candidate = { key: newKey, loc: verify.json };
-
-    // Persist new key
-    const { error: upErr } = await supabase
-      .from("marketplace_accounts")
-      .update({ merchant_location_key: newKey })
-      .eq("marketplace", "ebay")
-      .eq("environment", env);
-    if (upErr) throw upErr;
-
-    const addr = verify.json.location?.address ?? {};
-    return {
-      merchantLocationKey: newKey,
-      status: verify.json.merchantLocationStatus,
-      country: addr.country,
-      postalCode: addr.postalCode,
-      city: addr.city,
-      stateOrProvince: addr.stateOrProvince,
-      created: true,
-    };
   }
 
   // Persist saved key if it differs from current account row

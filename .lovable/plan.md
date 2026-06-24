@@ -1,53 +1,56 @@
-# Modo Fila (Batch) — Cadastro em massa
+# eBay Shipping Origin
 
-Nova página `/products/batch` que permite cadastrar muitos produtos de uma vez, com IA agrupando fotos automaticamente e analisando em lote com 3 análises paralelas.
+Adds a Settings panel to view/edit the eBay Inventory Location used as shipping origin, removes the silent fallback to a generic California address, and lets the user retro-apply the new origin to active listings created by the system.
 
-## Fluxo do usuário
+## Files
 
-1. **Upload em massa**: usuário solta/seleciona N fotos (de vários produtos misturados).
-2. **Agrupar com IA**: clica em "Agrupar fotos" → IA visualiza todas as fotos e retorna grupos por produto (ex: fotos 1,3,7 = produto A; fotos 2,5 = produto B…).
-3. **Ajuste manual** (caso IA erre): usuário pode arrastar fotos entre grupos, mesclar grupos ou separar.
-4. **Analisar lote**: clica em "Analisar todos" → cria drafts (1 por grupo), faz upload das fotos, e roda `analyzeProductWithAI` com concorrência máx. 3.
-5. **Revisão inline**: tabela com 1 linha por produto mostrando capa + título/marca/categoria/condição/preço editáveis + status (`pending → uploading → analyzing → ready → error`).
-6. **Salvar tudo**: confirma os drafts em massa e leva para `/products`.
+**New**
+- `src/lib/marketplaces/ebay/shipping-origin.server.ts` — pure eBay/Supabase logic.
+- `src/lib/marketplaces/ebay/shipping-origin.functions.ts` — `createServerFn` wrappers.
+- `src/components/EbayShippingOriginPanel.tsx` — UI panel.
 
-## Mudanças técnicas
+**Edited**
+- `src/lib/marketplaces/ebay/seller-setup.server.ts` — `ensureValidMerchantLocation`: stop creating a generic CA warehouse. If no valid location is configured, throw `MERCHANT_LOCATION_NOT_CONFIGURED` with the message `Configure your eBay shipping origin in Settings before publishing.`
+- `src/lib/marketplaces/ebay/publish.functions.ts` — map that error to a user-facing block (already returns `errorMessage`; just preserve text).
+- `src/routes/_authenticated/settings.tsx` — render `EbayShippingOriginPanel` under the eBay section.
 
-### Backend (server functions)
+## Server functions
 
-**`src/lib/batch-grouping.functions.ts`** (novo)
-- `groupPhotosBySimilarity({ photoIds: string[] })` — recebe IDs de fotos já em um bucket de staging (`product-photos`, em path `staging/{userId}/...`), gera URLs assinadas, e chama Lovable AI (`google/gemini-3-flash-preview`) com `Output.object` pedindo `{ groups: number[][] }`. Retorna agrupamento por índices.
-- Usa `requireSupabaseAuth`.
+In `shipping-origin.functions.ts` (all `requireSupabaseAuth`):
 
-**Staging de fotos**: reutiliza bucket `product-photos` com prefixo `staging/{userId}/{sessionId}/`. Quando um draft é criado a partir do grupo, fotos são movidas para `{productId}/`. Se sessão for descartada, é feito cleanup.
+1. `getEbayShippingOrigin` — reads `marketplace_accounts.merchant_location_key`, then `GET /sell/inventory/v1/location/{key}`. Returns `{ ok, merchantLocationKey, name, locationTypes, merchantLocationStatus, addressLine1, city, stateOrProvince, postalCode, country }` or `{ ok:false, configured:false }` when no key.
+2. `saveEbayShippingOrigin({ name, addressLine1, city, stateOrProvince, postalCode })` — country fixed `US`.
+   - If no key saved → create new `WAREHOUSE` with `merchantLocationKey = loc_<ts>`, enable, GET to verify, persist key.
+   - If current is `WAREHOUSE` or `STORE` → GET, merge name + address, `POST /location/{key}/update_location_details`, GET to verify, keep key.
+   - If current is `FULFILLMENT_CENTER` → create new `WAREHOUSE` with new key, enable, verify, persist new key. Do not delete the old one.
+3. `countActiveSystemEbayListings` — counts `marketplace_listings` where `marketplace='ebay'`, `status='active'`, `external_listing_id` not null.
+4. `applyShippingOriginToActiveListings` — for each active listing: fetch the offer, replace only `merchantLocationKey`, PUT full body back (reusing `setOfferMerchantLocation`). Returns per-listing `{ listingId, ok, error? }`.
 
-### Frontend
+All use existing `getValidEbayAccessToken` + `ebayFetch`.
 
-**`src/routes/_authenticated/products.batch.tsx`** (novo)
-- Estado local: `photos: StagedPhoto[]`, `groups: { id: string; photoIndexes: number[] }[]`, `drafts: BatchDraft[]`.
-- Concorrência: helper `runWithConcurrency(tasks, 3)` que processa fila de 3 em 3.
-- Componentes inline (no mesmo arquivo, simples): `PhotoGrid`, `GroupCard` (com botão "separar"/"mesclar com..."), `DraftRow` (editável).
+## UI
 
-**`src/lib/concurrency.ts`** (novo, pequeno)
-- `runWithConcurrency<T,R>(items: T[], limit: number, fn: (item:T, i:number) => Promise<R>): Promise<R[]>` — utilitário genérico.
+`EbayShippingOriginPanel` (in Settings):
+- Header **eBay Shipping origin**.
+- Current location block: human-readable `Shipping from: City, State ZIP, United States` + small details (key, name, type, status).
+- Form (controlled): Location name, Address, City, State, ZIP, Country (disabled = `US`). Submit = **Save eBay shipping origin** → calls `saveEbayShippingOrigin`, invalidates query, toasts.
+- Below: **Apply shipping origin to active eBay listings** button → opens AlertDialog showing count + confirmation; on confirm calls `applyShippingOriginToActiveListings` and renders per-listing results.
 
-**`src/routes/_authenticated/products.index.tsx`**
-- Adicionar botão secundário "Cadastro em lote" ao lado do "+ Novo", apontando para `/products/batch`.
+## Publish guardrail
 
-### i18n
-Adicionar chaves em `src/lib/i18n.tsx`: `batch.title`, `batch.upload`, `batch.group`, `batch.grouping`, `batch.analyze`, `batch.analyzing`, `batch.saveAll`, `batch.status.pending|uploading|analyzing|ready|error`, etc.
+`ensureValidMerchantLocation` no longer auto-creates a CA warehouse. If the saved key is missing/invalid and no valid location exists on the account, throw an error whose message is exactly:
 
-## Escopo desta entrega (V1)
+`Configure your eBay shipping origin in Settings before publishing.`
 
-- ✅ Upload em massa + agrupamento por IA
-- ✅ Ajuste manual de grupos (mover/mesclar/separar)
-- ✅ Análise em lote com 3 paralelos
-- ✅ Edição inline + salvar tudo
-- ❌ **Não inclui**: publicar no eBay em lote (continua 1 por 1 na página do produto). Isso fica para próxima iteração se você quiser.
-- ❌ Não inclui: progresso persistido (se fechar a aba, perde a sessão). Mantido simples para V1.
+`publish.functions.ts` already surfaces this `errorMessage` to the UI.
 
-## Por que essa abordagem
+## Out of scope (explicit)
 
-- **Reaproveita** `analyzeProductWithAI`, `prepareImageForUpload`, bucket `product-photos`, schema atual — zero migração de banco.
-- **Modular**: agrupamento e concorrência ficam em arquivos próprios, não poluem a página existente.
-- **Sem regressão**: página `/products/new` (1 produto) continua intacta.
+No changes to fulfillment policy, shipping cost, handling time, return policy, payment policy, or Sales Sync.
+
+```text
+Settings → eBay Shipping origin
+ ├── Current: Shipping from: Cartersville, Georgia 30121, United States
+ ├── [Form: name, address, city, state, ZIP, country=US (disabled)]  [Save]
+ └── [Apply shipping origin to active eBay listings] → confirm dialog
+```
