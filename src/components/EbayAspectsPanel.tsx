@@ -404,6 +404,21 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
           );
         })()}
       </CardContent>
+      <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] flex items-center gap-2">
+        <div className="text-xs text-muted-foreground flex-1 min-w-0 truncate">
+          {requiredMissing
+            ? `Missing: ${missingRequired.join(", ")}`
+            : "All required filled"}
+        </div>
+        <Button
+          size="sm"
+          onClick={() => saveMut.mutate()}
+          disabled={saveMut.isPending || aspectsQ.isLoading || requiredMissing}
+        >
+          <Save className="h-4 w-4 mr-1" />
+          {saveMut.isPending ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </Card>
   );
 }
