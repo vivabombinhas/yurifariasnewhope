@@ -134,10 +134,34 @@ export function MobilePostingWizard({
     staleTime: 10_000,
   });
 
-  const initialProgress: Progress = useMemo(() => {
+  const storageKey = `mpw:progress:${marketplace}:${productId}`;
+
+  // Read any locally-cached progress synchronously so the wizard hydrates
+  // instantly even if the server query is still loading or offline.
+  const localProgress: Progress = useMemo(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      return raw ? (JSON.parse(raw) as Progress) : {};
+    } catch {
+      return {};
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey, open]);
+
+  const serverProgress: Progress = useMemo(() => {
     const pm = (q.data?.listing?.provider_metadata as any) ?? {};
     return (pm.mobilePostingProgress as Progress) ?? {};
   }, [q.data]);
+
+  // Merge: prefer the most recently updated source, field-by-field fall back.
+  const initialProgress: Progress = useMemo(() => {
+    const ls = localProgress.updatedAt ? Date.parse(localProgress.updatedAt) : 0;
+    const ss = serverProgress.updatedAt ? Date.parse(serverProgress.updatedAt) : 0;
+    const primary = ls >= ss ? localProgress : serverProgress;
+    const secondary = ls >= ss ? serverProgress : localProgress;
+    return { ...secondary, ...primary };
+  }, [localProgress, serverProgress]);
 
   const [step, setStep] = useState(0);
   const [copied, setCopied] = useState<string[]>([]);
@@ -150,60 +174,116 @@ export function MobilePostingWizard({
   );
   const [confirmReset, setConfirmReset] = useState(false);
   const hydrated = useRef(false);
+  // Accumulates the live state so we can always flush the latest snapshot,
+  // even if a debounced save is mid-flight when the user backgrounds the app.
+  const latestRef = useRef<Progress>({});
 
-  // Hydrate from server progress once per open.
+  // Hydrate once per open from the merged local+server snapshot.
   useEffect(() => {
     if (!open) {
       hydrated.current = false;
       return;
     }
-    if (hydrated.current || !q.data) return;
+    // We can hydrate from localStorage even before the server query resolves.
+    if (hydrated.current) return;
+    if (!q.data && !localProgress.updatedAt) return;
     hydrated.current = true;
-    setStep(initialProgress.currentStep ?? 0);
-    setCopied(initialProgress.copiedFields ?? []);
-    setPhotosPrepared(initialProgress.photosPrepared ?? false);
-    setMarketplaceOpened(initialProgress.marketplaceOpened ?? false);
-    setChecklist(initialProgress.checklist ?? {});
-  }, [open, q.data, initialProgress]);
+    const init = initialProgress;
+    setStep(init.currentStep ?? 0);
+    setCopied(init.copiedFields ?? []);
+    setPhotosPrepared(init.photosPrepared ?? false);
+    setMarketplaceOpened(init.marketplaceOpened ?? false);
+    setChecklist(init.checklist ?? {});
+    latestRef.current = { ...init };
+  }, [open, q.data, initialProgress, localProgress.updatedAt]);
 
-  // Debounced save; pass `immediate` for milestone events.
+  // Debounced save with localStorage write-through and serialized in-flight
+  // writes. Local storage is the source of truth across reloads; the server
+  // is best-effort and retried on failure.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlight = useRef<Promise<unknown> | null>(null);
+  const pendingPatch = useRef<Progress>({});
 
-  const persist = async (patch: Partial<Progress>, immediate = false) => {
-    if (!open || !hydrated.current) return;
-    const run = async () => {
+  const writeLocal = (next: Progress) => {
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      /* quota / private mode — ignore */
+    }
+  };
+
+  const flushNow = async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const patch = pendingPatch.current;
+    if (!patch || Object.keys(patch).length === 0) return;
+    pendingPatch.current = {};
+    const attempt = async (tries: number): Promise<void> => {
       try {
-        // Serialize writes to avoid races.
         if (inFlight.current) await inFlight.current.catch(() => {});
         const p = saveFn({ data: { productId, marketplace, progress: patch } });
         inFlight.current = p;
         await p;
       } catch (e) {
         console.warn("[wizard] save failed", e);
+        if (tries > 0) {
+          await new Promise((r) => setTimeout(r, 600));
+          return attempt(tries - 1);
+        }
       } finally {
         inFlight.current = null;
       }
     };
+    await attempt(2);
+  };
+
+  const persist = async (patch: Partial<Progress>, immediate = false) => {
+    if (!open || !hydrated.current) return;
+    const now = new Date().toISOString();
+    const merged: Progress = { ...latestRef.current, ...patch, updatedAt: now };
+    latestRef.current = merged;
+    pendingPatch.current = { ...pendingPatch.current, ...patch, updatedAt: now };
+    // Always mirror to localStorage immediately — survives crash/close/offline.
+    writeLocal(merged);
     if (immediate) {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      await run();
+      await flushNow();
       return;
     }
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(run, 400);
+    saveTimer.current = setTimeout(() => {
+      void flushNow();
+    }, 400);
   };
 
-  // Flush on close.
+  // Flush pending writes on close, tab hide, navigation, or app background.
+  // Mobile browsers often skip 'beforeunload'; pagehide + visibilitychange
+  // are the reliable signals.
   useEffect(() => {
-    if (open) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (!open) return;
+    const handler = () => {
+      if (document.visibilityState === "hidden") void flushNow();
+    };
+    const onPageHide = () => void flushNow();
+    document.addEventListener("visibilitychange", handler);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", handler);
+      window.removeEventListener("pagehide", onPageHide);
+      void flushNow();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
 
   const publish = useMutation({
     mutationFn: (listingUrl: string) =>
       publishFn({ data: { productId, marketplace, listingUrl } }),
     onSuccess: () => {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {/* ignore */}
       toast.success("Marked as published");
       qc.invalidateQueries({ queryKey });
       qc.invalidateQueries({ queryKey: ["assisted-listing-status", marketplace, productId] });
@@ -211,6 +291,7 @@ export function MobilePostingWizard({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (!open) return null;
 
@@ -289,6 +370,11 @@ export function MobilePostingWizard({
     setConfirmReset(false);
     try {
       await saveFn({ data: { productId, marketplace, progress: {}, reset: true } });
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {/* ignore */}
+      pendingPatch.current = {};
+      latestRef.current = {};
       setStep(0);
       setCopied([]);
       setPhotosPrepared(false);
@@ -300,6 +386,7 @@ export function MobilePostingWizard({
       toast.error((e as Error).message);
     }
   };
+
 
   return (
     <>
