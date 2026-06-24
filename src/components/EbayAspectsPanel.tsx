@@ -231,13 +231,16 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
   const requiredMissing = missingRequired.length > 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base flex items-center gap-2">
-          <ListChecks className="h-4 w-4" /> eBay Item Specifics
+    <Card className="pb-20 sm:pb-0">
+      <CardHeader className="space-y-3 sm:flex sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+        <CardTitle className="text-base flex items-center gap-2 min-w-0">
+          <ListChecks className="h-4 w-4 shrink-0" />
+          <span className="truncate">eBay Item Specifics</span>
         </CardTitle>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">Cat: {product.ebay_category_name ?? categoryId}</Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="max-w-full truncate">
+            Cat: {product.ebay_category_name ?? categoryId}
+          </Badge>
           <Button
             size="sm"
             variant="outline"
@@ -254,6 +257,7 @@ export function EbayAspectsPanel({ product, onSaved }: Props) {
             size="sm"
             onClick={() => saveMut.mutate()}
             disabled={saveMut.isPending || aspectsQ.isLoading || requiredMissing}
+            className="hidden sm:inline-flex"
           >
             <Save className="h-4 w-4 mr-1" />
             {saveMut.isPending ? "Saving…" : "Save"}
