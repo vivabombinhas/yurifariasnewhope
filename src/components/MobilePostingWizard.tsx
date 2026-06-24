@@ -281,6 +281,9 @@ export function MobilePostingWizard({
     mutationFn: (listingUrl: string) =>
       publishFn({ data: { productId, marketplace, listingUrl } }),
     onSuccess: () => {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {/* ignore */}
       toast.success("Marked as published");
       qc.invalidateQueries({ queryKey });
       qc.invalidateQueries({ queryKey: ["assisted-listing-status", marketplace, productId] });
@@ -288,6 +291,7 @@ export function MobilePostingWizard({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
 
   if (!open) return null;
 
