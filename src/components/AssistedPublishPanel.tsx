@@ -8,12 +8,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
   Copy,
   ExternalLink,
   Image as ImageIcon,
   Loader2,
+  Smartphone,
   ShoppingBag,
   Tag,
 } from "lucide-react";
@@ -24,6 +31,8 @@ import {
   markAssistedSold,
 } from "@/lib/marketplaces/assisted.functions";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
+import { MobilePostingWizard } from "@/components/MobilePostingWizard";
+
 
 interface Props {
   marketplace: MarketplaceId;
@@ -119,7 +128,19 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
   const isSold = status === "sold";
 
   return (
-    <div className="space-y-4 p-3">
+    <div className="space-y-3 p-3">
+      {/* Mobile wizard launcher — primary action */}
+      <MobileLauncher marketplace={marketplace} productId={productId} onSaved={onSaved} />
+
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-between text-xs">
+            Advanced manual posting
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-4 pt-3">
+
       {/* Status row */}
       <div className="flex flex-wrap items-center gap-2">
         {isSold ? (
@@ -301,9 +322,43 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
           </Button>
         </div>
       )}
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }
+
+function MobileLauncher({
+  marketplace,
+  productId,
+  onSaved,
+}: {
+  marketplace: MarketplaceId;
+  productId: string;
+  onSaved?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        size="lg"
+        className="w-full"
+        onClick={() => setOpen(true)}
+      >
+        <Smartphone className="mr-2 h-4 w-4" />
+        Start mobile posting
+      </Button>
+      <MobilePostingWizard
+        open={open}
+        onOpenChange={setOpen}
+        marketplace={marketplace}
+        productId={productId}
+        onSaved={onSaved}
+      />
+    </>
+  );
+}
+
 
 function FieldRow({
   label,

@@ -271,7 +271,81 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
 const SoldInput = z.object({
   productId: z.string().uuid(),
   marketplace: Marketplace,
+  });
+
+const ProgressInput = z.object({
+  productId: z.string().uuid(),
+  marketplace: Marketplace,
+  progress: z.record(z.string(), z.any()),
+  reset: z.boolean().optional(),
 });
+
+/**
+ * Merge a partial mobilePostingProgress object into provider_metadata.
+ * Never touches listing_url, published_at, status, or other provider_metadata keys.
+ * When `reset: true`, clears only the mobilePostingProgress key.
+ */
+export const saveMobileProgress = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ProgressInput.parse(input))
+  .handler(async ({ data, context }) => {
+    if (!ASSISTED.has(data.marketplace)) throw new Error("Not an assisted marketplace.");
+    const { supabase } = context;
+
+    // RLS check: the read enforces the user can access this product's listing scope.
+    const { data: product, error: prodErr } = await supabase
+      .from("products")
+      .select("id")
+      .eq("id", data.productId)
+      .maybeSingle();
+    if (prodErr) throw new Error(prodErr.message);
+    if (!product) throw new Error("Product not found");
+
+    const { data: existing } = await supabase
+      .from("marketplace_listings")
+      .select("id, provider_metadata")
+      .eq("product_id", data.productId)
+      .eq("marketplace", data.marketplace)
+      .maybeSingle();
+
+    const now = new Date().toISOString();
+    const currentMeta = (existing?.provider_metadata as Record<string, any>) ?? {};
+    const currentProgress =
+      (currentMeta.mobilePostingProgress as Record<string, any>) ?? {};
+
+    const nextProgress = data.reset
+      ? null
+      : { ...currentProgress, ...data.progress, updatedAt: now };
+
+    const nextMeta: Record<string, any> = { ...currentMeta };
+    if (nextProgress === null) delete nextMeta.mobilePostingProgress;
+    else nextMeta.mobilePostingProgress = nextProgress;
+
+    if (existing) {
+      const { error } = await supabase
+        .from("marketplace_listings")
+        .update({ provider_metadata: nextMeta })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+      return { ok: true, progress: nextProgress };
+    }
+
+    // No row yet — create a draft only if we have progress to save.
+    if (nextProgress === null) return { ok: true, progress: null };
+    const { error } = await supabase.from("marketplace_listings").insert({
+      product_id: data.productId,
+      marketplace: data.marketplace,
+      status: "draft",
+      provider_metadata: {
+        assisted: true,
+        prepared_at: now,
+        mobilePostingProgress: nextProgress,
+      },
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true, progress: nextProgress };
+  });
+
 
 export const markAssistedSold = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
