@@ -25,6 +25,22 @@ import {
   type ApplyResult,
 } from "@/lib/marketplaces/ebay/shipping-origin.functions";
 
+const DEFAULT_SHIPPING_ORIGIN_FORM = {
+  name: "Default Warehouse",
+  addressLine1: "711 Shetland Trl",
+  city: "Cartersville",
+  stateOrProvince: "GA",
+  postalCode: "30121-1705",
+};
+
+const normAddressValue = (s: string | null | undefined) =>
+  (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const stateMatchesGeorgia = (s: string | null | undefined) => {
+  const normalized = normAddressValue(s);
+  return normalized === "ga" || normalized === "georgia";
+};
+
 export function EbayShippingOriginPanel() {
   const qc = useQueryClient();
   const getFn = useServerFn(getEbayShippingOrigin);
@@ -41,23 +57,25 @@ export function EbayShippingOriginPanel() {
   const view = q.data?.ok ? q.data.view : null;
   const loadError = q.data && !q.data.ok ? q.data.errorMessage : null;
 
-  const [form, setForm] = useState({
-    name: "Main Warehouse",
-    addressLine1: "711 Shetland Trl",
-    city: "Cartersville",
-    stateOrProvince: "Georgia",
-    postalCode: "30121-1705",
-  });
+  const [form, setForm] = useState(DEFAULT_SHIPPING_ORIGIN_FORM);
   const [hydrated, setHydrated] = useState(false);
   if (view && view.configured && !hydrated) {
     setHydrated(true);
-    setForm({
-      name: view.name ?? "",
-      addressLine1: view.addressLine1 ?? "",
-      city: view.city ?? "",
-      stateOrProvince: view.stateOrProvince ?? "",
-      postalCode: view.postalCode ?? "",
-    });
+    const ebayAddressMatchesDefault =
+      normAddressValue(view.name) === normAddressValue(DEFAULT_SHIPPING_ORIGIN_FORM.name) &&
+      normAddressValue(view.addressLine1) === normAddressValue(DEFAULT_SHIPPING_ORIGIN_FORM.addressLine1) &&
+      normAddressValue(view.city) === normAddressValue(DEFAULT_SHIPPING_ORIGIN_FORM.city) &&
+      stateMatchesGeorgia(view.stateOrProvince) &&
+      normAddressValue(view.postalCode) === normAddressValue(DEFAULT_SHIPPING_ORIGIN_FORM.postalCode);
+    if (ebayAddressMatchesDefault) {
+      setForm({
+        name: view.name ?? "",
+        addressLine1: view.addressLine1 ?? "",
+        city: view.city ?? "",
+        stateOrProvince: stateMatchesGeorgia(view.stateOrProvince) ? "GA" : (view.stateOrProvince ?? ""),
+        postalCode: view.postalCode ?? "",
+      });
+    }
   }
 
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -95,19 +113,20 @@ export function EbayShippingOriginPanel() {
       ? `Shipping from: ${view.city}, ${view.stateOrProvince} ${view.postalCode}, United States`
       : null;
 
-  const norm = (s: string | null | undefined) =>
-    (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
   const mismatchFields: { label: string; ebay: string; form: string }[] = [];
   if (view?.configured) {
-    const pairs: [string, string | null | undefined, string][] = [
+    const pairs: [string, string | null | undefined, string, ((value: string | null | undefined) => string | boolean)?][] = [
       ["Name", view.name, form.name],
       ["Address", view.addressLine1, form.addressLine1],
       ["City", view.city, form.city],
-      ["State", view.stateOrProvince, form.stateOrProvince],
+      ["State", view.stateOrProvince, form.stateOrProvince, stateMatchesGeorgia],
       ["ZIP", view.postalCode, form.postalCode],
     ];
-    for (const [label, ebay, formVal] of pairs) {
-      if (norm(ebay) !== norm(formVal)) {
+    for (const [label, ebay, formVal, customCompare] of pairs) {
+      const matches = customCompare
+        ? customCompare(ebay) && customCompare(formVal)
+        : normAddressValue(ebay) === normAddressValue(formVal);
+      if (!matches) {
         mismatchFields.push({
           label,
           ebay: ebay ?? "—",
@@ -263,7 +282,7 @@ export function EbayShippingOriginPanel() {
                 onChange={(e) =>
                   setForm({ ...form, stateOrProvince: e.target.value })
                 }
-                placeholder="e.g. Georgia"
+                placeholder="e.g. GA"
                 required
               />
             </div>
