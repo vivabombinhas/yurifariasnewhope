@@ -69,20 +69,24 @@ function requiredLocationCreateBody() {
 }
 
 function requiredLocationUpdateBody(current: any) {
-  const currentAddr = current?.location?.address ?? current?.address ?? {};
+  const currentLocation = current?.location ?? {};
+  const currentAddr = currentLocation?.address ?? current?.address ?? {};
   return {
     name: REQUIRED_SHIPPING_ORIGIN.name,
     locationInstructions: current?.locationInstructions ?? "Items ship from here",
     locationAdditionalInformation: current?.locationAdditionalInformation,
     locationWebUrl: current?.locationWebUrl,
     phone: current?.phone,
-    address: {
-      ...currentAddr,
-      country: REQUIRED_SHIPPING_ORIGIN.country,
-      city: REQUIRED_SHIPPING_ORIGIN.city,
-      stateOrProvince: REQUIRED_SHIPPING_ORIGIN.stateOrProvince,
-      postalCode: REQUIRED_SHIPPING_ORIGIN.postalCode,
-      addressLine1: REQUIRED_SHIPPING_ORIGIN.addressLine1,
+    location: {
+      ...currentLocation,
+      address: {
+        ...currentAddr,
+        country: REQUIRED_SHIPPING_ORIGIN.country,
+        city: REQUIRED_SHIPPING_ORIGIN.city,
+        stateOrProvince: REQUIRED_SHIPPING_ORIGIN.stateOrProvince,
+        postalCode: REQUIRED_SHIPPING_ORIGIN.postalCode,
+        addressLine1: REQUIRED_SHIPPING_ORIGIN.addressLine1,
+      },
     },
   };
 }

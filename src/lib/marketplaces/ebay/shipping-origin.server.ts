@@ -172,20 +172,24 @@ async function updateExistingLocationDetails(
   current: any,
   input: SaveOriginInput,
 ) {
-  const currentAddr = current?.location?.address ?? {};
+  const currentLocation = current?.location ?? {};
+  const currentAddr = currentLocation?.address ?? {};
   const body = {
     name: input.name,
     locationInstructions: current?.locationInstructions,
     locationAdditionalInformation: current?.locationAdditionalInformation,
     locationWebUrl: current?.locationWebUrl,
     phone: current?.phone,
-    address: {
-      ...currentAddr,
-      country: "US",
-      city: input.city,
-      stateOrProvince: input.stateOrProvince,
-      postalCode: input.postalCode,
-      addressLine1: input.addressLine1,
+    location: {
+      ...currentLocation,
+      address: {
+        ...currentAddr,
+        country: "US",
+        city: input.city,
+        stateOrProvince: input.stateOrProvince,
+        postalCode: input.postalCode,
+        addressLine1: input.addressLine1,
+      },
     },
   };
   const res = await ebayFetch(
