@@ -281,15 +281,6 @@ export async function createSandboxReturnPolicy(): Promise<{ id: string }> {
  * preflight flips to Ready. Fetches the offer, merges merchantLocationKey
  * + listingPolicies, and PUTs the full body back.
  */
-export async function syncOfferWithSellerSetup(offerId: string): Promise<{
-  ok: true;
-  applied: {
-    merchantLocationKey?: string;
-    fulfillmentPolicyId?: string;
-    paymentPolicyId?: string;
-    returnPolicyId?: string;
-  };
-}>;
 export async function syncOfferWithSellerSetup(
   offerId: string,
   merchantLocationKeyOverride?: string,
