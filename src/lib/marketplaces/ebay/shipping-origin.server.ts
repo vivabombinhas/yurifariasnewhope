@@ -31,6 +31,14 @@ export interface ShippingOriginView {
   country?: string | null;
 }
 
+export interface SaveOriginInput {
+  name: string;
+  addressLine1: string;
+  city: string;
+  stateOrProvince: string;
+  postalCode: string;
+}
+
 const DEFAULT_SHIPPING_ORIGIN: SaveOriginInput = {
   name: "Default Warehouse",
   addressLine1: "711 Shetland Trl",
@@ -38,6 +46,26 @@ const DEFAULT_SHIPPING_ORIGIN: SaveOriginInput = {
   stateOrProvince: "GA",
   postalCode: "30121-1705",
 };
+
+function norm(s: unknown) {
+  return String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function stateMatchesGeorgia(state: unknown) {
+  const normalized = norm(state);
+  return normalized === "ga" || normalized === "georgia";
+}
+
+function matchesRequiredAddress(view: ShippingOriginView) {
+  return (
+    view.merchantLocationStatus === "ENABLED" &&
+    view.country === "US" &&
+    norm(view.addressLine1) === norm(DEFAULT_SHIPPING_ORIGIN.addressLine1) &&
+    norm(view.city) === norm(DEFAULT_SHIPPING_ORIGIN.city) &&
+    stateMatchesGeorgia(view.stateOrProvince) &&
+    norm(view.postalCode) === norm(DEFAULT_SHIPPING_ORIGIN.postalCode)
+  );
+}
 
 function flatten(key: string, json: any): ShippingOriginView {
   const addr = json?.location?.address ?? json?.address ?? {};
@@ -84,14 +112,6 @@ export async function getShippingOrigin(
   const res = await getLocation(token, account.merchant_location_key);
   if (!res.ok || !res.json) return { configured: false };
   return flatten(account.merchant_location_key, res.json);
-}
-
-export interface SaveOriginInput {
-  name: string;
-  addressLine1: string;
-  city: string;
-  stateOrProvince: string;
-  postalCode: string;
 }
 
 async function persistKey(
@@ -183,14 +203,11 @@ async function updateExistingLocationDetails(
 }
 
 function verifyAddress(view: ShippingOriginView) {
-  if (
-    view.country !== "US" ||
-    !view.postalCode ||
-    !view.city ||
-    !view.stateOrProvince
-  ) {
+  if (!matchesRequiredAddress(view)) {
     throw new Error(
-      `Location verification failed: missing city/state/zip/country. Got: ${JSON.stringify({
+      `Location verification failed: expected Default Warehouse, 711 Shetland Trl, Cartersville, GA 30121-1705, US. Got: ${JSON.stringify({
+        name: view.name,
+        address: view.addressLine1,
         city: view.city,
         state: view.stateOrProvince,
         postalCode: view.postalCode,
@@ -262,13 +279,7 @@ export async function requireConfiguredShippingOrigin(
   const res = await getLocation(token, account.merchant_location_key);
   if (!res.ok || !res.json) throw new Error(NOT_CONFIGURED_MSG);
   const view = flatten(account.merchant_location_key, res.json);
-  if (
-    view.merchantLocationStatus !== "ENABLED" ||
-    view.country !== "US" ||
-    !view.postalCode ||
-    !view.city ||
-    !view.stateOrProvince
-  ) {
+  if (!matchesRequiredAddress(view)) {
     throw new Error(NOT_CONFIGURED_MSG);
   }
   return { merchantLocationKey: account.merchant_location_key, view };
