@@ -237,7 +237,13 @@ export async function saveShippingOrigin(
       const types: string[] = cur.json?.locationTypes ?? [];
       const isWarehouseOrStore =
         types.includes("WAREHOUSE") || types.includes("STORE");
-      if (isWarehouseOrStore) {
+      const curView = flatten(account.merchant_location_key, cur.json);
+      const addressAlreadyMatches = matchesRequiredAddress(curView);
+
+      // eBay's update_location_details endpoint does NOT change the address.
+      // Only reuse the existing key when the address is already correct;
+      // otherwise create a brand-new location with the correct address.
+      if (isWarehouseOrStore && addressAlreadyMatches) {
         await updateExistingLocationDetails(
           token,
           account.merchant_location_key,
@@ -246,7 +252,6 @@ export async function saveShippingOrigin(
         );
         keyToUse = account.merchant_location_key;
       }
-      // FULFILLMENT_CENTER or anything else → fall through and create new
     }
   }
 
@@ -255,6 +260,7 @@ export async function saveShippingOrigin(
     await createWarehouse(token, newKey, input);
     keyToUse = newKey;
   }
+
 
   const verifyRes = await getLocation(token, keyToUse);
   if (!verifyRes.ok || !verifyRes.json) {
