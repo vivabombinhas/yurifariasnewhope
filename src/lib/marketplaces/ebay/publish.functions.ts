@@ -355,17 +355,31 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     // ---------- Ensure merchant location + policies on Offer ----------
     let locationInfo: {
       merchantLocationKey: string;
-      status: string;
-      country: string;
+      status?: string;
+      country?: string;
       postalCode?: string;
       city?: string;
       stateOrProvince?: string;
-      created: boolean;
+      created?: boolean;
     };
     try {
-      const { ensureValidMerchantLocation, setOfferMerchantLocation, syncOfferWithSellerSetup } =
+      const { setOfferMerchantLocation, syncOfferWithSellerSetup } =
         await import("./seller-setup.server");
-      locationInfo = await ensureValidMerchantLocation(context.supabase);
+      const { requireConfiguredShippingOrigin } = await import(
+        "./shipping-origin.server"
+      );
+      // Use the strict, user-configured shipping origin (same path the
+      // "Apply shipping origin to active listings" button uses) so newly
+      // published items always show the correct origin without a manual sync.
+      const configured = await requireConfiguredShippingOrigin(context.supabase);
+      locationInfo = {
+        merchantLocationKey: configured.merchantLocationKey,
+        status: configured.view.merchantLocationStatus,
+        country: configured.view.country ?? undefined,
+        postalCode: configured.view.postalCode ?? undefined,
+        city: configured.view.city ?? undefined,
+        stateOrProvince: configured.view.stateOrProvince ?? undefined,
+      };
       await setOfferMerchantLocation(offerId, locationInfo.merchantLocationKey);
       // Always (re)apply listingPolicies — fulfillment/payment/return — to the
       // unpublished Offer. Also repairs the Fulfillment Policy if it is missing
