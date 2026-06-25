@@ -234,11 +234,15 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         aspects: product.ebay_aspects,
         imageUrls,
       });
-      const { ensureValidMerchantLocation, setOfferMerchantLocation } = await import(
-        "./seller-setup.server"
+      const { setOfferMerchantLocation } = await import("./seller-setup.server");
+      const { requireConfiguredShippingOrigin } = await import(
+        "./shipping-origin.server"
       );
-      const locationInfo = await ensureValidMerchantLocation(context.supabase);
-      await setOfferMerchantLocation(result.offerId, locationInfo.merchantLocationKey);
+      const { merchantLocationKey } = await requireConfiguredShippingOrigin(
+        context.supabase,
+      );
+      const locationInfo = { merchantLocationKey };
+      await setOfferMerchantLocation(result.offerId, merchantLocationKey);
       console.log("[createEbayDraft] offer created", {
         publishAttemptId,
         productId: data.productId,
