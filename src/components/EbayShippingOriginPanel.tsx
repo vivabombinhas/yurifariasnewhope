@@ -177,6 +177,51 @@ export function EbayShippingOriginPanel() {
           </div>
         )}
 
+        {view?.configured && hasMismatch && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
+              <div className="text-sm">
+                <div className="font-medium">
+                  Form differs from eBay account address
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Saving will overwrite the eBay location with the values
+                  below.
+                </div>
+              </div>
+            </div>
+            <ul className="text-xs space-y-1 font-mono">
+              {mismatchFields.map((m) => (
+                <li key={m.label} className="break-all">
+                  <span className="font-semibold">{m.label}:</span>{" "}
+                  <span className="text-muted-foreground">eBay</span> “{m.ebay}”
+                  → <span className="text-muted-foreground">form</span> “
+                  {m.form}”
+                </li>
+              ))}
+            </ul>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setForm({
+                  name: view.name ?? "",
+                  addressLine1: view.addressLine1 ?? "",
+                  city: view.city ?? "",
+                  stateOrProvince: view.stateOrProvince ?? "",
+                  postalCode: view.postalCode ?? "",
+                })
+              }
+            >
+              Use eBay address
+            </Button>
+          </div>
+        )}
+
+
+
         <form
           className="space-y-3"
           onSubmit={(e) => {
