@@ -234,11 +234,17 @@ export const createEbayDraft = createServerFn({ method: "POST" })
         aspects: product.ebay_aspects,
         imageUrls,
       });
+      const { ensureValidMerchantLocation, setOfferMerchantLocation } = await import(
+        "./seller-setup.server"
+      );
+      const locationInfo = await ensureValidMerchantLocation(context.supabase);
+      await setOfferMerchantLocation(result.offerId, locationInfo.merchantLocationKey);
       console.log("[createEbayDraft] offer created", {
         publishAttemptId,
         productId: data.productId,
         offerId: result.offerId,
         sku: result.sku,
+        merchantLocationKey: locationInfo.merchantLocationKey,
         categoryId: product.ebay_category_id,
         ebayConditionId: product.ebay_condition_id,
         ebayConditionName: product.ebay_condition_name,
@@ -263,6 +269,14 @@ export const createEbayDraft = createServerFn({ method: "POST" })
           sku: result.sku,
           internalSku: product.sku,
           env,
+          merchantLocationKey: locationInfo.merchantLocationKey,
+          shippingOrigin: {
+            addressLine1: "711 Shetland Trl",
+            city: "Cartersville",
+            stateOrProvince: "GA",
+            postalCode: "30121-1705",
+            country: "US",
+          },
           categoryId: product.ebay_category_id,
           ebayConditionId: product.ebay_condition_id,
           ebayConditionName: product.ebay_condition_name,
