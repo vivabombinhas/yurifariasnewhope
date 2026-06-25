@@ -95,6 +95,29 @@ export function EbayShippingOriginPanel() {
       ? `Shipping from: ${view.city}, ${view.stateOrProvince} ${view.postalCode}, United States`
       : null;
 
+  const norm = (s: string | null | undefined) =>
+    (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const mismatchFields: { label: string; ebay: string; form: string }[] = [];
+  if (view?.configured) {
+    const pairs: [string, string | null | undefined, string][] = [
+      ["Name", view.name, form.name],
+      ["Address", view.addressLine1, form.addressLine1],
+      ["City", view.city, form.city],
+      ["State", view.stateOrProvince, form.stateOrProvince],
+      ["ZIP", view.postalCode, form.postalCode],
+    ];
+    for (const [label, ebay, formVal] of pairs) {
+      if (norm(ebay) !== norm(formVal)) {
+        mismatchFields.push({
+          label,
+          ebay: ebay ?? "—",
+          form: formVal || "—",
+        });
+      }
+    }
+  }
+  const hasMismatch = mismatchFields.length > 0;
+
   return (
     <Card>
       <CardHeader>
@@ -153,6 +176,51 @@ export function EbayShippingOriginPanel() {
             </div>
           </div>
         )}
+
+        {view?.configured && hasMismatch && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 mt-0.5 text-amber-600" />
+              <div className="text-sm">
+                <div className="font-medium">
+                  Form differs from eBay account address
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Saving will overwrite the eBay location with the values
+                  below.
+                </div>
+              </div>
+            </div>
+            <ul className="text-xs space-y-1 font-mono">
+              {mismatchFields.map((m) => (
+                <li key={m.label} className="break-all">
+                  <span className="font-semibold">{m.label}:</span>{" "}
+                  <span className="text-muted-foreground">eBay</span> “{m.ebay}”
+                  → <span className="text-muted-foreground">form</span> “
+                  {m.form}”
+                </li>
+              ))}
+            </ul>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                setForm({
+                  name: view.name ?? "",
+                  addressLine1: view.addressLine1 ?? "",
+                  city: view.city ?? "",
+                  stateOrProvince: view.stateOrProvince ?? "",
+                  postalCode: view.postalCode ?? "",
+                })
+              }
+            >
+              Use eBay address
+            </Button>
+          </div>
+        )}
+
+
 
         <form
           className="space-y-3"
