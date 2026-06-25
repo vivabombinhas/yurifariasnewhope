@@ -64,8 +64,9 @@ export const syncEbayOfferWithSellerSetup = createServerFn({ method: "POST" })
       if (!offerId) {
         return { ok: false, errorMessage: "No eBay offer found. Create a draft first." };
       }
-      const { syncOfferWithSellerSetup } = await import("./seller-setup.server");
-      await syncOfferWithSellerSetup(offerId);
+      const { ensureValidMerchantLocation, syncOfferWithSellerSetup } = await import("./seller-setup.server");
+      const locationInfo = await ensureValidMerchantLocation(context.supabase);
+      await syncOfferWithSellerSetup(offerId, locationInfo.merchantLocationKey);
       return { ok: true };
     } catch (e: any) {
       return { ok: false, errorMessage: e?.message ?? String(e) };

@@ -15,6 +15,14 @@ import { ebayFetch, ebayErrorMessage } from "./draft.server";
 
 const MARKETPLACE_ID = "EBAY_US";
 const DEFAULT_LOCATION_KEY = "default_location";
+const REQUIRED_SHIPPING_ORIGIN = {
+  name: "Default Warehouse",
+  addressLine1: "711 Shetland Trl",
+  city: "Cartersville",
+  stateOrProvince: "GA",
+  postalCode: "30121-1705",
+  country: "US",
+};
 
 export type SellerSetupKey =
   | "location"
@@ -120,15 +128,15 @@ export async function createSandboxLocation(): Promise<{ merchantLocationKey: st
   const body = {
     location: {
       address: {
-        country: "US",
-        city: "San Jose",
-        stateOrProvince: "CA",
-        postalCode: "95125",
-        addressLine1: "2025 Hamilton Ave",
+        country: REQUIRED_SHIPPING_ORIGIN.country,
+        city: REQUIRED_SHIPPING_ORIGIN.city,
+        stateOrProvince: REQUIRED_SHIPPING_ORIGIN.stateOrProvince,
+        postalCode: REQUIRED_SHIPPING_ORIGIN.postalCode,
+        addressLine1: REQUIRED_SHIPPING_ORIGIN.addressLine1,
       },
     },
     locationInstructions: "Items ship from here",
-    name: "Default Location",
+    name: REQUIRED_SHIPPING_ORIGIN.name,
     merchantLocationStatus: "ENABLED",
     locationTypes: ["WAREHOUSE"],
   };
@@ -281,12 +289,25 @@ export async function syncOfferWithSellerSetup(offerId: string): Promise<{
     paymentPolicyId?: string;
     returnPolicyId?: string;
   };
+}>;
+export async function syncOfferWithSellerSetup(
+  offerId: string,
+  merchantLocationKeyOverride?: string,
+): Promise<{
+  ok: true;
+  applied: {
+    merchantLocationKey?: string;
+    fulfillmentPolicyId?: string;
+    paymentPolicyId?: string;
+    returnPolicyId?: string;
+  };
 }> {
   const env = await ensureSandbox();
   const token = await getValidEbayAccessToken();
   const status = await inspectSellerSetup();
   const d = status.defaults;
-  if (!d.merchantLocationKey || !d.fulfillmentPolicyId || !d.paymentPolicyId || !d.returnPolicyId) {
+  const merchantLocationKey = merchantLocationKeyOverride ?? d.merchantLocationKey;
+  if (!merchantLocationKey || !d.fulfillmentPolicyId || !d.paymentPolicyId || !d.returnPolicyId) {
     throw new Error("Seller setup incomplete; create all four resources first.");
   }
 
@@ -315,7 +336,7 @@ export async function syncOfferWithSellerSetup(offerId: string): Promise<{
     categoryId: offer.categoryId,
     listingDescription: offer.listingDescription,
     pricingSummary: offer.pricingSummary,
-    merchantLocationKey: d.merchantLocationKey,
+    merchantLocationKey,
     listingPolicies: {
       fulfillmentPolicyId: d.fulfillmentPolicyId,
       paymentPolicyId: d.paymentPolicyId,
@@ -337,7 +358,7 @@ export async function syncOfferWithSellerSetup(offerId: string): Promise<{
   return {
     ok: true,
     applied: {
-      merchantLocationKey: d.merchantLocationKey,
+      merchantLocationKey,
       fulfillmentPolicyId: d.fulfillmentPolicyId,
       paymentPolicyId: d.paymentPolicyId,
       returnPolicyId: d.returnPolicyId,
@@ -403,6 +424,15 @@ interface MinimalSupabase {
   from: (table: string) => any;
 }
 
+function norm(s: unknown) {
+  return String(s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function stateMatches(state: unknown) {
+  const normalized = norm(state);
+  return normalized === "ga" || normalized === "georgia";
+}
+
 function locationIsValid(loc: any, expectedCountry: string) {
   const status = loc?.merchantLocationStatus;
   const addr = loc?.location?.address ?? {};
@@ -410,9 +440,13 @@ function locationIsValid(loc: any, expectedCountry: string) {
   const postalCode = addr.postalCode;
   const city = addr.city;
   const state = addr.stateOrProvince;
+  const addressLine1 = addr.addressLine1;
   if (status !== "ENABLED") return false;
   if (!country || country !== expectedCountry) return false;
-  if (!postalCode && !(city && state)) return false;
+  if (norm(addressLine1) !== norm(REQUIRED_SHIPPING_ORIGIN.addressLine1)) return false;
+  if (norm(city) !== norm(REQUIRED_SHIPPING_ORIGIN.city)) return false;
+  if (!stateMatches(state)) return false;
+  if (norm(postalCode) !== norm(REQUIRED_SHIPPING_ORIGIN.postalCode)) return false;
   return true;
 }
 

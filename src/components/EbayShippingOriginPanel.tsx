@@ -42,10 +42,10 @@ export function EbayShippingOriginPanel() {
   const loadError = q.data && !q.data.ok ? q.data.errorMessage : null;
 
   const [form, setForm] = useState({
-    name: "Main Warehouse",
+    name: "Default Warehouse",
     addressLine1: "711 Shetland Trl",
     city: "Cartersville",
-    stateOrProvince: "Georgia",
+    stateOrProvince: "GA",
     postalCode: "30121-1705",
   });
   const [hydrated, setHydrated] = useState(false);
@@ -263,7 +263,7 @@ export function EbayShippingOriginPanel() {
                 onChange={(e) =>
                   setForm({ ...form, stateOrProvince: e.target.value })
                 }
-                placeholder="e.g. Georgia"
+                placeholder="e.g. GA"
                 required
               />
             </div>
