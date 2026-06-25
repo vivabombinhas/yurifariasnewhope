@@ -31,6 +31,14 @@ export interface ShippingOriginView {
   country?: string | null;
 }
 
+const DEFAULT_SHIPPING_ORIGIN: SaveOriginInput = {
+  name: "Default Warehouse",
+  addressLine1: "711 Shetland Trl",
+  city: "Cartersville",
+  stateOrProvince: "GA",
+  postalCode: "30121-1705",
+};
+
 function flatten(key: string, json: any): ShippingOriginView {
   const addr = json?.location?.address ?? json?.address ?? {};
   return {

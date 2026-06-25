@@ -50,6 +50,43 @@ export interface SellerSetupStatus {
   };
 }
 
+function requiredLocationCreateBody() {
+  return {
+    location: {
+      address: {
+        country: REQUIRED_SHIPPING_ORIGIN.country,
+        city: REQUIRED_SHIPPING_ORIGIN.city,
+        stateOrProvince: REQUIRED_SHIPPING_ORIGIN.stateOrProvince,
+        postalCode: REQUIRED_SHIPPING_ORIGIN.postalCode,
+        addressLine1: REQUIRED_SHIPPING_ORIGIN.addressLine1,
+      },
+    },
+    locationInstructions: "Items ship from here",
+    name: REQUIRED_SHIPPING_ORIGIN.name,
+    merchantLocationStatus: "ENABLED",
+    locationTypes: ["WAREHOUSE"],
+  };
+}
+
+function requiredLocationUpdateBody(current: any) {
+  const currentAddr = current?.location?.address ?? current?.address ?? {};
+  return {
+    name: REQUIRED_SHIPPING_ORIGIN.name,
+    locationInstructions: current?.locationInstructions ?? "Items ship from here",
+    locationAdditionalInformation: current?.locationAdditionalInformation,
+    locationWebUrl: current?.locationWebUrl,
+    phone: current?.phone,
+    address: {
+      ...currentAddr,
+      country: REQUIRED_SHIPPING_ORIGIN.country,
+      city: REQUIRED_SHIPPING_ORIGIN.city,
+      stateOrProvince: REQUIRED_SHIPPING_ORIGIN.stateOrProvince,
+      postalCode: REQUIRED_SHIPPING_ORIGIN.postalCode,
+      addressLine1: REQUIRED_SHIPPING_ORIGIN.addressLine1,
+    },
+  };
+}
+
 async function ensureSandbox() {
   const env = (process.env.EBAY_ENV ?? "sandbox").toLowerCase();
   if (env !== "sandbox" && env !== "production") {
@@ -71,6 +108,8 @@ export async function inspectSellerSetup(): Promise<SellerSetupStatus> {
   ]);
 
   const locations = (locRes.json?.locations ?? []) as any[];
+  const preferredLocation =
+    locations.find((l) => locationIsValid(l, "US")) ?? locations[0];
   const fulfillment = (fulRes.json?.fulfillmentPolicies ?? []) as any[];
   const payment = (payRes.json?.paymentPolicies ?? []) as any[];
   const returns = (retRes.json?.returnPolicies ?? []) as any[];
@@ -80,8 +119,8 @@ export async function inspectSellerSetup(): Promise<SellerSetupStatus> {
       key: "location",
       label: "Merchant Location",
       status: locations.length ? "exists" : "missing",
-      id: locations[0]?.merchantLocationKey,
-      name: locations[0]?.name,
+      id: preferredLocation?.merchantLocationKey,
+      name: preferredLocation?.name,
       count: locations.length,
     },
     {
@@ -114,7 +153,7 @@ export async function inspectSellerSetup(): Promise<SellerSetupStatus> {
     ready: items.every((i) => i.status === "exists"),
     items,
     defaults: {
-      merchantLocationKey: locations[0]?.merchantLocationKey,
+      merchantLocationKey: preferredLocation?.merchantLocationKey,
       fulfillmentPolicyId: fulfillment[0]?.fulfillmentPolicyId,
       paymentPolicyId: payment[0]?.paymentPolicyId,
       returnPolicyId: returns[0]?.returnPolicyId,
@@ -125,32 +164,35 @@ export async function inspectSellerSetup(): Promise<SellerSetupStatus> {
 export async function createSandboxLocation(): Promise<{ merchantLocationKey: string }> {
   const env = await ensureSandbox();
   const token = await getValidEbayAccessToken();
-  const body = {
-    location: {
-      address: {
-        country: REQUIRED_SHIPPING_ORIGIN.country,
-        city: REQUIRED_SHIPPING_ORIGIN.city,
-        stateOrProvince: REQUIRED_SHIPPING_ORIGIN.stateOrProvince,
-        postalCode: REQUIRED_SHIPPING_ORIGIN.postalCode,
-        addressLine1: REQUIRED_SHIPPING_ORIGIN.addressLine1,
-      },
-    },
-    locationInstructions: "Items ship from here",
-    name: REQUIRED_SHIPPING_ORIGIN.name,
-    merchantLocationStatus: "ENABLED",
-    locationTypes: ["WAREHOUSE"],
-  };
   const res = await ebayFetch(
     env,
     "POST",
     `/sell/inventory/v1/location/${DEFAULT_LOCATION_KEY}`,
     token,
-    body,
+    requiredLocationCreateBody(),
   );
   // 204 on create, 409 if already exists — both acceptable
-  if (!res.ok && res.status !== 409) {
+  if (res.status === 409) {
+    const current = await fetchLocation(env, token, DEFAULT_LOCATION_KEY);
+    const updateRes = await ebayFetch(
+      env,
+      "POST",
+      `/sell/inventory/v1/location/${DEFAULT_LOCATION_KEY}/update_location_details`,
+      token,
+      requiredLocationUpdateBody(current.json),
+    );
+    if (!updateRes.ok) {
+      throw new Error(`Update location: ${ebayErrorMessage(updateRes.status, updateRes.json, updateRes.text)}`);
+    }
+  } else if (!res.ok) {
     throw new Error(`Location: ${ebayErrorMessage(res.status, res.json, res.text)}`);
   }
+  await ebayFetch(
+    env,
+    "POST",
+    `/sell/inventory/v1/location/${DEFAULT_LOCATION_KEY}/enable`,
+    token,
+  );
   return { merchantLocationKey: DEFAULT_LOCATION_KEY };
 }
 
@@ -487,11 +529,17 @@ export async function ensureValidMerchantLocation(
     if (found) candidate = { key: found.merchantLocationKey, loc: found };
   }
 
-  // No valid location configured — DO NOT auto-create a generic warehouse.
+  // No valid location configured — create/repair the known correct warehouse only.
   if (!candidate || !locationIsValid(candidate.loc, expectedCountry)) {
-    throw new Error(
-      "Configure your eBay shipping origin in Settings before publishing.",
-    );
+    const created = await createSandboxLocation();
+    const createdLocation = await fetchLocation(env, token, created.merchantLocationKey);
+    if (createdLocation.ok && createdLocation.json) {
+      candidate = { key: created.merchantLocationKey, loc: createdLocation.json };
+    }
+  }
+
+  if (!candidate || !locationIsValid(candidate.loc, expectedCountry)) {
+    throw new Error("Configure your eBay shipping origin in Settings before publishing.");
   }
 
   // Persist saved key if it differs from current account row
