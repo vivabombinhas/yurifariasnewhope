@@ -95,6 +95,29 @@ export function EbayShippingOriginPanel() {
       ? `Shipping from: ${view.city}, ${view.stateOrProvince} ${view.postalCode}, United States`
       : null;
 
+  const norm = (s: string | null | undefined) =>
+    (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const mismatchFields: { label: string; ebay: string; form: string }[] = [];
+  if (view?.configured) {
+    const pairs: [string, string | null | undefined, string][] = [
+      ["Name", view.name, form.name],
+      ["Address", view.addressLine1, form.addressLine1],
+      ["City", view.city, form.city],
+      ["State", view.stateOrProvince, form.stateOrProvince],
+      ["ZIP", view.postalCode, form.postalCode],
+    ];
+    for (const [label, ebay, formVal] of pairs) {
+      if (norm(ebay) !== norm(formVal)) {
+        mismatchFields.push({
+          label,
+          ebay: ebay ?? "—",
+          form: formVal || "—",
+        });
+      }
+    }
+  }
+  const hasMismatch = mismatchFields.length > 0;
+
   return (
     <Card>
       <CardHeader>
