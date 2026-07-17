@@ -18,6 +18,7 @@ import { RouteError } from "@/components/RouteError";
 import { MarketplaceConnections } from "@/components/MarketplaceConnections";
 import { EbayOrdersSyncPanel } from "@/components/EbayOrdersSyncPanel";
 import { EbayShippingOriginPanel } from "@/components/EbayShippingOriginPanel";
+import { EbayOfferSettingsPanel } from "@/components/EbayOfferSettingsPanel";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   head: () => ({ meta: [{ title: "Settings — Inventory" }] }),
