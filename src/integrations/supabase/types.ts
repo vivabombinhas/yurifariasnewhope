@@ -102,6 +102,42 @@ export type Database = {
           },
         ]
       }
+      ebay_offer_settings: {
+        Row: {
+          allow_offers: boolean
+          auto_accept_amount_cents: number | null
+          auto_accept_mode: string
+          auto_accept_percentage: number | null
+          id: string
+          minimum_amount_cents: number | null
+          minimum_mode: string
+          minimum_percentage: number | null
+          updated_at: string
+        }
+        Insert: {
+          allow_offers?: boolean
+          auto_accept_amount_cents?: number | null
+          auto_accept_mode?: string
+          auto_accept_percentage?: number | null
+          id?: string
+          minimum_amount_cents?: number | null
+          minimum_mode?: string
+          minimum_percentage?: number | null
+          updated_at?: string
+        }
+        Update: {
+          allow_offers?: boolean
+          auto_accept_amount_cents?: number | null
+          auto_accept_mode?: string
+          auto_accept_percentage?: number | null
+          id?: string
+          minimum_amount_cents?: number | null
+          minimum_mode?: string
+          minimum_percentage?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           area: string
@@ -466,6 +502,14 @@ export type Database = {
           ebay_condition_enum: string | null
           ebay_condition_id: number | null
           ebay_condition_name: string | null
+          ebay_offer_allow: boolean | null
+          ebay_offer_auto_accept_amount_cents: number | null
+          ebay_offer_auto_accept_mode: string | null
+          ebay_offer_auto_accept_percentage: number | null
+          ebay_offer_minimum_amount_cents: number | null
+          ebay_offer_minimum_mode: string | null
+          ebay_offer_minimum_percentage: number | null
+          ebay_offer_override: boolean
           id: string
           item_specifics: Json
           location_id: string | null
@@ -494,6 +538,14 @@ export type Database = {
           ebay_condition_enum?: string | null
           ebay_condition_id?: number | null
           ebay_condition_name?: string | null
+          ebay_offer_allow?: boolean | null
+          ebay_offer_auto_accept_amount_cents?: number | null
+          ebay_offer_auto_accept_mode?: string | null
+          ebay_offer_auto_accept_percentage?: number | null
+          ebay_offer_minimum_amount_cents?: number | null
+          ebay_offer_minimum_mode?: string | null
+          ebay_offer_minimum_percentage?: number | null
+          ebay_offer_override?: boolean
           id?: string
           item_specifics?: Json
           location_id?: string | null
@@ -522,6 +574,14 @@ export type Database = {
           ebay_condition_enum?: string | null
           ebay_condition_id?: number | null
           ebay_condition_name?: string | null
+          ebay_offer_allow?: boolean | null
+          ebay_offer_auto_accept_amount_cents?: number | null
+          ebay_offer_auto_accept_mode?: string | null
+          ebay_offer_auto_accept_percentage?: number | null
+          ebay_offer_minimum_amount_cents?: number | null
+          ebay_offer_minimum_mode?: string | null
+          ebay_offer_minimum_percentage?: number | null
+          ebay_offer_override?: boolean
           id?: string
           item_specifics?: Json
           location_id?: string | null
