@@ -16,6 +16,7 @@ import { EbaySellerSetupPanel } from "@/components/EbaySellerSetupPanel";
 import { EbayPublishPreflightPanel } from "@/components/EbayPublishPreflightPanel";
 import { EbayPublishAuditPanel } from "@/components/EbayPublishAuditPanel";
 import { EbayPublishPanel } from "@/components/EbayPublishPanel";
+import { EbayOfferOverridePanel } from "@/components/EbayOfferOverridePanel";
 
 interface Props {
   productId: string;
