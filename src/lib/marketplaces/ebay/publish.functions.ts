@@ -385,6 +385,41 @@ export const publishEbayListing = createServerFn({ method: "POST" })
       // unpublished Offer. Also repairs the Fulfillment Policy if it is missing
       // a valid shipping service (eBay errorId 25007).
       await syncOfferWithSellerSetup(offerId, locationInfo.merchantLocationKey);
+
+      // Apply Best Offer terms (offer settings + optional per-product override).
+      try {
+        const [{ resolveBestOfferForProduct }, { applyBestOfferToOffer }] = await Promise.all([
+          import("./best-offer"),
+          import("./best-offer.server"),
+        ]);
+        const { data: globalRow } = await context.supabase
+          .from("ebay_offer_settings")
+          .select("*")
+          .eq("id", "global")
+          .maybeSingle();
+        if (globalRow) {
+          const resolved = resolveBestOfferForProduct(
+            globalRow as any,
+            product as any,
+            product.price_cents ?? null,
+          );
+          const bo = await applyBestOfferToOffer(offerId, resolved);
+          if (!bo.ok) {
+            console.warn("[ebayPublish] best-offer apply failed (non-blocking)", {
+              publishAttemptId,
+              offerId,
+              error: bo.error,
+              category: bo.category,
+            });
+          }
+        }
+      } catch (e: any) {
+        console.warn("[ebayPublish] best-offer step skipped", {
+          publishAttemptId,
+          offerId,
+          error: e?.message ?? String(e),
+        });
+      }
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       await context.supabase
