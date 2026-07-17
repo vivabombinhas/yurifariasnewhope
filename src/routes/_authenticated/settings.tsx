@@ -35,6 +35,7 @@ function SettingsPage() {
 
       <MarketplaceConnections />
       <EbayShippingOriginPanel />
+      <EbayOfferSettingsPanel />
       <EbayOrdersSyncPanel />
 
       <Card>
