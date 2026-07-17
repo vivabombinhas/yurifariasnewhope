@@ -89,7 +89,7 @@ export function EbayDraftPanel({ productId }: Props) {
   const isActive = listing.data?.status === "active";
   const isOutdated = !!meta?.draftOutdated;
   const persistedListingError =
-    !createMut.isPending && !createMut.data && !createMut.error
+    !createMut.isPending && !createMut.data && !createMut.error && !isActive
       ? listing.data?.error_message
       : null;
 
