@@ -85,7 +85,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     const { data: product, error: pErr } = await context.supabase
       .from("products")
       .select(
-        "sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects, updated_at",
+        "sku, title, description, price_cents, condition, ebay_category_id, ebay_condition_id, ebay_condition_enum, ebay_condition_name, ebay_aspects, updated_at, ebay_offer_override, ebay_offer_allow, ebay_offer_minimum_mode, ebay_offer_minimum_percentage, ebay_offer_minimum_amount_cents, ebay_offer_auto_accept_mode, ebay_offer_auto_accept_percentage, ebay_offer_auto_accept_amount_cents",
       )
       .eq("id", data.productId)
       .maybeSingle();
