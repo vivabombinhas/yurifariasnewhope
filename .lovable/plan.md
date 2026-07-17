@@ -1,56 +1,111 @@
-# eBay Shipping Origin
+# eBay Best Offer Support
 
-Adds a Settings panel to view/edit the eBay Inventory Location used as shipping origin, removes the silent fallback to a generic California address, and lets the user retro-apply the new origin to active listings created by the system.
+Add "Allow offers" / Minimum offer / Auto accept automation to every eBay listing the system creates, so these fields never need to be filled manually on eBay.
+
+Confirmed against the eBay Inventory API: `Offer.listingPolicies.bestOfferTerms` with fields `bestOfferEnabled` (boolean), `autoAcceptPrice` (Amount) and `autoDeclinePrice` (Amount). "Minimum offer" from the UI = `autoDeclinePrice` (offers below this are auto-declined).
+
+## 1. Data model
+
+New table `ebay_offer_settings` (one row per user, global defaults):
+
+```
+user_id (pk)  allow_offers boolean
+minimum_mode  'off' | 'percentage' | 'fixed'
+minimum_percentage numeric(5,2)    -- 0.01..99.99
+minimum_amount_cents integer
+auto_accept_mode 'off' | 'percentage' | 'fixed'
+auto_accept_percentage numeric(5,2)
+auto_accept_amount_cents integer
+updated_at
+```
+
+RLS: user owns own row. GRANT to authenticated + service_role.
+
+Per-product override columns on `products`:
+- `ebay_offer_override` boolean default false
+- `ebay_offer_allow` boolean null
+- `ebay_offer_minimum_mode`, `ebay_offer_minimum_percentage`, `ebay_offer_minimum_amount_cents`
+- `ebay_offer_auto_accept_mode`, `ebay_offer_auto_accept_percentage`, `ebay_offer_auto_accept_amount_cents`
+
+Defaults on new install: allow=ON, minimum=percentage 70, auto_accept=off.
+
+## 2. Resolution + validation helper
+
+`src/lib/marketplaces/ebay/best-offer.ts` (pure, no I/O):
+- `resolveBestOfferForProduct(globalSettings, productOverride, priceCents)` → `{ enabled, autoAcceptCents?, autoDeclineCents? }` or `{ enabled:false }`.
+- Percentage → `round(priceCents * pct / 100)`, 2-decimal (cent) precision.
+- `validateSettings(settings, referencePriceCents?)` returns Zod-style errors for:
+  - min/auto-accept > 0
+  - max 2 decimals (cents integer already enforces this)
+  - if reference price given: minimum < price, auto_accept ≤ price
+  - if both active: auto_accept > minimum
+
+Used by both the Settings form and per-product override editor.
+
+## 3. Server functions
+
+`src/lib/marketplaces/ebay/best-offer.functions.ts`:
+- `getEbayOfferSettings` — read global row (create default lazily).
+- `updateEbayOfferSettings` — validate + upsert.
+- `updateProductOfferOverride({ productId, override, ... })` — validate against product's price.
+- `applyOfferSettingsToActiveListings` — enumerate active `marketplace_listings` for eBay, GET each offer, merge Best Offer fields into `listingPolicies.bestOfferTerms`, PUT full offer back, record per-listing result. Preserves every other field. Never publishes / withdraws.
+- `countActiveEbayListings` — for confirmation dialog.
+
+## 4. Publish integration
+
+In `src/lib/marketplaces/ebay/publish.functions.ts` (and initial offer body in `draft.server.ts` if we want it set on creation):
+- After resolving policies, resolve Best Offer via `resolveBestOfferForProduct` using the product's price.
+- Merge into `offerBody.listingPolicies.bestOfferTerms`:
+  ```
+  { bestOfferEnabled: true,
+    autoAcceptPrice: { value, currency },   // when set
+    autoDeclinePrice: { value, currency } } // when set (= "minimum offer")
+  ```
+- When disabled, set `{ bestOfferEnabled: false }` and omit prices.
+- Same code path used by "Apply offer settings to active listings", so publish and bulk-apply are consistent.
+
+Do not touch shipping origin, sales sync, photos, or fulfillment policies.
+
+## 5. UI
+
+**Settings → `EbayOfferSettingsPanel.tsx`** (new, added to `settings.tsx` right below shipping origin):
+- Toggle Allow offers by default.
+- Minimum offer: mode select (Off / % / $) + numeric input.
+- Auto accept: mode select + numeric input, with warning banner "Auto accept can sell items automatically at or above this amount." shown whenever mode ≠ off before Save.
+- Inline validation errors from the shared helper.
+- "Apply offer settings to active eBay listings" button → confirmation dialog showing active-listing count, then runs bulk apply and shows per-listing success/error list.
+
+**Product page** — extend `EbayPublishPanel` (or a small new `EbayOfferPanel` subcomponent):
+- Advanced disclosure "Override offer settings" (checkbox).
+- When on: same three controls as global, validated against product price.
+- When off: show read-only summary derived from resolved settings:
+  - `Offers: On / Minimum: 70% / $14.00 / Auto accept: Off` (or `Offers: Off`).
+
+## 6. Safety & edge cases
+
+- Bulk apply requires explicit confirmation and shows count first.
+- Ignore listings where eBay returns "Best Offer not supported for this category" — log warning per listing, keep going, surface count in result.
+- All monetary inputs stored as integer cents; percentages as numeric(5,2). Never negative, never zero, never > price.
+- Never modify a listing not created by the system (filtered via `marketplace_listings.marketplace_account_id` for the current user + `source = 'system'` equivalent already used elsewhere).
+
+## 7. Tests / manual checks
+
+Run through the scenarios listed in the request against sandbox+production:
+new product offers-only, minimum 70%, auto-accept 90%, cheap-item rounding, per-product override, bulk update of one active listing, invalid inputs blocked, category-that-rejects-BestOffer handled gracefully.
 
 ## Files
 
-**New**
-- `src/lib/marketplaces/ebay/shipping-origin.server.ts` — pure eBay/Supabase logic.
-- `src/lib/marketplaces/ebay/shipping-origin.functions.ts` — `createServerFn` wrappers.
-- `src/components/EbayShippingOriginPanel.tsx` — UI panel.
+New:
+- `supabase` migration: `ebay_offer_settings` table + product override columns + grants + RLS.
+- `src/lib/marketplaces/ebay/best-offer.ts`
+- `src/lib/marketplaces/ebay/best-offer.functions.ts`
+- `src/components/EbayOfferSettingsPanel.tsx`
+- `src/components/EbayOfferOverridePanel.tsx` (used inside product page)
 
-**Edited**
-- `src/lib/marketplaces/ebay/seller-setup.server.ts` — `ensureValidMerchantLocation`: stop creating a generic CA warehouse. If no valid location is configured, throw `MERCHANT_LOCATION_NOT_CONFIGURED` with the message `Configure your eBay shipping origin in Settings before publishing.`
-- `src/lib/marketplaces/ebay/publish.functions.ts` — map that error to a user-facing block (already returns `errorMessage`; just preserve text).
-- `src/routes/_authenticated/settings.tsx` — render `EbayShippingOriginPanel` under the eBay section.
+Edited:
+- `src/lib/marketplaces/ebay/publish.functions.ts` — inject Best Offer terms.
+- `src/routes/_authenticated/settings.tsx` — mount new panel.
+- `src/routes/_authenticated/products.$id.tsx` (or existing `EbayPublishPanel.tsx`) — mount override panel + summary.
+- `src/integrations/supabase/types.ts` — regenerated after migration.
 
-## Server functions
-
-In `shipping-origin.functions.ts` (all `requireSupabaseAuth`):
-
-1. `getEbayShippingOrigin` — reads `marketplace_accounts.merchant_location_key`, then `GET /sell/inventory/v1/location/{key}`. Returns `{ ok, merchantLocationKey, name, locationTypes, merchantLocationStatus, addressLine1, city, stateOrProvince, postalCode, country }` or `{ ok:false, configured:false }` when no key.
-2. `saveEbayShippingOrigin({ name, addressLine1, city, stateOrProvince, postalCode })` — country fixed `US`.
-   - If no key saved → create new `WAREHOUSE` with `merchantLocationKey = loc_<ts>`, enable, GET to verify, persist key.
-   - If current is `WAREHOUSE` or `STORE` → GET, merge name + address, `POST /location/{key}/update_location_details`, GET to verify, keep key.
-   - If current is `FULFILLMENT_CENTER` → create new `WAREHOUSE` with new key, enable, verify, persist new key. Do not delete the old one.
-3. `countActiveSystemEbayListings` — counts `marketplace_listings` where `marketplace='ebay'`, `status='active'`, `external_listing_id` not null.
-4. `applyShippingOriginToActiveListings` — for each active listing: fetch the offer, replace only `merchantLocationKey`, PUT full body back (reusing `setOfferMerchantLocation`). Returns per-listing `{ listingId, ok, error? }`.
-
-All use existing `getValidEbayAccessToken` + `ebayFetch`.
-
-## UI
-
-`EbayShippingOriginPanel` (in Settings):
-- Header **eBay Shipping origin**.
-- Current location block: human-readable `Shipping from: City, State ZIP, United States` + small details (key, name, type, status).
-- Form (controlled): Location name, Address, City, State, ZIP, Country (disabled = `US`). Submit = **Save eBay shipping origin** → calls `saveEbayShippingOrigin`, invalidates query, toasts.
-- Below: **Apply shipping origin to active eBay listings** button → opens AlertDialog showing count + confirmation; on confirm calls `applyShippingOriginToActiveListings` and renders per-listing results.
-
-## Publish guardrail
-
-`ensureValidMerchantLocation` no longer auto-creates a CA warehouse. If the saved key is missing/invalid and no valid location exists on the account, throw an error whose message is exactly:
-
-`Configure your eBay shipping origin in Settings before publishing.`
-
-`publish.functions.ts` already surfaces this `errorMessage` to the UI.
-
-## Out of scope (explicit)
-
-No changes to fulfillment policy, shipping cost, handling time, return policy, payment policy, or Sales Sync.
-
-```text
-Settings → eBay Shipping origin
- ├── Current: Shipping from: Cartersville, Georgia 30121, United States
- ├── [Form: name, address, city, state, ZIP, country=US (disabled)]  [Save]
- └── [Apply shipping origin to active eBay listings] → confirm dialog
-```
+Nothing else in shipping/sales/photos/policies changes.
