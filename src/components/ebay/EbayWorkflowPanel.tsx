@@ -173,16 +173,18 @@ export function EbayWorkflowPanel({ productId, product, onSaved }: Props) {
             ? "Crie/atualize o draft primeiro"
             : "Pronto para publicar",
         primary: <EbayPublishPanel productId={productId} />,
-        details:
-          publishStatus === "ok"
-            ? undefined
-            : (
-                <div className="space-y-4">
-                  <EbaySellerSetupPanel productId={productId} />
-                  <EbayPublishPreflightPanel productId={productId} />
-                  <EbayPublishAuditPanel productId={productId} />
-                </div>
-              ),
+        details: (
+          <div className="space-y-4">
+            <EbayOfferOverridePanel productId={productId} />
+            {publishStatus !== "ok" && (
+              <>
+                <EbaySellerSetupPanel productId={productId} />
+                <EbayPublishPreflightPanel productId={productId} />
+                <EbayPublishAuditPanel productId={productId} />
+              </>
+            )}
+          </div>
+        ),
       },
     ];
   }, [
