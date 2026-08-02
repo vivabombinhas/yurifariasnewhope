@@ -5,8 +5,7 @@ import type { Json } from "@/integrations/supabase/types";
 import type { EbayPublishResult } from "./publish.server";
 
 export type EbayPublishDTO =
-  | { ok: true; result: EbayPublishResult }
-  | { ok: false; errorMessage: string };
+  { ok: true; result: EbayPublishResult } | { ok: false; errorMessage: string };
 
 export const publishEbayListing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -182,12 +181,16 @@ export const publishEbayListing = createServerFn({ method: "POST" })
         .eq("id", listing.id);
       return { ok: false, errorMessage: msg };
     }
-    let ebayInventorySku = typeof meta.sku === "string" && meta.sku.trim() ? meta.sku : product.sku!;
+    let ebayInventorySku =
+      typeof meta.sku === "string" && meta.sku.trim() ? meta.sku : product.sku!;
 
     // Initial read-only audit (used to decide repair vs publish).
     const { readEbayPublishAuditResources } = await import("./publish-audit.server");
     const readAudit = async (currentOfferId: string) => {
-      const r = await readEbayPublishAuditResources({ sku: ebayInventorySku, offerId: currentOfferId });
+      const r = await readEbayPublishAuditResources({
+        sku: ebayInventorySku,
+        offerId: currentOfferId,
+      });
       const inventoryJson =
         r.inventoryItemRaw.json && typeof r.inventoryItemRaw.json === "object"
           ? r.inventoryItemRaw.json
@@ -365,9 +368,7 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     try {
       const { setOfferMerchantLocation, syncOfferWithSellerSetup } =
         await import("./seller-setup.server");
-      const { requireConfiguredShippingOrigin } = await import(
-        "./shipping-origin.server"
-      );
+      const { requireConfiguredShippingOrigin } = await import("./shipping-origin.server");
       // Use the strict, user-configured shipping origin (same path the
       // "Apply shipping origin to active listings" button uses) so newly
       // published items always show the correct origin without a manual sync.
@@ -438,9 +439,10 @@ export const publishEbayListing = createServerFn({ method: "POST" })
     // eBay Sandbox often omits createdDate on getOffer; keep the effective
     // value only for diagnostics, not as a hard publish blocker.
     const draftCreatedAtMs = new Date(String(meta.draftCreatedAt ?? 0)).getTime();
-    const finalOfferCreatedAt = Number.isFinite(audit.offerCreatedAt) && audit.offerCreatedAt > 0
-      ? audit.offerCreatedAt
-      : draftCreatedAtMs;
+    const finalOfferCreatedAt =
+      Number.isFinite(audit.offerCreatedAt) && audit.offerCreatedAt > 0
+        ? audit.offerCreatedAt
+        : draftCreatedAtMs;
     const finalCheck = {
       inventorySkuOk: String(audit.inventoryJson.sku ?? ebayInventorySku) === ebayInventorySku,
       offerSkuOk: String(audit.offerJson.sku ?? "") === ebayInventorySku,
@@ -549,6 +551,23 @@ export const publishEbayListing = createServerFn({ method: "POST" })
           })
           .eq("id", listing.id);
         if (upErr) throw upErr;
+        const { data: persistedIdentity, error: identityError } = await context.supabase
+          .from("marketplace_listings")
+          .select("external_listing_id, listing_url, provider_metadata")
+          .eq("id", listing.id)
+          .single();
+        if (identityError) throw identityError;
+        const persistedMeta = (persistedIdentity.provider_metadata ?? {}) as Record<string, any>;
+        if (
+          persistedIdentity.external_listing_id !== result.listingId ||
+          persistedIdentity.listing_url !== listingUrl ||
+          persistedMeta.sku !== ebayInventorySku ||
+          persistedMeta.internalSku !== product.sku
+        ) {
+          throw new Error(
+            "eBay published successfully, but its permanent product identity was not saved. Do not republish; run the publish audit.",
+          );
+        }
       } else {
         newMeta.publishStatus = "FAILED";
         await context.supabase

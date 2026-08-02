@@ -17,8 +17,7 @@
  */
 import { loadEbayConfig, refreshAccessToken } from "./oauth.server";
 
-const FULFILLMENT_SCOPE =
-  "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly";
+const FULFILLMENT_SCOPE = "https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly";
 const PAGE_LIMIT = 200;
 const MAX_PAGES = 25; // safety cap (200 * 25 = 5000 orders / run)
 const MANUAL_COOLDOWN_SECONDS = 60;
@@ -27,9 +26,7 @@ const FIRST_RUN_FALLBACK_DAYS = 30;
 const OVERLAP_MINUTES = 15;
 
 function apiHost(env: string) {
-  return env === "production"
-    ? "https://api.ebay.com"
-    : "https://api.sandbox.ebay.com";
+  return env === "production" ? "https://api.ebay.com" : "https://api.sandbox.ebay.com";
 }
 
 function sleep(ms: number) {
@@ -81,6 +78,7 @@ export interface RunEbaySyncOptions {
 function redactLineItem(li: any) {
   return {
     lineItemId: li?.lineItemId,
+    title: li?.title,
     sku: li?.sku,
     legacyItemId: li?.legacyItemId,
     quantity: li?.quantity,
@@ -98,9 +96,7 @@ function redactOrder(order: any) {
     orderFulfillmentStatus: order?.orderFulfillmentStatus,
     sellerId: order?.sellerId,
     salesRecordReference: order?.salesRecordReference,
-    lineItems: Array.isArray(order?.lineItems)
-      ? order.lineItems.map(redactLineItem)
-      : [],
+    lineItems: Array.isArray(order?.lineItems) ? order.lineItems.map(redactLineItem) : [],
     // explicitly omitted: buyer, fulfillmentStartInstructions, pricingSummary
     // (totals/amounts), payments, fulfillmentHrefs, etc.
   };
@@ -163,8 +159,7 @@ async function ensureAccessTokenForFulfillment(
   supabaseAdmin: any,
   account: any,
 ): Promise<
-  | { ok: true; token: string }
-  | { ok: false; reason: "needs_reconnect" | "error"; message: string }
+  { ok: true; token: string } | { ok: false; reason: "needs_reconnect" | "error"; message: string }
 > {
   const cfg = loadEbayConfig();
   const scopes: string[] = Array.isArray(account.scopes) ? account.scopes : [];
@@ -208,8 +203,7 @@ async function ensureAccessTokenForFulfillment(
     return { ok: true, token: t.access_token };
   } catch (e: any) {
     const msg = String(e?.message ?? e);
-    const needsReconnect =
-      /invalid_grant|invalid_scope|unauthorized_client|expired/i.test(msg);
+    const needsReconnect = /invalid_grant|invalid_scope|unauthorized_client|expired/i.test(msg);
     await supabaseAdmin
       .from("marketplace_accounts")
       .update({
@@ -248,18 +242,12 @@ async function computeWindowStart(
     .limit(1)
     .maybeSingle();
 
-  const ninetyDaysAgo = new Date(
-    endOfWindow.getTime() - FIRST_RUN_MAX_DAYS * 86400 * 1000,
-  );
-  const fallback = new Date(
-    endOfWindow.getTime() - FIRST_RUN_FALLBACK_DAYS * 86400 * 1000,
-  );
+  const ninetyDaysAgo = new Date(endOfWindow.getTime() - FIRST_RUN_MAX_DAYS * 86400 * 1000);
+  const fallback = new Date(endOfWindow.getTime() - FIRST_RUN_FALLBACK_DAYS * 86400 * 1000);
 
   if (firstListing) {
     const candidate =
-      firstListing.published_at ??
-      firstListing.listed_at ??
-      firstListing.created_at;
+      firstListing.published_at ?? firstListing.listed_at ?? firstListing.created_at;
     if (candidate) {
       const c = new Date(candidate);
       return c < ninetyDaysAgo ? ninetyDaysAgo : c;
@@ -272,9 +260,7 @@ async function computeWindowStart(
 /* Main entry                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function runEbaySyncOrders(
-  opts: RunEbaySyncOptions = {},
-): Promise<SyncOrdersResult> {
+export async function runEbaySyncOrders(opts: RunEbaySyncOptions = {}): Promise<SyncOrdersResult> {
   const startedAt = new Date().toISOString();
   const dryRun = !!opts.dryRun;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -306,9 +292,7 @@ export async function runEbaySyncOrders(
   const results: SyncOrdersAccountResult[] = [];
   for (const account of accounts ?? []) {
     if (opts.enforceManualCooldown && account.last_orders_sync_attempt_at) {
-      const ageSec =
-        (Date.now() - new Date(account.last_orders_sync_attempt_at).getTime()) /
-        1000;
+      const ageSec = (Date.now() - new Date(account.last_orders_sync_attempt_at).getTime()) / 1000;
       if (ageSec < MANUAL_COOLDOWN_SECONDS) {
         results.push({
           accountId: account.id,
@@ -353,12 +337,8 @@ export async function runEbaySyncOrders(
       unmatchedItems: 0,
     },
   );
-  const errors = results.flatMap((r) =>
-    r.errors.map((e) => ({ accountId: r.accountId, ...e })),
-  );
-  const anyError = results.some(
-    (r) => r.status === "error" || r.status === "needs_reconnect",
-  );
+  const errors = results.flatMap((r) => r.errors.map((e) => ({ accountId: r.accountId, ...e })));
+  const anyError = results.some((r) => r.status === "error" || r.status === "needs_reconnect");
   const allSkipped = results.length > 0 && results.every((r) => r.status === "skipped_locked");
   const status: SyncOrdersResult["status"] = anyError
     ? results.some((r) => r.status === "success")
@@ -404,10 +384,10 @@ async function syncOrdersForAccount(
   };
 
   // 1. Lock
-  const { data: lockOk } = await supabaseAdmin.rpc(
-    "try_acquire_orders_sync_lock",
-    { _account_id: account.id, _ttl_seconds: 600 },
-  );
+  const { data: lockOk } = await supabaseAdmin.rpc("try_acquire_orders_sync_lock", {
+    _account_id: account.id,
+    _ttl_seconds: 600,
+  });
   if (!lockOk) {
     result.status = "skipped_locked";
     result.errors.push({
@@ -425,13 +405,9 @@ async function syncOrdersForAccount(
       .eq("id", account.id);
 
     // 3. Token + scope
-    const tokenRes = await ensureAccessTokenForFulfillment(
-      supabaseAdmin,
-      account,
-    );
+    const tokenRes = await ensureAccessTokenForFulfillment(supabaseAdmin, account);
     if (!tokenRes.ok) {
-      result.status =
-        tokenRes.reason === "needs_reconnect" ? "needs_reconnect" : "error";
+      result.status = tokenRes.reason === "needs_reconnect" ? "needs_reconnect" : "error";
       result.errors.push({ stage: "auth", message: tokenRes.message });
       return result;
     }
@@ -439,11 +415,7 @@ async function syncOrdersForAccount(
 
     // 4. Window
     const endOfWindow = new Date();
-    const windowStart = await computeWindowStart(
-      supabaseAdmin,
-      account,
-      endOfWindow,
-    );
+    const windowStart = await computeWindowStart(supabaseAdmin, account, endOfWindow);
     result.windowStart = windowStart.toISOString();
     result.windowEnd = endOfWindow.toISOString();
 
@@ -491,13 +463,7 @@ async function syncOrdersForAccount(
         for (const li of lineItems) {
           result.lineItemsProcessed += 1;
           try {
-            const outcome = await processLineItem(
-              supabaseAdmin,
-              account,
-              order,
-              li,
-              dryRun,
-            );
+            const outcome = await processLineItem(supabaseAdmin, account, order, li, dryRun);
             if (outcome === "recorded") result.salesRecorded += 1;
             else if (outcome === "already") result.alreadyProcessed += 1;
             else if (outcome === "unmatched") result.unmatchedItems += 1;
@@ -516,8 +482,7 @@ async function syncOrdersForAccount(
     }
 
     // 6. Advance cursor ONLY on full success
-    const fullSuccess =
-      !hadFetchError && !result.errors.some((e) => e.stage !== "cooldown");
+    const fullSuccess = !hadFetchError && !result.errors.some((e) => e.stage !== "cooldown");
     if (fullSuccess && !dryRun) {
       await supabaseAdmin
         .from("marketplace_accounts")
@@ -566,19 +531,10 @@ async function processLineItem(
     throw new Error("Missing orderId or lineItemId");
   }
 
-  // Match by SKU first, then legacyItemId; scope to this account.
+  // Match by the immutable eBay listing id first, then by listing metadata,
+  // and finally by an exact internal product SKU. Never auto-match by title.
   let listing: any = null;
-  if (sku) {
-    const { data } = await supabaseAdmin
-      .from("marketplace_listings")
-      .select("id, product_id, status")
-      .eq("marketplace", "ebay")
-      .or(`provider_metadata->>sku.eq.${sku},external_listing_id.eq.${sku}`)
-      .limit(1)
-      .maybeSingle();
-    listing = data ?? null;
-  }
-  if (!listing && legacyItemId) {
+  if (legacyItemId) {
     const { data } = await supabaseAdmin
       .from("marketplace_listings")
       .select("id, product_id, status")
@@ -588,6 +544,65 @@ async function processLineItem(
       .maybeSingle();
     listing = data ?? null;
   }
+  if (!listing && sku) {
+    const { data } = await supabaseAdmin
+      .from("marketplace_listings")
+      .select("id, product_id, status")
+      .eq("marketplace", "ebay")
+      .eq("provider_metadata->>sku", sku)
+      .limit(1)
+      .maybeSingle();
+    listing = data ?? null;
+  }
+  if (!listing && sku) {
+    const { data } = await supabaseAdmin
+      .from("marketplace_listings")
+      .select("id, product_id, status")
+      .eq("marketplace", "ebay")
+      .eq("provider_metadata->>internalSku", sku)
+      .limit(1)
+      .maybeSingle();
+    listing = data ?? null;
+  }
+  if (!listing && sku) {
+    const { data: products } = await supabaseAdmin
+      .from("products")
+      .select("id, sku")
+      .eq("sku", sku)
+      .limit(2);
+    if (products?.length === 1) {
+      const productId = products[0].id;
+      const { data: existing } = await supabaseAdmin
+        .from("marketplace_listings")
+        .select("id, product_id, status")
+        .eq("marketplace", "ebay")
+        .eq("product_id", productId)
+        .maybeSingle();
+      if (existing) {
+        listing = existing;
+      } else {
+        const { data: recovered, error: recoverError } = await supabaseAdmin
+          .from("marketplace_listings")
+          .insert({
+            product_id: productId,
+            marketplace: "ebay",
+            status: "active",
+            external_listing_id: legacyItemId,
+            listing_url: legacyItemId ? `https://www.ebay.com/itm/${legacyItemId}` : null,
+            provider_metadata: {
+              sku,
+              internalSku: products[0].sku,
+              recoveredFromExactOrderSku: true,
+              recoveredAt: new Date().toISOString(),
+            },
+          })
+          .select("id, product_id, status")
+          .single();
+        if (recoverError) throw recoverError;
+        listing = recovered;
+      }
+    }
+  }
 
   const matched = !!listing;
   const processing_status = matched ? "matched" : "unmatched";
@@ -596,34 +611,30 @@ async function processLineItem(
     return matched ? "recorded" : "unmatched";
   }
 
-  const { data: rpcRes, error } = await supabaseAdmin.rpc(
-    "record_marketplace_sale",
-    {
-      _marketplace_account_id: account.id,
-      _marketplace: "ebay",
-      _external_order_id: orderId,
-      _external_line_item_id: lineItemId,
-      _external_listing_id: legacyItemId,
-      _sku: sku,
-      _quantity: typeof li?.quantity === "number" ? li.quantity : null,
-      _order_created_at: order?.creationDate ?? null,
-      _order_modified_at: order?.lastModifiedDate ?? null,
-      _payment_status: order?.orderPaymentStatus ?? null,
-      _fulfillment_status: order?.orderFulfillmentStatus ?? null,
-      _processing_status: processing_status,
-      _processing_error: null,
-      _raw_order_redacted: redactOrder(order),
-      _product_id: listing?.product_id ?? null,
-      _marketplace_listing_id: listing?.id ?? null,
-    },
-  );
+  const { data: rpcRes, error } = await supabaseAdmin.rpc("record_marketplace_sale", {
+    _marketplace_account_id: account.id,
+    _marketplace: "ebay",
+    _external_order_id: orderId,
+    _external_line_item_id: lineItemId,
+    _external_listing_id: legacyItemId,
+    _sku: sku,
+    _quantity: typeof li?.quantity === "number" ? li.quantity : null,
+    _order_created_at: order?.creationDate ?? null,
+    _order_modified_at: order?.lastModifiedDate ?? null,
+    _payment_status: order?.orderPaymentStatus ?? null,
+    _fulfillment_status: order?.orderFulfillmentStatus ?? null,
+    _processing_status: processing_status,
+    _processing_error: null,
+    _raw_order_redacted: redactOrder(order),
+    _product_id: listing?.product_id ?? null,
+    _marketplace_listing_id: listing?.id ?? null,
+  });
   if (error) throw error;
 
   if (rpcRes?.already_processed) return "already";
   if (matched && listing?.product_id) {
-    const { closeOtherActiveListings } = await import(
-      "@/lib/marketplaces/close-product-listings.server"
-    );
+    const { closeOtherActiveListings } =
+      await import("@/lib/marketplaces/close-product-listings.server");
     await closeOtherActiveListings(supabaseAdmin, listing.product_id, "ebay");
   }
   return matched ? "recorded" : "unmatched";

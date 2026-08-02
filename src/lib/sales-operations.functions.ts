@@ -21,7 +21,7 @@ export const listSalesOperations = createServerFn({ method: "GET" })
         supabase
           .from("marketplace_sales")
           .select(
-            "id, marketplace, external_order_id, processing_status, processed_at, order_created_at, sku, product_id, product:products(title, sku)",
+            "id, marketplace, external_order_id, external_line_item_id, external_listing_id, processing_status, processed_at, order_created_at, sku, quantity, raw_order_redacted, product_id, product:products(title, sku)",
           )
           .order("processed_at", { ascending: false })
           .limit(50),
@@ -30,6 +30,38 @@ export const listSalesOperations = createServerFn({ method: "GET" })
     if (pendingError) throw new Error(pendingError.message);
     if (salesError) throw new Error(salesError.message);
     return { pendingClosures: pending ?? [], recentSales: sales ?? [] };
+  });
+
+const SaleResolutionInput = z.object({
+  saleId: z.string().uuid(),
+  productId: z.string().uuid(),
+});
+
+export const reconcileEbaySale = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => SaleResolutionInput.parse(input))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: result, error } = await (supabaseAdmin as any).rpc("reconcile_ebay_sale", {
+      _sale_id: data.saleId,
+      _product_id: data.productId,
+    });
+    if (error) throw new Error(error.message);
+    const closureResults = await closeOtherActiveListings(supabaseAdmin, data.productId, "ebay");
+    return { ok: true, result, closureResults };
+  });
+
+export const ignoreUnmatchedEbaySale = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ saleId: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any).rpc("ignore_unmatched_ebay_sale", {
+      _sale_id: data.saleId,
+      _reason: "old_or_external_listing",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const searchSellableProducts = createServerFn({ method: "GET" })

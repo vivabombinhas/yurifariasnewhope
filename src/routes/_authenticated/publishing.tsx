@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,6 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -20,6 +27,8 @@ import {
 import { markAssistedClosed } from "@/lib/marketplaces/assisted.functions";
 import {
   listSalesOperations,
+  reconcileEbaySale,
+  ignoreUnmatchedEbaySale,
   registerManualSale,
   searchSellableProducts,
 } from "@/lib/sales-operations.functions";
@@ -48,6 +57,7 @@ function SalesOperationsPage() {
   const [search, setSearch] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
   const [soldOn, setSoldOn] = useState<"ebay" | "poshmark" | "depop" | "local">("local");
+  const [reviewSale, setReviewSale] = useState<any | null>(null);
   const query = useQuery({
     queryKey: ["sales-operations"],
     queryFn: () => load(),
@@ -265,11 +275,15 @@ function SalesOperationsPage() {
                         Pedido {sale.external_order_id} · {fmt(sale.order_created_at)}
                       </div>
                     </div>
-                    <Badge
-                      variant={sale.processing_status === "matched" ? "secondary" : "destructive"}
-                    >
-                      {sale.processing_status === "matched" ? "Identificado" : "Revisar"}
-                    </Badge>
+                    {sale.processing_status === "matched" ? (
+                      <Badge variant="secondary">Identificado</Badge>
+                    ) : sale.processing_status === "ignored" ? (
+                      <Badge variant="outline">Ignorado</Badge>
+                    ) : (
+                      <Button size="sm" variant="destructive" onClick={() => setReviewSale(sale)}>
+                        Revisar
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -277,6 +291,158 @@ function SalesOperationsPage() {
           )}
         </CardContent>
       </Card>
+      <ReviewSaleDialog
+        sale={reviewSale}
+        open={!!reviewSale}
+        onOpenChange={(open) => !open && setReviewSale(null)}
+        onResolved={() => {
+          setReviewSale(null);
+          query.refetch();
+        }}
+      />
     </div>
+  );
+}
+
+function lineItemTitle(sale: any): string | null {
+  const items = sale?.raw_order_redacted?.lineItems;
+  if (!Array.isArray(items)) return null;
+  const item = items.find((value: any) => value?.lineItemId === sale.external_line_item_id);
+  return typeof item?.title === "string" && item.title.trim() ? item.title.trim() : null;
+}
+
+function ReviewSaleDialog({
+  sale,
+  open,
+  onOpenChange,
+  onResolved,
+}: {
+  sale: any | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onResolved: () => void;
+}) {
+  const searchFn = useServerFn(searchSellableProducts);
+  const reconcileFn = useServerFn(reconcileEbaySale);
+  const ignoreFn = useServerFn(ignoreUnmatchedEbaySale);
+  const initialSearch = sale?.sku || lineItemTitle(sale) || "";
+  const [search, setSearch] = useState(initialSearch);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  useEffect(() => {
+    setSearch(sale?.sku || lineItemTitle(sale) || "");
+    setSelectedProductId("");
+  }, [sale?.id]);
+  const products = useQuery({
+    queryKey: ["sale-product-suggestions", sale?.id, search],
+    queryFn: () => searchFn({ data: { search } }),
+    enabled: open && !!sale,
+  });
+  const reconcile = useMutation({
+    mutationFn: () => reconcileFn({ data: { saleId: sale.id, productId: selectedProductId } }),
+    onSuccess: (result) => {
+      toast.success("Venda vinculada e produto marcado como vendido.");
+      const pending = result.closureResults.filter((item) => item.status === "manual_required");
+      if (pending.length) toast.warning(`${pending.length} remoção(ões) aguardando confirmação.`);
+      onResolved();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+  const ignore = useMutation({
+    mutationFn: () => ignoreFn({ data: { saleId: sale.id } }),
+    onSuccess: () => {
+      toast.success("Venda antiga ou externa ignorada.");
+      onResolved();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Revisar venda não identificada</DialogTitle>
+          <DialogDescription>
+            Confirme o produto correto. O sistema nunca fará essa associação apenas pela semelhança
+            do título.
+          </DialogDescription>
+        </DialogHeader>
+        {sale && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-3 text-sm">
+              <span className="text-muted-foreground">Pedido</span>
+              <span>{sale.external_order_id}</span>
+              <span className="text-muted-foreground">SKU do eBay</span>
+              <span>{sale.sku || "Não informado"}</span>
+              <span className="text-muted-foreground">ID do anúncio</span>
+              <span>{sale.external_listing_id || "Não informado"}</span>
+              <span className="text-muted-foreground">Título</span>
+              <span>{lineItemTitle(sale) || "Não disponível neste pedido antigo"}</span>
+              <span className="text-muted-foreground">Quantidade</span>
+              <span>{sale.quantity ?? 1}</span>
+              <span className="text-muted-foreground">Data</span>
+              <span>{fmt(sale.order_created_at)}</span>
+            </div>
+            <div className="space-y-2">
+              <Label>Buscar produto por SKU ou título</Label>
+              <Input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setSelectedProductId("");
+                }}
+                placeholder="SKU ou título do produto"
+                className="h-11"
+              />
+              <div className="max-h-56 space-y-2 overflow-y-auto">
+                {(products.data ?? []).map((product: any) => (
+                  <button
+                    type="button"
+                    key={product.id}
+                    onClick={() => setSelectedProductId(product.id)}
+                    className={`w-full rounded-md border p-3 text-left ${selectedProductId === product.id ? "border-primary bg-primary/5" : "hover:bg-muted"}`}
+                  >
+                    <div className="text-sm font-medium">
+                      {product.title || "Produto sem título"}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{product.sku}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button
+              className="h-12 w-full"
+              disabled={!selectedProductId || reconcile.isPending}
+              onClick={() => {
+                const product = products.data?.find((item: any) => item.id === selectedProductId);
+                if (
+                  confirm(
+                    `Vincular esta venda a ${product?.sku ?? "este produto"} e marcá-lo como vendido?`,
+                  )
+                )
+                  reconcile.mutate();
+              }}
+            >
+              {reconcile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Vincular e marcar como vendido
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={ignore.isPending}
+              onClick={() => {
+                if (
+                  confirm(
+                    "Ignorar esta venda como anúncio antigo ou externo? Nenhum produto será alterado.",
+                  )
+                )
+                  ignore.mutate();
+              }}
+            >
+              Ignorar anúncio antigo/externo
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
