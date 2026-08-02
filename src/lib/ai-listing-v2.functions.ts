@@ -62,17 +62,23 @@ GLOBAL RULES:
 - Never guarantee authenticity, rarity, edition, material, dimensions, functionality, or completeness from appearance alone.
 - Put every material uncertainty into uncertain_claims and create a short verification question.
 - Questions must be answerable with one mobile tap. Use 2-4 concise options such as Yes/No/Not tested.
+- Questions must ask for a FACT about the physical item. Never ask the operator to take/add a photo, research online, scan a code, or perform another workflow action. If a fact is unavailable, include an "Unknown/Not visible" option.
+- Mark a question required only when its answer changes a publishable factual claim, condition tier, lot composition, safety, or price. Optional questions must not block saving.
 - Describe every visible flaw and its location. No marketing fluff.
 - All listing copy must be in natural English.
 - Stock code is added elsewhere; do not invent one.
 - Price is an ESTIMATE, not live market research. Use research_required for jewelry, watches, premium brands, rare collectibles, or unclear models. Never pretend you checked sold listings.
+- item_specifics may contain confirmed values only. Never use "presumed", "likely", "appears", "possibly", "style", "unknown", or a guessed mechanism/material/model as an attribute value.
+- Use a specific product category, not a broad or incorrect neighboring category. Funko Pop vinyl figures are Vinyl Figures/Action Figures, never Bobbleheads unless the packaging explicitly says bobblehead.
+- Use NWT/New With Tags only when a physical retail/manufacturer tag is visibly attached. A sticker on packaging, hologram, or loose price sticker alone is not sufficient.
 
 PLATFORM RULES:
-- eBay: title <=80 characters; keyword-first. Description <=900 characters. shipping_text must mention ships from Cartersville, Georgia in 2-5 business days. eBay uses FREE SHIPPING, so buyer_shipping_cents=0 and estimated total equals listing price.
+- eBay: title <=80 characters; keyword-first. Description 500-900 characters when enough facts are visible. Structure the copy as factual item identification, an explicit Condition paragraph, and a final NOTE: "Please visit our store for additional similar items." shipping_text must mention FREE SHIPPING, an honest estimated packed weight and package dimensions when reasonably inferable (clearly label both Estimated), the packaging method, and ships from Cartersville, Georgia in 2-5 business days. eBay uses FREE SHIPPING, so buyer_shipping_cents=0 and estimated total equals listing price.
 - Poshmark: concise, brand/style/size focused; buyer pays shipping. Do not say free shipping.
 - Depop: concise and natural; emphasize relevant era/style/aesthetic only when supported. Avoid keyword spam and excessive hashtags.
 - Each platform gets its own title and description; do not mechanically copy eBay.
 - SALE FAST means a defensible quick-sale estimate. Provide an offer floor only when safe.
+- Poshmark and Depop shipping_text must say buyer-paid shipping and must not copy the eBay free-shipping statement.
 
 QUALITY:
 - Add validation_flags for missing measurements, untested function, unclear authenticity, uncertain lot composition, missing package weight, or any rule violation risk.
@@ -193,6 +199,66 @@ function configuredModel() {
   return process.env.AI_LISTING_MODEL?.trim() || "google/gemini-3-flash-preview";
 }
 
+const UNCERTAIN_ATTRIBUTE =
+  /\b(presum(?:ed|ably)|likely|appears?|possibly|maybe|unknown|guess(?:ed)?|style)\b/i;
+const NOTE_LINE = "NOTE: Please visit our store for additional similar items.";
+
+function normalizeResult(
+  parsed: Omit<AiListingV2, "analysisId" | "status">,
+): Omit<AiListingV2, "analysisId" | "status"> {
+  const identification = {
+    ...parsed.identification,
+    item_specifics: (parsed.identification.item_specifics ?? [])
+      .map((item) => ({ name: item.name.trim(), value: item.value.trim() }))
+      .filter((item) => item.name && item.value && !UNCERTAIN_ATTRIBUTE.test(item.value)),
+  };
+  const drafts = (parsed.marketplace_drafts ?? []).map((source) => {
+    const validation = [...(source.validation_flags ?? [])];
+    let title = (source.title ?? "").trim();
+    const titleLimit = source.marketplace === "ebay" ? 80 : 100;
+    if (title.length > titleLimit) {
+      title = title
+        .slice(0, titleLimit)
+        .replace(/\s+\S*$/, "")
+        .trim();
+      validation.push(`title_trimmed_to_${titleLimit}_characters`);
+    }
+    let description = (source.description ?? "").trim();
+    if (!description.toUpperCase().includes("NOTE:")) {
+      description = `${description}\n\n${NOTE_LINE}`.trim();
+    }
+    if (description.length > 900) {
+      description = description.slice(0, 900).trim();
+      validation.push("description_trimmed_to_900_characters");
+    }
+    if (UNCERTAIN_ATTRIBUTE.test(`${title} ${source.condition_text}`)) {
+      validation.push("uncertain_claim_in_publishable_copy");
+    }
+    return {
+      ...source,
+      title,
+      description,
+      condition_text: (source.condition_text ?? "").trim(),
+      shipping_text: (source.shipping_text ?? "").trim(),
+      keywords: source.keywords ?? [],
+      validation_flags: [...new Set(validation)],
+    };
+  });
+  return {
+    ...parsed,
+    identification,
+    verification_questions: (parsed.verification_questions ?? []).filter(
+      (question) =>
+        question.prompt.trim() &&
+        !/\b(take|add|upload|research|search|scan)\b.*\b(photo|picture|online|code|barcode)\b/i.test(
+          question.prompt,
+        ),
+    ),
+    quality_flags: parsed.quality_flags ?? [],
+    marketplace_drafts: drafts,
+  };
+}
+
 async function loadPhotoUrls(supabase: any, productId: string) {
   const { data: photos, error } = await supabase
     .from("product_photos")
@@ -268,11 +334,16 @@ export const analyzeProductV2 = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
     const { supabase, userId } = context;
     const imageUrls = await loadPhotoUrls(supabase, data.productId);
-    const { model, raw, parsed } = await callGateway(
+    const {
+      model,
+      raw,
+      parsed: rawParsed,
+    } = await callGateway(
       apiKey,
       imageUrls,
       "Analyze this product and create the three marketplace drafts.",
     );
+    const parsed = normalizeResult(rawParsed);
     const questions = Array.isArray(parsed.verification_questions)
       ? parsed.verification_questions
       : [];
@@ -340,7 +411,11 @@ export const finalizeProductV2 = createServerFn({ method: "POST" })
     const answerLines = Object.entries(data.answers)
       .map(([key, value]) => `- ${key}: ${value}`)
       .join("\n");
-    const { model, raw, parsed } = await callGateway(
+    const {
+      model,
+      raw,
+      parsed: rawParsed,
+    } = await callGateway(
       apiKey,
       imageUrls,
       `Revise the existing analysis and all three drafts using the operator's confirmed answers.
@@ -359,6 +434,7 @@ ${JSON.stringify(currentDrafts ?? [])}
 
 Apply each answer consistently to identification, condition, titles, descriptions, shipping and pricing. Do not preserve a contradicted assumption. Return only genuinely unresolved verification questions.`,
     );
+    const parsed = normalizeResult(rawParsed);
     const questions = Array.isArray(parsed.verification_questions)
       ? parsed.verification_questions
       : [];

@@ -513,6 +513,17 @@ function BatchIntakePage() {
             })
             .eq("id", d.aiAnalysisId);
           if (reviewError) throw reviewError;
+          const { error: marketplaceDraftError } = await (supabase as any)
+            .from("ai_marketplace_drafts")
+            .upsert(
+              d.marketplaceDrafts.map((listing) => ({
+                ...listing,
+                analysis_id: d.aiAnalysisId,
+                product_id: d.productId,
+              })),
+              { onConflict: "analysis_id,marketplace" },
+            );
+          if (marketplaceDraftError) throw marketplaceDraftError;
         }
       });
       const failed = results.filter((r) => !r.ok).length;
@@ -750,6 +761,25 @@ function DraftCard({
   const otherDrafts = allDrafts.filter((d) => d.id !== draft.id);
   const isEditable = draft.status === "ready" || draft.status === "pending";
   const isLocked = draft.status === "uploading" || draft.status === "analyzing";
+  function updateMarketplaceDraft(
+    marketplace: MarketplaceDraftV2["marketplace"],
+    patch: Partial<MarketplaceDraftV2>,
+  ) {
+    const marketplaceDrafts = draft.marketplaceDrafts.map((listing) =>
+      listing.marketplace === marketplace ? { ...listing, ...patch } : listing,
+    );
+    const productPatch: Partial<BatchDraft> = { marketplaceDrafts };
+    if (marketplace === "ebay") {
+      if (typeof patch.title === "string") productPatch.title = patch.title;
+      if (typeof patch.description === "string") productPatch.description = patch.description;
+      if (typeof patch.shipping_text === "string")
+        productPatch.shipping_notes = patch.shipping_text;
+      if (patch.listing_price_cents !== undefined)
+        productPatch.price =
+          patch.listing_price_cents == null ? "" : (patch.listing_price_cents / 100).toFixed(2);
+    }
+    onUpdate(productPatch);
+  }
 
   return (
     <div className="rounded-md border p-3 space-y-3">
@@ -844,22 +874,140 @@ function DraftCard({
               )}
             </Button>
           )}
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2">
             {draft.marketplaceDrafts.map((listing) => (
-              <div key={listing.marketplace} className="rounded-md border bg-background p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold capitalize">{listing.marketplace}</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    {listing.price_confidence.replaceAll("_", " ")}
-                  </Badge>
+              <details key={listing.marketplace} className="group rounded-md border bg-background">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold capitalize">
+                        {listing.marketplace}
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {listing.price_confidence.replaceAll("_", " ")}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">{listing.title}</p>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold">
+                    {listing.listing_price_cents == null
+                      ? "Research"
+                      : `$${(listing.listing_price_cents / 100).toFixed(2)}`}
+                  </span>
+                </summary>
+                <div className="space-y-3 border-t p-3">
+                  <div className="space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <Label className="text-xs">Title</Label>
+                      <span className="text-[10px] text-muted-foreground">
+                        {listing.title.length}/{listing.marketplace === "ebay" ? 80 : 100}
+                      </span>
+                    </div>
+                    <Input
+                      value={listing.title}
+                      maxLength={listing.marketplace === "ebay" ? 80 : 100}
+                      onChange={(event) =>
+                        updateMarketplaceDraft(listing.marketplace, {
+                          title: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Condition</Label>
+                    <Textarea
+                      rows={2}
+                      value={listing.condition_text}
+                      onChange={(event) =>
+                        updateMarketplaceDraft(listing.marketplace, {
+                          condition_text: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <Label className="text-xs">Description</Label>
+                      <span className="text-[10px] text-muted-foreground">
+                        {listing.description.length}/900
+                      </span>
+                    </div>
+                    <Textarea
+                      rows={7}
+                      maxLength={900}
+                      value={listing.description}
+                      onChange={(event) =>
+                        updateMarketplaceDraft(listing.marketplace, {
+                          description: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Shipping</Label>
+                    <Textarea
+                      rows={3}
+                      value={listing.shipping_text}
+                      onChange={(event) =>
+                        updateMarketplaceDraft(listing.marketplace, {
+                          shipping_text: event.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Price</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={
+                          listing.listing_price_cents == null
+                            ? ""
+                            : (listing.listing_price_cents / 100).toFixed(2)
+                        }
+                        onChange={(event) =>
+                          updateMarketplaceDraft(listing.marketplace, {
+                            listing_price_cents: event.target.value
+                              ? Math.round(Number(event.target.value) * 100)
+                              : null,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Minimum offer</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={
+                          listing.minimum_offer_cents == null
+                            ? ""
+                            : (listing.minimum_offer_cents / 100).toFixed(2)
+                        }
+                        onChange={(event) =>
+                          updateMarketplaceDraft(listing.marketplace, {
+                            minimum_offer_cents: event.target.value
+                              ? Math.round(Number(event.target.value) * 100)
+                              : null,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {listing.pricing_basis ||
+                      "Price is an estimate until comparables are researched."}
+                  </p>
+                  {listing.validation_flags.length > 0 && (
+                    <p className="text-xs text-amber-700">
+                      Review: {listing.validation_flags.join(" · ")}
+                    </p>
+                  )}
                 </div>
-                <p className="mt-1 line-clamp-2 text-xs">{listing.title}</p>
-                <p className="mt-1 text-sm font-semibold">
-                  {listing.listing_price_cents == null
-                    ? "Research price"
-                    : `$${(listing.listing_price_cents / 100).toFixed(2)}`}
-                </p>
-              </div>
+              </details>
             ))}
           </div>
         </div>
@@ -901,165 +1049,170 @@ function DraftCard({
       </div>
 
       {(draft.status === "ready" || draft.status === "pending") && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div className="sm:col-span-2 space-y-1">
-            <Label className="text-xs">Title</Label>
-            <Input
-              value={draft.title}
-              onChange={(e) => onUpdate({ title: e.target.value })}
-              disabled={!isEditable}
-            />
-          </div>
-          <div className="sm:col-span-2 space-y-1">
-            <Label className="text-xs">Description</Label>
-            <Textarea
-              rows={3}
-              value={draft.description}
-              onChange={(e) => onUpdate({ description: e.target.value })}
-              disabled={!isEditable}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Brand</Label>
-            <Input
-              value={draft.brand}
-              onChange={(e) => onUpdate({ brand: e.target.value })}
-              disabled={!isEditable}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Category</Label>
-            <Input
-              value={draft.category}
-              onChange={(e) => onUpdate({ category: e.target.value })}
-              disabled={!isEditable}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Condition</Label>
-            <Select
-              value={draft.condition}
-              onValueChange={(v) => onUpdate({ condition: v })}
-              disabled={!isEditable}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="—" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUCT_CONDITIONS.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {tCondition(t, c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Price (USD)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              value={draft.price}
-              onChange={(e) => onUpdate({ price: e.target.value })}
-              disabled={!isEditable}
-            />
-          </div>
-
-          <div className="sm:col-span-2 space-y-1">
-            <Label className="text-xs">Condition grade</Label>
-            <Input
-              value={draft.condition_grade}
-              onChange={(e) => onUpdate({ condition_grade: e.target.value })}
-              disabled={!isEditable}
-              placeholder='e.g. "Used – Very Good"'
-            />
-          </div>
-          <div className="sm:col-span-2 space-y-1">
-            <Label className="text-xs">Condition notes</Label>
-            <Textarea
-              rows={2}
-              value={draft.condition_notes}
-              onChange={(e) => onUpdate({ condition_notes: e.target.value })}
-              disabled={!isEditable}
-              placeholder="Visible flaws, locations, wear…"
-            />
-          </div>
-          <div className="sm:col-span-2 space-y-1">
-            <Label className="text-xs">Shipping notes</Label>
-            <Textarea
-              rows={2}
-              value={draft.shipping_notes}
-              onChange={(e) => onUpdate({ shipping_notes: e.target.value })}
-              disabled={!isEditable}
-              placeholder="Packaging plan, handling…"
-            />
-          </div>
-
-          <div className="sm:col-span-2 space-y-1">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Item specifics ({draft.item_specifics.length})</Label>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
+        <details className="rounded-md border bg-muted/20">
+          <summary className="cursor-pointer p-3 text-sm font-medium">
+            Product details and item specifics
+          </summary>
+          <div className="grid grid-cols-1 gap-2 border-t p-3 sm:grid-cols-2">
+            <div className="sm:col-span-2 space-y-1">
+              <Label className="text-xs">Title</Label>
+              <Input
+                value={draft.title}
+                onChange={(e) => onUpdate({ title: e.target.value })}
                 disabled={!isEditable}
-                onClick={() =>
-                  onUpdate({
-                    item_specifics: [...draft.item_specifics, { name: "", value: "" }],
-                  })
-                }
-              >
-                + Add
-              </Button>
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1">
+              <Label className="text-xs">Description</Label>
+              <Textarea
+                rows={3}
+                value={draft.description}
+                onChange={(e) => onUpdate({ description: e.target.value })}
+                disabled={!isEditable}
+              />
             </div>
             <div className="space-y-1">
-              {draft.item_specifics.map((sp, i) => (
-                <div key={i} className="flex gap-1">
-                  <Input
-                    className="h-8 text-xs flex-1"
-                    placeholder="Name"
-                    value={sp.name}
-                    disabled={!isEditable}
-                    onChange={(e) => {
-                      const next = [...draft.item_specifics];
-                      next[i] = { ...next[i], name: e.target.value };
-                      onUpdate({ item_specifics: next });
-                    }}
-                  />
-                  <Input
-                    className="h-8 text-xs flex-1"
-                    placeholder="Value"
-                    value={sp.value}
-                    disabled={!isEditable}
-                    onChange={(e) => {
-                      const next = [...draft.item_specifics];
-                      next[i] = { ...next[i], value: e.target.value };
-                      onUpdate({ item_specifics: next });
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 px-2"
-                    disabled={!isEditable}
-                    onClick={() =>
-                      onUpdate({
-                        item_specifics: draft.item_specifics.filter((_, j) => j !== i),
-                      })
-                    }
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-              {draft.item_specifics.length === 0 && (
-                <p className="text-[11px] text-muted-foreground">No specifics yet.</p>
-              )}
+              <Label className="text-xs">Brand</Label>
+              <Input
+                value={draft.brand}
+                onChange={(e) => onUpdate({ brand: e.target.value })}
+                disabled={!isEditable}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Category</Label>
+              <Input
+                value={draft.category}
+                onChange={(e) => onUpdate({ category: e.target.value })}
+                disabled={!isEditable}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Condition</Label>
+              <Select
+                value={draft.condition}
+                onValueChange={(v) => onUpdate({ condition: v })}
+                disabled={!isEditable}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCT_CONDITIONS.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {tCondition(t, c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Price (USD)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={draft.price}
+                onChange={(e) => onUpdate({ price: e.target.value })}
+                disabled={!isEditable}
+              />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1">
+              <Label className="text-xs">Condition grade</Label>
+              <Input
+                value={draft.condition_grade}
+                onChange={(e) => onUpdate({ condition_grade: e.target.value })}
+                disabled={!isEditable}
+                placeholder='e.g. "Used – Very Good"'
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1">
+              <Label className="text-xs">Condition notes</Label>
+              <Textarea
+                rows={2}
+                value={draft.condition_notes}
+                onChange={(e) => onUpdate({ condition_notes: e.target.value })}
+                disabled={!isEditable}
+                placeholder="Visible flaws, locations, wear…"
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1">
+              <Label className="text-xs">Shipping notes</Label>
+              <Textarea
+                rows={2}
+                value={draft.shipping_notes}
+                onChange={(e) => onUpdate({ shipping_notes: e.target.value })}
+                disabled={!isEditable}
+                placeholder="Packaging plan, handling…"
+              />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Item specifics ({draft.item_specifics.length})</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={!isEditable}
+                  onClick={() =>
+                    onUpdate({
+                      item_specifics: [...draft.item_specifics, { name: "", value: "" }],
+                    })
+                  }
+                >
+                  + Add
+                </Button>
+              </div>
+              <div className="space-y-1">
+                {draft.item_specifics.map((sp, i) => (
+                  <div key={i} className="flex gap-1">
+                    <Input
+                      className="h-8 text-xs flex-1"
+                      placeholder="Name"
+                      value={sp.name}
+                      disabled={!isEditable}
+                      onChange={(e) => {
+                        const next = [...draft.item_specifics];
+                        next[i] = { ...next[i], name: e.target.value };
+                        onUpdate({ item_specifics: next });
+                      }}
+                    />
+                    <Input
+                      className="h-8 text-xs flex-1"
+                      placeholder="Value"
+                      value={sp.value}
+                      disabled={!isEditable}
+                      onChange={(e) => {
+                        const next = [...draft.item_specifics];
+                        next[i] = { ...next[i], value: e.target.value };
+                        onUpdate({ item_specifics: next });
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2"
+                      disabled={!isEditable}
+                      onClick={() =>
+                        onUpdate({
+                          item_specifics: draft.item_specifics.filter((_, j) => j !== i),
+                        })
+                      }
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+                {draft.item_specifics.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground">No specifics yet.</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        </details>
       )}
     </div>
   );
