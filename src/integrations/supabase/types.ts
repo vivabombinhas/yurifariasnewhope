@@ -14,6 +14,143 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_marketplace_drafts: {
+        Row: {
+          analysis_id: string
+          approved: boolean
+          buyer_shipping_cents: number | null
+          condition_text: string
+          created_at: string
+          description: string
+          estimated_buyer_total_cents: number | null
+          id: string
+          keywords: Json
+          listing_price_cents: number | null
+          marketplace: Database["public"]["Enums"]["marketplace"]
+          minimum_offer_cents: number | null
+          price_confidence: string
+          pricing_basis: string
+          product_id: string
+          shipping_text: string
+          title: string
+          updated_at: string
+          validation_flags: Json
+        }
+        Insert: {
+          analysis_id: string
+          approved?: boolean
+          buyer_shipping_cents?: number | null
+          condition_text?: string
+          created_at?: string
+          description?: string
+          estimated_buyer_total_cents?: number | null
+          id?: string
+          keywords?: Json
+          listing_price_cents?: number | null
+          marketplace: Database["public"]["Enums"]["marketplace"]
+          minimum_offer_cents?: number | null
+          price_confidence?: string
+          pricing_basis?: string
+          product_id: string
+          shipping_text?: string
+          title?: string
+          updated_at?: string
+          validation_flags?: Json
+        }
+        Update: {
+          analysis_id?: string
+          approved?: boolean
+          buyer_shipping_cents?: number | null
+          condition_text?: string
+          created_at?: string
+          description?: string
+          estimated_buyer_total_cents?: number | null
+          id?: string
+          keywords?: Json
+          listing_price_cents?: number | null
+          marketplace?: Database["public"]["Enums"]["marketplace"]
+          minimum_offer_cents?: number | null
+          price_confidence?: string
+          pricing_basis?: string
+          product_id?: string
+          shipping_text?: string
+          title?: string
+          updated_at?: string
+          validation_flags?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_marketplace_drafts_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "ai_product_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_marketplace_drafts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_product_analyses: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          identification: Json
+          model: string
+          product_id: string
+          quality_flags: Json
+          raw_response: Json
+          status: string
+          updated_at: string
+          verification_answers: Json
+          verification_questions: Json
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          identification?: Json
+          model: string
+          product_id: string
+          quality_flags?: Json
+          raw_response?: Json
+          status?: string
+          updated_at?: string
+          verification_answers?: Json
+          verification_questions?: Json
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          identification?: Json
+          model?: string
+          product_id?: string
+          quality_flags?: Json
+          raw_response?: Json
+          status?: string
+          updated_at?: string
+          verification_answers?: Json
+          verification_questions?: Json
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_product_analyses_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_suggestions: {
         Row: {
           accepted: boolean

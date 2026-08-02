@@ -9,29 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
-import { Route as AuthenticatedIntakeRouteImport } from './routes/_authenticated/intake'
-import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
-import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
-import { Route as AuthenticatedPublishingRouteImport } from './routes/_authenticated/publishing'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedPublishingRouteImport } from './routes/_authenticated/publishing'
+import { Route as AuthenticatedProductsRouteImport } from './routes/_authenticated/products'
+import { Route as AuthenticatedLocationsRouteImport } from './routes/_authenticated/locations'
+import { Route as AuthenticatedIntakeRouteImport } from './routes/_authenticated/intake'
 import { Route as AuthenticatedProductsIndexRouteImport } from './routes/_authenticated/products.index'
-import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
-import { Route as AuthenticatedProductsBatchRouteImport } from './routes/_authenticated/products.batch'
 import { Route as AuthenticatedProductsNewRouteImport } from './routes/_authenticated/products.new'
-import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
+import { Route as AuthenticatedProductsBatchRouteImport } from './routes/_authenticated/products.batch'
+import { Route as AuthenticatedProductsIdRouteImport } from './routes/_authenticated/products.$id'
 import { Route as ApiPublicEbaySyncOrdersRouteImport } from './routes/api/public/ebay/sync-orders'
+import { Route as ApiPublicEbayCallbackRouteImport } from './routes/api/public/ebay/callback'
 import { Route as ApiPublicEbayImagePhotoIdRouteImport } from './routes/api/public/ebay/image.$photoId'
 
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
@@ -39,19 +39,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedIntakeRoute = AuthenticatedIntakeRouteImport.update({
-  id: '/intake',
-  path: '/intake',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
-  id: '/locations',
-  path: '/locations',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
-  id: '/products',
-  path: '/products',
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPublishingRoute = AuthenticatedPublishingRouteImport.update({
@@ -59,9 +49,19 @@ const AuthenticatedPublishingRoute = AuthenticatedPublishingRouteImport.update({
   path: '/publishing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AuthenticatedProductsRoute = AuthenticatedProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedLocationsRoute = AuthenticatedLocationsRouteImport.update({
+  id: '/locations',
+  path: '/locations',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedIntakeRoute = AuthenticatedIntakeRouteImport.update({
+  id: '/intake',
+  path: '/intake',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedProductsIndexRoute =
@@ -70,31 +70,31 @@ const AuthenticatedProductsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedProductsRoute,
   } as any)
-const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthenticatedProductsRoute,
-} as any)
-const AuthenticatedProductsBatchRoute =
-  AuthenticatedProductsBatchRouteImport.update({
-    id: '/batch',
-    path: '/batch',
-    getParentRoute: () => AuthenticatedProductsRoute,
-  } as any)
 const AuthenticatedProductsNewRoute =
   AuthenticatedProductsNewRouteImport.update({
     id: '/new',
     path: '/new',
     getParentRoute: () => AuthenticatedProductsRoute,
   } as any)
-const ApiPublicEbayCallbackRoute = ApiPublicEbayCallbackRouteImport.update({
-  id: '/api/public/ebay/callback',
-  path: '/api/public/ebay/callback',
-  getParentRoute: () => rootRouteImport,
+const AuthenticatedProductsBatchRoute =
+  AuthenticatedProductsBatchRouteImport.update({
+    id: '/batch',
+    path: '/batch',
+    getParentRoute: () => AuthenticatedProductsRoute,
+  } as any)
+const AuthenticatedProductsIdRoute = AuthenticatedProductsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedProductsRoute,
 } as any)
 const ApiPublicEbaySyncOrdersRoute = ApiPublicEbaySyncOrdersRouteImport.update({
   id: '/api/public/ebay/sync-orders',
   path: '/api/public/ebay/sync-orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicEbayCallbackRoute = ApiPublicEbayCallbackRouteImport.update({
+  id: '/api/public/ebay/callback',
+  path: '/api/public/ebay/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicEbayImagePhotoIdRoute =
@@ -214,18 +214,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_authenticated': {
-      id: '/_authenticated'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AuthenticatedRouteRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/': {
@@ -235,25 +235,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/intake': {
-      id: '/_authenticated/intake'
-      path: '/intake'
-      fullPath: '/intake'
-      preLoaderRoute: typeof AuthenticatedIntakeRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/locations': {
-      id: '/_authenticated/locations'
-      path: '/locations'
-      fullPath: '/locations'
-      preLoaderRoute: typeof AuthenticatedLocationsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/products': {
-      id: '/_authenticated/products'
-      path: '/products'
-      fullPath: '/products'
-      preLoaderRoute: typeof AuthenticatedProductsRouteImport
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/publishing': {
@@ -263,11 +249,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPublishingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+    '/_authenticated/products': {
+      id: '/_authenticated/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof AuthenticatedProductsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/locations': {
+      id: '/_authenticated/locations'
+      path: '/locations'
+      fullPath: '/locations'
+      preLoaderRoute: typeof AuthenticatedLocationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/intake': {
+      id: '/_authenticated/intake'
+      path: '/intake'
+      fullPath: '/intake'
+      preLoaderRoute: typeof AuthenticatedIntakeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/products/': {
@@ -277,11 +277,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsIndexRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
-    '/_authenticated/products/$id': {
-      id: '/_authenticated/products/$id'
-      path: '/$id'
-      fullPath: '/products/$id'
-      preLoaderRoute: typeof AuthenticatedProductsIdRouteImport
+    '/_authenticated/products/new': {
+      id: '/_authenticated/products/new'
+      path: '/new'
+      fullPath: '/products/new'
+      preLoaderRoute: typeof AuthenticatedProductsNewRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
     '/_authenticated/products/batch': {
@@ -291,25 +291,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProductsBatchRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
     }
-    '/_authenticated/products/new': {
-      id: '/_authenticated/products/new'
-      path: '/new'
-      fullPath: '/products/new'
-      preLoaderRoute: typeof AuthenticatedProductsNewRouteImport
+    '/_authenticated/products/$id': {
+      id: '/_authenticated/products/$id'
+      path: '/$id'
+      fullPath: '/products/$id'
+      preLoaderRoute: typeof AuthenticatedProductsIdRouteImport
       parentRoute: typeof AuthenticatedProductsRoute
-    }
-    '/api/public/ebay/callback': {
-      id: '/api/public/ebay/callback'
-      path: '/api/public/ebay/callback'
-      fullPath: '/api/public/ebay/callback'
-      preLoaderRoute: typeof ApiPublicEbayCallbackRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/api/public/ebay/sync-orders': {
       id: '/api/public/ebay/sync-orders'
       path: '/api/public/ebay/sync-orders'
       fullPath: '/api/public/ebay/sync-orders'
       preLoaderRoute: typeof ApiPublicEbaySyncOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/ebay/callback': {
+      id: '/api/public/ebay/callback'
+      path: '/api/public/ebay/callback'
+      fullPath: '/api/public/ebay/callback'
+      preLoaderRoute: typeof ApiPublicEbayCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/ebay/image/$photoId': {
