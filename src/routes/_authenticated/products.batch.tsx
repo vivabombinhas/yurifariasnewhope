@@ -405,7 +405,7 @@ function BatchIntakePage() {
               verificationAnswers: {},
               marketplaceDrafts: v2?.marketplace_drafts ?? [],
               qualityFlags: v2?.quality_flags ?? [],
-              answersApplied: !v2?.verification_questions?.length,
+              answersApplied: !v2?.verification_questions?.some((question) => question.required),
             }
           : d,
       ),
@@ -914,6 +914,7 @@ function DraftCard({
               onClick={onRefine}
               disabled={
                 draft.status === "refining" ||
+                Object.keys(draft.verificationAnswers).length === 0 ||
                 draft.verificationQuestions.some(
                   (question) => question.required && !draft.verificationAnswers[question.key],
                 )

@@ -205,6 +205,7 @@ const NOTE_LINE = "NOTE: Please visit our store for additional similar items.";
 
 function normalizeResult(
   parsed: Omit<AiListingV2, "analysisId" | "status">,
+  answers: Record<string, string> = {},
 ): Omit<AiListingV2, "analysisId" | "status"> {
   const identification = {
     ...parsed.identification,
@@ -212,9 +213,95 @@ function normalizeResult(
       .map((item) => ({ name: item.name.trim(), value: item.value.trim() }))
       .filter((item) => item.name && item.value && !UNCERTAIN_ATTRIBUTE.test(item.value)),
   };
+  const hasNwtClaim = (parsed.marketplace_drafts ?? []).some((draft) =>
+    /\bNWT\b|\bnew with tags?\b/i.test(
+      `${draft.title} ${draft.condition_text} ${draft.description}`,
+    ),
+  );
+  let questions = (parsed.verification_questions ?? [])
+    .filter(
+      (question) =>
+        question.prompt.trim() &&
+        !/\b(take|add|upload|research|search|scan)\b.*\b(photo|picture|online|code|barcode)\b/i.test(
+          question.prompt,
+        ),
+    )
+    .map((question) => ({
+      ...question,
+      reason: question.reason.replace(/authenticity/gi, "product identification"),
+      required:
+        question.required ||
+        /\b(seal(?:ed)?|opened|working|works|tested|complete|missing|damage|cracks?|hang tag|attached tag)\b/i.test(
+          question.prompt,
+        ),
+    }));
+  const hasTagQuestion = questions.some((question) =>
+    /\b(hang tag|attached tag|tag physically attached)\b/i.test(question.prompt),
+  );
+  if (hasNwtClaim && !hasTagQuestion && !answers.attached_hang_tag) {
+    questions.push({
+      key: "attached_hang_tag",
+      prompt: "Is a physical retail or manufacturer hang tag attached to the item?",
+      reason: "NWT can only be used when a physical tag is visibly attached.",
+      options: ["Attached hang tag", "Stickers only", "No tag", "Unknown"],
+      required: true,
+    });
+  }
+
+  function answerFor(question: VerificationQuestionV2) {
+    return answers[question.key]?.trim();
+  }
+  const unresolvedSeal = questions.some(
+    (question) => /\bseal(?:ed)?\b/i.test(question.prompt) && !answerFor(question),
+  );
+  const tagQuestion = questions.find((question) =>
+    /\b(hang tag|attached tag|tag physically attached)\b/i.test(question.prompt),
+  );
+  const tagAnswer = (
+    answers.attached_hang_tag ??
+    (tagQuestion ? answers[tagQuestion.key] : "") ??
+    ""
+  ).trim();
+  const attachedTagConfirmed = /^attached hang tag$/i.test(tagAnswer);
+
+  function sanitizeCopy(value: string, validation: string[]) {
+    let text = value;
+    const banned: Array<[RegExp, string, string]> = [
+      [/\bauthentic\b/gi, "", "removed_unverified_authenticity_claim"],
+      [/\brare\b/gi, "", "removed_unverified_rarity_claim"],
+      [/\binsane\b/gi, "", "removed_marketing_exaggeration"],
+      [/\bdeadstock\b/gi, "new in package", "replaced_deadstock_claim"],
+    ];
+    for (const [pattern, replacement, flag] of banned) {
+      if (text.match(pattern)) {
+        text = text.replace(pattern, replacement);
+        validation.push(flag);
+      }
+    }
+    if (hasNwtClaim && !attachedTagConfirmed) {
+      const replacement = /stickers only/i.test(tagAnswer)
+        ? "New with stickers"
+        : /no tag/i.test(tagAnswer)
+          ? "New without tags"
+          : "New — tag status unconfirmed";
+      if (/\bNWT\b|\bnew with tags?\b/i.test(text)) {
+        text = text.replace(/\bNWT\b|\bnew with tags?\b/gi, replacement);
+        validation.push("nwt_requires_attached_hang_tag");
+      }
+    }
+    if (unresolvedSeal && /\b(factory\s+)?sealed\b/i.test(text)) {
+      text = text.replace(
+        /\b(factory\s+)?sealed\b/gi,
+        "in original packaging (seal status unconfirmed)",
+      );
+      validation.push("seal_claim_waiting_for_confirmation");
+    }
+    return text.replace(/[ \t]{2,}/g, " ").trim();
+  }
+
   const drafts = (parsed.marketplace_drafts ?? []).map((source) => {
     const validation = [...(source.validation_flags ?? [])];
-    let title = (source.title ?? "").trim();
+    let title = sanitizeCopy((source.title ?? "").trim(), validation);
     const titleLimit = source.marketplace === "ebay" ? 80 : 100;
     if (title.length > titleLimit) {
       title = title
@@ -223,23 +310,32 @@ function normalizeResult(
         .trim();
       validation.push(`title_trimmed_to_${titleLimit}_characters`);
     }
-    let description = (source.description ?? "").trim();
-    if (!description.toUpperCase().includes("NOTE:")) {
-      description = `${description}\n\n${NOTE_LINE}`.trim();
-    }
-    if (description.length > 900) {
-      description = description.slice(0, 900).trim();
+    let conditionText = sanitizeCopy((source.condition_text ?? "").trim(), validation);
+    let description = sanitizeCopy((source.description ?? "").trim(), validation);
+    const paragraphs = description
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .filter(
+        (paragraph) =>
+          paragraph &&
+          !/^shipping\s*(?:&\s*handling)?\s*:/i.test(paragraph) &&
+          !/^NOTE:/i.test(paragraph),
+      );
+    const descriptionBody = paragraphs.join("\n\n");
+    const maxBodyLength = 900 - NOTE_LINE.length - 2;
+    description = `${descriptionBody.slice(0, maxBodyLength).trim()}\n\n${NOTE_LINE}`.trim();
+    if (descriptionBody.length > maxBodyLength) {
       validation.push("description_trimmed_to_900_characters");
     }
-    if (UNCERTAIN_ATTRIBUTE.test(`${title} ${source.condition_text}`)) {
+    if (UNCERTAIN_ATTRIBUTE.test(`${title} ${conditionText}`)) {
       validation.push("uncertain_claim_in_publishable_copy");
     }
     return {
       ...source,
       title,
       description,
-      condition_text: (source.condition_text ?? "").trim(),
-      shipping_text: (source.shipping_text ?? "").trim(),
+      condition_text: conditionText,
+      shipping_text: sanitizeCopy((source.shipping_text ?? "").trim(), validation),
       keywords: source.keywords ?? [],
       validation_flags: [...new Set(validation)],
     };
@@ -247,13 +343,7 @@ function normalizeResult(
   return {
     ...parsed,
     identification,
-    verification_questions: (parsed.verification_questions ?? []).filter(
-      (question) =>
-        question.prompt.trim() &&
-        !/\b(take|add|upload|research|search|scan)\b.*\b(photo|picture|online|code|barcode)\b/i.test(
-          question.prompt,
-        ),
-    ),
+    verification_questions: questions,
     quality_flags: parsed.quality_flags ?? [],
     marketplace_drafts: drafts,
   };
@@ -434,7 +524,7 @@ ${JSON.stringify(currentDrafts ?? [])}
 
 Apply each answer consistently to identification, condition, titles, descriptions, shipping and pricing. Do not preserve a contradicted assumption. Return only genuinely unresolved verification questions.`,
     );
-    const parsed = normalizeResult(rawParsed);
+    const parsed = normalizeResult(rawParsed, data.answers);
     const questions = Array.isArray(parsed.verification_questions)
       ? parsed.verification_questions
       : [];
