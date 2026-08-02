@@ -20,15 +20,9 @@ import { closeOtherActiveListings } from "@/lib/marketplaces/close-product-listi
  *   listing_url, published_at, sold_at, provider_metadata (jsonb)
  */
 
-const ASSISTED: ReadonlySet<MarketplaceId> = new Set([
-  "poshmark",
-  "depop",
-]);
+const ASSISTED: ReadonlySet<MarketplaceId> = new Set(["poshmark", "depop"]);
 
-const Marketplace = z.enum([
-  "poshmark",
-  "depop",
-]) as unknown as z.ZodType<MarketplaceId>;
+const Marketplace = z.enum(["poshmark", "depop"]) as unknown as z.ZodType<MarketplaceId>;
 
 function pickSpec(specs: ItemSpecific[], names: string[]): string | null {
   for (const s of specs) {
@@ -46,12 +40,15 @@ function buildFields(marketplace: MarketplaceId, p: any): Field[] {
   const brand = p.brand?.name ?? pickSpec(specs, ["Brand"]) ?? null;
   const category = p.category?.name ?? null;
   const condition =
-    p.condition_grade ||
-    (p.condition ? String(p.condition).replace(/_/g, " ") : null);
+    p.condition_grade || (p.condition ? String(p.condition).replace(/_/g, " ") : null);
   const size = pickSpec(specs, ["Size", "US Size", "Shoe Size"]);
   const color = pickSpec(specs, ["Color", "Colour", "Primary Color"]);
   const material = pickSpec(specs, ["Material", "Fabric"]);
   const style = pickSpec(specs, ["Style", "Type"]);
+  const categoryNeedsSize =
+    /\b(clothing|apparel|shoes?|footwear|dress|shirt|pants|jeans|shorts|skirt|jacket|coat|sweater|hoodie|swimwear|lingerie)\b/i.test(
+      category ?? "",
+    );
 
   const base: Field[] = [
     { key: "title", label: "Title", value: p.title || null, required: true },
@@ -73,7 +70,7 @@ function buildFields(marketplace: MarketplaceId, p: any): Field[] {
   ];
 
   base.push(
-    { key: "size", label: "Size", value: size, required: true },
+    { key: "size", label: "Size", value: size, required: categoryNeedsSize },
     { key: "color", label: "Color", value: color, required: false },
     { key: "material", label: "Material", value: material, required: false },
   );
@@ -135,9 +132,7 @@ export const getAssistedListing = createServerFn({ method: "POST" })
 
     const { data: listing } = await supabase
       .from("marketplace_listings")
-      .select(
-        "id, status, listing_url, published_at, sold_at, provider_metadata, updated_at",
-      )
+      .select("id, status, listing_url, published_at, sold_at, provider_metadata, updated_at")
       .eq("product_id", data.productId)
       .eq("marketplace", data.marketplace)
       .maybeSingle();
@@ -306,7 +301,7 @@ export const markAssistedClosed = createServerFn({ method: "POST" })
 const SoldInput = z.object({
   productId: z.string().uuid(),
   marketplace: Marketplace,
-  });
+});
 
 const ProgressInput = z.object({
   productId: z.string().uuid(),
@@ -345,8 +340,7 @@ export const saveMobileProgress = createServerFn({ method: "POST" })
 
     const now = new Date().toISOString();
     const currentMeta = (existing?.provider_metadata as Record<string, any>) ?? {};
-    const currentProgress =
-      (currentMeta.mobilePostingProgress as Record<string, any>) ?? {};
+    const currentProgress = (currentMeta.mobilePostingProgress as Record<string, any>) ?? {};
 
     const nextProgress = data.reset
       ? null
@@ -380,7 +374,6 @@ export const saveMobileProgress = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true, progress: nextProgress };
   });
-
 
 export const markAssistedSold = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
