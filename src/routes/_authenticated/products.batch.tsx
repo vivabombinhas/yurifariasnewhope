@@ -2,23 +2,17 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  ChevronLeft,
-  ImagePlus,
-  Loader2,
-  Sparkles,
-  Trash2,
-  Wand2,
-  X,
-} from "lucide-react";
+import { ChevronLeft, ImagePlus, Loader2, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { prepareImageForUpload, getUnsupportedImageMessage } from "@/lib/image-convert";
 import { runWithConcurrency } from "@/lib/concurrency";
 import { groupPhotosBySimilarity } from "@/lib/batch-grouping.functions";
+import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
 import {
-  analyzeProductWithAI,
-  type AiSuggestion,
-} from "@/lib/ai-suggestions.functions";
+  analyzeProductV2,
+  type MarketplaceDraftV2,
+  type VerificationQuestionV2,
+} from "@/lib/ai-listing-v2.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,12 +44,7 @@ type StagedPhoto = {
   uploading: boolean;
 };
 
-type DraftStatus =
-  | "pending"
-  | "uploading"
-  | "analyzing"
-  | "ready"
-  | "error";
+type DraftStatus = "pending" | "uploading" | "analyzing" | "ready" | "error";
 
 type ItemSpecific = { name: string; value: string };
 
@@ -76,6 +65,12 @@ type BatchDraft = {
   condition_notes: string;
   shipping_notes: string;
   item_specifics: ItemSpecific[];
+  aiAnalysisId: string | null;
+  aiVersion: 1 | 2;
+  verificationQuestions: VerificationQuestionV2[];
+  verificationAnswers: Record<string, string>;
+  marketplaceDrafts: MarketplaceDraftV2[];
+  qualityFlags: string[];
 };
 
 function rid() {
@@ -92,6 +87,7 @@ function BatchIntakePage() {
   const navigate = useNavigate();
   const groupFn = useServerFn(groupPhotosBySimilarity);
   const analyzeFn = useServerFn(analyzeProductWithAI);
+  const analyzeV2Fn = useServerFn(analyzeProductV2);
 
   const sessionId = useMemo(() => rid(), []);
   const [photos, setPhotos] = useState<StagedPhoto[]>([]);
@@ -103,9 +99,7 @@ function BatchIntakePage() {
 
   const allUploaded = photos.length > 0 && photos.every((p) => p.storagePath);
   const hasDrafts = drafts.length > 0;
-  const allReadyOrError = drafts.every(
-    (d) => d.status === "ready" || d.status === "error",
-  );
+  const allReadyOrError = drafts.every((d) => d.status === "ready" || d.status === "error");
 
   async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
@@ -128,22 +122,25 @@ function BatchIntakePage() {
     setPhotos((cur) => [...cur, ...newOnes]);
 
     // Upload to staging in parallel (limit 4)
-    await runWithConcurrency(newOnes, 4, async (p) => {
-      const path = `staging/${sessionId}/${p.id}${extOf(p.file.name)}`;
-      const { error } = await supabase.storage
-        .from("product-photos")
-        .upload(path, p.file, { contentType: p.file.type });
-      if (error) throw error;
-      setPhotos((cur) =>
-        cur.map((x) =>
-          x.id === p.id ? { ...x, storagePath: path, uploading: false } : x,
-        ),
-      );
-    }, (_i, _v, err) => {
-      if (err) {
-        toast.error(`Upload failed: ${(err as any)?.message ?? err}`);
-      }
-    });
+    await runWithConcurrency(
+      newOnes,
+      4,
+      async (p) => {
+        const path = `staging/${sessionId}/${p.id}${extOf(p.file.name)}`;
+        const { error } = await supabase.storage
+          .from("product-photos")
+          .upload(path, p.file, { contentType: p.file.type });
+        if (error) throw error;
+        setPhotos((cur) =>
+          cur.map((x) => (x.id === p.id ? { ...x, storagePath: path, uploading: false } : x)),
+        );
+      },
+      (_i, _v, err) => {
+        if (err) {
+          toast.error(`Upload failed: ${(err as any)?.message ?? err}`);
+        }
+      },
+    );
   }
 
   function removePhoto(id: string) {
@@ -155,7 +152,10 @@ function BatchIntakePage() {
         .filter((d) => d.photoIds.length > 0),
     );
     if (p?.storagePath) {
-      supabase.storage.from("product-photos").remove([p.storagePath]).catch(() => {});
+      supabase.storage
+        .from("product-photos")
+        .remove([p.storagePath])
+        .catch(() => {});
     }
     URL.revokeObjectURL(p?.previewUrl ?? "");
   }
@@ -203,6 +203,12 @@ function BatchIntakePage() {
       condition_notes: "",
       shipping_notes: "",
       item_specifics: [],
+      aiAnalysisId: null,
+      aiVersion: 2,
+      verificationQuestions: [],
+      verificationAnswers: {},
+      marketplaceDrafts: [],
+      qualityFlags: [],
     };
   }
 
@@ -212,9 +218,7 @@ function BatchIntakePage() {
       if (!target || target.photoIds.length <= 1) return cur;
       const remaining = target.photoIds.filter((p) => p !== photoId);
       const fresh = newDraftFromPhotoIds([photoId]);
-      return cur.map((d) =>
-        d.id === draftId ? { ...d, photoIds: remaining } : d,
-      ).concat(fresh);
+      return cur.map((d) => (d.id === draftId ? { ...d, photoIds: remaining } : d)).concat(fresh);
     });
   }
 
@@ -238,9 +242,7 @@ function BatchIntakePage() {
 
   async function materializeAndAnalyze(draft: BatchDraft): Promise<void> {
     // 1. Insert product row
-    setDrafts((cur) =>
-      cur.map((d) => (d.id === draft.id ? { ...d, status: "uploading" } : d)),
-    );
+    setDrafts((cur) => cur.map((d) => (d.id === draft.id ? { ...d, status: "uploading" } : d)));
     const { data: product, error: insErr } = await supabase
       .from("products")
       .insert({
@@ -264,9 +266,7 @@ function BatchIntakePage() {
       const fromPath = sp.storagePath!;
       const fname = fromPath.split("/").pop()!;
       const toPath = `${product.id}/${fname}`;
-      const { error: mvErr } = await supabase.storage
-        .from("product-photos")
-        .move(fromPath, toPath);
+      const { error: mvErr } = await supabase.storage.from("product-photos").move(fromPath, toPath);
       if (mvErr) throw new Error(`Move photo: ${mvErr.message}`);
       finalPaths.push(toPath);
       const { error: phErr } = await supabase.from("product_photos").insert({
@@ -286,8 +286,42 @@ function BatchIntakePage() {
       ),
     );
 
-    // 3. Analyze with AI
-    const s: AiSuggestion = await analyzeFn({ data: { productId: product.id } });
+    // 3. Analyze with AI v2. If the additive v2 tables are not deployed yet,
+    // preserve the existing batch workflow through the proven v1 fallback.
+    let s: AiSuggestion;
+    let v2: Awaited<ReturnType<typeof analyzeV2Fn>> | null = null;
+    try {
+      v2 = await analyzeV2Fn({ data: { productId: product.id } });
+      const ebay = v2.marketplace_drafts.find((draft) => draft.marketplace === "ebay");
+      s = {
+        title: ebay?.title ?? v2.identification.product_name,
+        description: ebay?.description ?? "",
+        brand: v2.identification.brand,
+        category: v2.identification.category,
+        condition: v2.identification.condition,
+        tags: ebay?.keywords ?? [],
+        suggested_price_cents: ebay?.listing_price_cents ?? null,
+        confidence_notes: v2.quality_flags.join(" "),
+        verification_needed: v2.verification_questions.map((q) => q.prompt),
+        item_specifics: v2.identification.item_specifics,
+        condition_grade: v2.identification.condition_grade,
+        condition_notes: v2.identification.condition_notes,
+        shipping_notes: ebay?.shipping_text ?? "",
+        possible_brand: "",
+        possible_model: v2.identification.model,
+        visual_clues: v2.identification.confirmed_facts,
+        search_keywords: ebay?.keywords ?? [],
+        recommended_research_queries: [],
+        price_confidence:
+          ebay?.price_confidence === "research_required"
+            ? "manual_required"
+            : ((ebay?.price_confidence ?? "low") as AiSuggestion["price_confidence"]),
+        potentially_valuable: v2.identification.potentially_valuable,
+      };
+    } catch (v2Error) {
+      console.warn("[batch] AI v2 unavailable; falling back to v1", v2Error);
+      s = await analyzeFn({ data: { productId: product.id } });
+    }
     setDrafts((cur) =>
       cur.map((d) =>
         d.id === draft.id
@@ -300,13 +334,17 @@ function BatchIntakePage() {
               category: s.category ?? "",
               condition: s.condition ?? "",
               price:
-                s.suggested_price_cents != null
-                  ? (s.suggested_price_cents / 100).toFixed(2)
-                  : "",
+                s.suggested_price_cents != null ? (s.suggested_price_cents / 100).toFixed(2) : "",
               condition_grade: s.condition_grade ?? "",
               condition_notes: s.condition_notes ?? "",
               shipping_notes: s.shipping_notes ?? "",
               item_specifics: Array.isArray(s.item_specifics) ? s.item_specifics : [],
+              aiAnalysisId: v2?.analysisId ?? null,
+              aiVersion: v2 ? 2 : 1,
+              verificationQuestions: v2?.verification_questions ?? [],
+              verificationAnswers: {},
+              marketplaceDrafts: v2?.marketplace_drafts ?? [],
+              qualityFlags: v2?.quality_flags ?? [],
             }
           : d,
       ),
@@ -324,9 +362,7 @@ function BatchIntakePage() {
         } catch (e: any) {
           setDrafts((cur) =>
             cur.map((x) =>
-              x.id === d.id
-                ? { ...x, status: "error", errorMessage: e?.message ?? "Failed" }
-                : x,
+              x.id === d.id ? { ...x, status: "error", errorMessage: e?.message ?? "Failed" } : x,
             ),
           );
         }
@@ -383,9 +419,7 @@ function BatchIntakePage() {
       const results = await runWithConcurrency(toSave, 4, async (d) => {
         const brand_id = await ensureBrand(d.brand);
         const category_id = await ensureCategory(d.category);
-        const price_cents = d.price
-          ? Math.round(parseFloat(d.price) * 100)
-          : null;
+        const price_cents = d.price ? Math.round(parseFloat(d.price) * 100) : null;
         const cleanSpecs = (d.item_specifics || [])
           .map((s) => ({ name: (s.name || "").trim(), value: (s.value || "").trim() }))
           .filter((s) => s.name && s.value);
@@ -406,6 +440,18 @@ function BatchIntakePage() {
           })
           .eq("id", d.productId!);
         if (error) throw error;
+        if (d.aiAnalysisId) {
+          const requiredKeys = d.verificationQuestions.filter((q) => q.required).map((q) => q.key);
+          const reviewComplete = requiredKeys.every((key) => !!d.verificationAnswers[key]);
+          const { error: reviewError } = await (supabase as any)
+            .from("ai_product_analyses")
+            .update({
+              verification_answers: d.verificationAnswers,
+              status: reviewComplete ? "approved" : "needs_review",
+            })
+            .eq("id", d.aiAnalysisId);
+          if (reviewError) throw reviewError;
+        }
       });
       const failed = results.filter((r) => !r.ok).length;
       if (failed) toast.error(`${failed} draft(s) failed to save.`);
@@ -429,9 +475,7 @@ function BatchIntakePage() {
 
       <Card>
         <CardContent className="pt-6 space-y-3">
-          <Label className="text-base">
-            1. Upload all photos (mix of multiple products is OK)
-          </Label>
+          <Label className="text-base">1. Upload all photos (mix of multiple products is OK)</Label>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
@@ -454,8 +498,7 @@ function BatchIntakePage() {
           {photos.length > 0 && (
             <>
               <div className="text-xs text-muted-foreground">
-                {photos.length} photo(s) ·{" "}
-                {photos.filter((p) => p.storagePath).length} uploaded
+                {photos.length} photo(s) · {photos.filter((p) => p.storagePath).length} uploaded
               </div>
               <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                 {photos.map((p) => (
@@ -463,11 +506,7 @@ function BatchIntakePage() {
                     key={p.id}
                     className="relative aspect-square overflow-hidden rounded-md border bg-muted"
                   >
-                    <img
-                      src={p.previewUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={p.previewUrl} alt="" className="h-full w-full object-cover" />
                     {p.uploading && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                         <Loader2 className="h-4 w-4 animate-spin text-white" />
@@ -515,8 +554,7 @@ function BatchIntakePage() {
           </Button>
           {hasDrafts && (
             <p className="text-[11px] text-muted-foreground">
-              {drafts.length} group(s) created. Adjust below if needed, then
-              analyze.
+              {drafts.length} group(s) created. Adjust below if needed, then analyze.
             </p>
           )}
         </CardContent>
@@ -533,10 +571,7 @@ function BatchIntakePage() {
               <Button
                 type="button"
                 onClick={runAnalyzeAll}
-                disabled={
-                  analyzing ||
-                  drafts.every((d) => d.status !== "pending")
-                }
+                disabled={analyzing || drafts.every((d) => d.status !== "pending")}
               >
                 {analyzing ? (
                   <>
@@ -546,8 +581,7 @@ function BatchIntakePage() {
                 ) : (
                   <>
                     <Wand2 className="h-4 w-4 mr-2" />
-                    Analyze {drafts.filter((d) => d.status === "pending").length}{" "}
-                    pending
+                    Analyze {drafts.filter((d) => d.status === "pending").length} pending
                   </>
                 )}
               </Button>
@@ -562,11 +596,7 @@ function BatchIntakePage() {
                   photos={photos}
                   allDrafts={drafts}
                   onUpdate={(patch) =>
-                    setDrafts((cur) =>
-                      cur.map((x) =>
-                        x.id === d.id ? { ...x, ...patch } : x,
-                      ),
-                    )
+                    setDrafts((cur) => cur.map((x) => (x.id === d.id ? { ...x, ...patch } : x)))
                   }
                   onSplit={(photoId) => splitDraft(d.id, photoId)}
                   onMove={movePhoto}
@@ -577,11 +607,7 @@ function BatchIntakePage() {
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate({ to: "/products" })}
-              >
+              <Button type="button" variant="outline" onClick={() => navigate({ to: "/products" })}>
                 Cancel
               </Button>
               <Button
@@ -590,7 +616,14 @@ function BatchIntakePage() {
                 disabled={
                   savingAll ||
                   !allReadyOrError ||
-                  drafts.filter((d) => d.status === "ready").length === 0
+                  drafts.filter((d) => d.status === "ready").length === 0 ||
+                  drafts.some(
+                    (d) =>
+                      d.status === "ready" &&
+                      d.verificationQuestions.some(
+                        (q) => q.required && !d.verificationAnswers[q.key],
+                      ),
+                  )
                 }
               >
                 {savingAll ? (
@@ -598,10 +631,7 @@ function BatchIntakePage() {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving…
                   </>
                 ) : (
-                  <>
-                    Save {drafts.filter((d) => d.status === "ready").length}{" "}
-                    draft(s)
-                  </>
+                  <>Save {drafts.filter((d) => d.status === "ready").length} draft(s)</>
                 )}
               </Button>
             </div>
@@ -652,44 +682,102 @@ function DraftCard({
     .filter((p): p is StagedPhoto => !!p);
   const otherDrafts = allDrafts.filter((d) => d.id !== draft.id);
   const isEditable = draft.status === "ready" || draft.status === "pending";
-  const isLocked =
-    draft.status === "uploading" || draft.status === "analyzing";
+  const isLocked = draft.status === "uploading" || draft.status === "analyzing";
 
   return (
     <div className="rounded-md border p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Product #{index + 1}</span>
-          {draft.sku && (
-            <span className="text-xs text-muted-foreground">{draft.sku}</span>
-          )}
+          {draft.sku && <span className="text-xs text-muted-foreground">{draft.sku}</span>}
           <Badge variant={statusVariant(draft.status)} className="capitalize">
             {draft.status}
           </Badge>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onDelete}
-          disabled={isLocked}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={isLocked}>
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 
-      {draft.errorMessage && (
-        <p className="text-xs text-destructive">{draft.errorMessage}</p>
+      {draft.errorMessage && <p className="text-xs text-destructive">{draft.errorMessage}</p>}
+
+      {draft.status === "ready" && draft.aiVersion === 2 && (
+        <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>AI v2</Badge>
+            {draft.verificationQuestions.length === 0 ? (
+              <span className="text-xs text-emerald-700">Ready for review</span>
+            ) : (
+              <span className="text-xs font-medium">
+                Confirm{" "}
+                {
+                  draft.verificationQuestions.filter(
+                    (q) => q.required && !draft.verificationAnswers[q.key],
+                  ).length
+                }{" "}
+                required detail(s)
+              </span>
+            )}
+          </div>
+          {draft.verificationQuestions.map((question) => (
+            <div key={question.key} className="space-y-1.5 rounded-md bg-background p-2">
+              <p className="text-sm font-medium">{question.prompt}</p>
+              {question.reason && (
+                <p className="text-[11px] text-muted-foreground">{question.reason}</p>
+              )}
+              <div className="flex flex-wrap gap-1.5">
+                {question.options.map((option) => (
+                  <Button
+                    key={option}
+                    type="button"
+                    size="sm"
+                    variant={
+                      draft.verificationAnswers[question.key] === option ? "default" : "outline"
+                    }
+                    className="h-8"
+                    onClick={() =>
+                      onUpdate({
+                        verificationAnswers: {
+                          ...draft.verificationAnswers,
+                          [question.key]: option,
+                        },
+                      })
+                    }
+                  >
+                    {option}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ))}
+          {draft.qualityFlags.length > 0 && (
+            <p className="text-xs text-amber-700">Check: {draft.qualityFlags.join(" · ")}</p>
+          )}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {draft.marketplaceDrafts.map((listing) => (
+              <div key={listing.marketplace} className="rounded-md border bg-background p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold capitalize">{listing.marketplace}</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {listing.price_confidence.replaceAll("_", " ")}
+                  </Badge>
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs">{listing.title}</p>
+                <p className="mt-1 text-sm font-semibold">
+                  {listing.listing_price_cents == null
+                    ? "Research price"
+                    : `$${(listing.listing_price_cents / 100).toFixed(2)}`}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2">
         {groupPhotos.map((p) => (
           <div key={p.id} className="relative group">
-            <img
-              src={p.previewUrl}
-              alt=""
-              className="h-16 w-16 rounded-md border object-cover"
-            />
+            <img src={p.previewUrl} alt="" className="h-16 w-16 rounded-md border object-cover" />
             {!isLocked && (
               <div className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/60 rounded-md gap-1">
                 {groupPhotos.length > 1 && draft.status === "pending" && (
@@ -702,9 +790,7 @@ function DraftCard({
                   </button>
                 )}
                 {otherDrafts.length > 0 && draft.status === "pending" && (
-                  <Select
-                    onValueChange={(val) => onMove(p.id, val)}
-                  >
+                  <Select onValueChange={(val) => onMove(p.id, val)}>
                     <SelectTrigger className="h-6 w-16 text-[10px]">
                       <SelectValue placeholder="Move" />
                     </SelectTrigger>
