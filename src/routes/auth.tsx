@@ -17,7 +17,6 @@ export const Route = createFileRoute("/auth")({
 function AuthPage() {
   const navigate = useNavigate();
   const t = useT();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,20 +31,9 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: window.location.origin },
-        });
-        if (error) throw error;
-        toast.success(t("auth.accountCreated"));
-        setMode("signin");
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate({ to: "/" });
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate({ to: "/" });
     } catch (err: any) {
       toast.error(err.message ?? t("auth.failed"));
     } finally {
@@ -58,7 +46,7 @@ function AuthPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">
-            {mode === "signin" ? t("auth.signIn") : t("auth.createAccount")}
+            {t("auth.signIn")}
           </CardTitle>
           <p className="text-sm text-muted-foreground">{t("auth.tagline")}</p>
         </CardHeader>
@@ -84,19 +72,12 @@ function AuthPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                autoComplete="current-password"
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t("auth.pleaseWait") : mode === "signin" ? t("auth.signIn") : t("auth.createAccount")}
+              {loading ? t("auth.pleaseWait") : t("auth.signIn")}
             </Button>
-            <button
-              type="button"
-              onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-              className="block w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
-            >
-              {mode === "signin" ? t("auth.noAccount") : t("auth.haveAccount")}
-            </button>
           </form>
           <p className="mt-6 text-center text-xs text-muted-foreground">
             <Link to="/" className="hover:underline">

@@ -12,11 +12,6 @@ export const MARKETPLACES: {
 }[] = [
   { id: "ebay", label: "eBay", sellUrl: "https://www.ebay.com/sl/sell" },
   { id: "etsy", label: "Etsy", sellUrl: "https://www.etsy.com/your/shops/me/tools/listings/new" },
-  {
-    id: "facebook_marketplace",
-    label: "Facebook Marketplace",
-    sellUrl: "https://www.facebook.com/marketplace/create/item",
-  },
   { id: "poshmark", label: "Poshmark", sellUrl: "https://poshmark.com/create-listing" },
   { id: "depop", label: "Depop", sellUrl: "https://www.depop.com/products/create/" },
 ];

@@ -28,6 +28,7 @@ import {
   getAssistedListing,
   prepareAssistedListing,
   markAssistedPublished,
+  markAssistedClosed,
   markAssistedSold,
 } from "@/lib/marketplaces/assisted.functions";
 import { MARKETPLACES, type MarketplaceId } from "@/lib/marketplaces";
@@ -47,6 +48,7 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
   const prepareFn = useServerFn(prepareAssistedListing);
   const publishFn = useServerFn(markAssistedPublished);
   const soldFn = useServerFn(markAssistedSold);
+  const closeFn = useServerFn(markAssistedClosed);
 
   const queryKey = ["assisted-listing", marketplace, productId];
   const q = useQuery({
@@ -83,13 +85,33 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
     mutationFn: () => soldFn({ data: { productId, marketplace } }),
     onSuccess: (res) => {
       toast.success("Marked as sold");
-      if (res.otherActive?.length) {
-        toast.warning(
-          `Still active on: ${res.otherActive
-            .map((o: any) => o.marketplace.replace(/_/g, " "))
-            .join(", ")}. End them manually.`,
+      const automaticallyClosed = res.closureResults?.filter((r) => r.status === "closed") ?? [];
+      const needsAttention =
+        res.closureResults?.filter((r) => r.status !== "closed") ?? [];
+      if (automaticallyClosed.length) {
+        toast.success(
+          `Ended automatically on: ${automaticallyClosed
+            .map((r) => r.marketplace.replace(/_/g, " "))
+            .join(", ")}.`,
         );
       }
+      if (needsAttention.length) {
+        toast.warning(
+          `Needs attention on: ${needsAttention
+            .map((r) => r.marketplace.replace(/_/g, " "))
+            .join(", ")}. Use the saved listing links.`,
+        );
+      }
+      qc.invalidateQueries({ queryKey });
+      onSaved?.();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const closeListing = useMutation({
+    mutationFn: () => closeFn({ data: { productId, marketplace } }),
+    onSuccess: () => {
+      toast.success("Listing confirmed as closed");
       qc.invalidateQueries({ queryKey });
       onSaved?.();
     },
@@ -126,6 +148,8 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
   const listingUrl = listing?.listing_url ?? null;
   const isPublished = status === "active";
   const isSold = status === "sold";
+  const providerMetadata = (listing?.provider_metadata ?? {}) as Record<string, unknown>;
+  const closurePending = providerMetadata.closurePending === true;
 
   return (
     <div className="space-y-3 p-3">
@@ -171,6 +195,30 @@ export function AssistedPublishPanel({ marketplace, productId, onSaved }: Props)
       </div>
 
       {/* Missing fields */}
+      {closurePending && listingUrl && (
+        <div className="space-y-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-sm">
+          <div className="font-medium">This item sold on another marketplace</div>
+          <p className="text-xs text-muted-foreground">
+            Open the exact saved listing, mark it not for sale, then confirm below.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <a href={listingUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="mr-1 h-3 w-3" /> Open exact listing
+              </a>
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => closeListing.mutate()}
+              disabled={closeListing.isPending}
+            >
+              {closeListing.isPending && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+              Confirm removed
+            </Button>
+          </div>
+        </div>
+      )}
+
       {missingFields.length > 0 && !isPublished && !isSold && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
           <div className="flex items-center gap-1 font-medium">

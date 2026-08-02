@@ -3,9 +3,11 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { MarketplaceId } from "@/lib/marketplaces";
 import { renderListing, type ItemSpecific } from "@/lib/marketplaces/render";
+import { normalizeListingUrl } from "@/lib/marketplaces/listing-url";
+import { closeOtherActiveListings } from "@/lib/marketplaces/close-product-listings.server";
 
 /**
- * Assisted publishing for Facebook Marketplace, Poshmark, and Depop.
+ * Assisted publishing for Poshmark and Depop.
  *
  * No external API calls. We prepare a per-marketplace payload, let the user
  * copy fields and open the marketplace site, then record the URL/status.
@@ -19,13 +21,11 @@ import { renderListing, type ItemSpecific } from "@/lib/marketplaces/render";
  */
 
 const ASSISTED: ReadonlySet<MarketplaceId> = new Set([
-  "facebook_marketplace",
   "poshmark",
   "depop",
 ]);
 
 const Marketplace = z.enum([
-  "facebook_marketplace",
   "poshmark",
   "depop",
 ]) as unknown as z.ZodType<MarketplaceId>;
@@ -72,18 +72,13 @@ function buildFields(marketplace: MarketplaceId, p: any): Field[] {
     { key: "brand", label: "Brand", value: brand, required: false },
   ];
 
-  if (marketplace === "facebook_marketplace") {
-    base.push({ key: "color", label: "Color", value: color, required: false });
-  } else {
-    // poshmark / depop
-    base.push(
-      { key: "size", label: "Size", value: size, required: true },
-      { key: "color", label: "Color", value: color, required: false },
-      { key: "material", label: "Material", value: material, required: false },
-    );
-    if (marketplace === "depop") {
-      base.push({ key: "style", label: "Style / Tags", value: style, required: false });
-    }
+  base.push(
+    { key: "size", label: "Size", value: size, required: true },
+    { key: "color", label: "Color", value: color, required: false },
+    { key: "material", label: "Material", value: material, required: false },
+  );
+  if (marketplace === "depop") {
+    base.push({ key: "style", label: "Style / Tags", value: style, required: false });
   }
   return base;
 }
@@ -221,6 +216,7 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
     if (!ASSISTED.has(data.marketplace)) throw new Error("Not an assisted marketplace.");
     const { supabase } = context;
     const now = new Date().toISOString();
+    const normalized = normalizeListingUrl(data.marketplace, data.listingUrl);
 
     const { data: existing } = await supabase
       .from("marketplace_listings")
@@ -240,7 +236,8 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
         .from("marketplace_listings")
         .update({
           status: "active",
-          listing_url: data.listingUrl,
+          listing_url: normalized.url,
+          external_listing_id: normalized.externalListingId,
           published_at: now,
           listed_at: now,
           provider_metadata: meta,
@@ -257,7 +254,8 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
         product_id: data.productId,
         marketplace: data.marketplace,
         status: "active",
-        listing_url: data.listingUrl,
+        listing_url: normalized.url,
+        external_listing_id: normalized.externalListingId,
         published_at: now,
         listed_at: now,
         provider_metadata: meta,
@@ -266,6 +264,43 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
     return { ok: true, id: row.id };
+  });
+
+const CloseInput = z.object({
+  productId: z.string().uuid(),
+  marketplace: Marketplace,
+});
+
+export const markAssistedClosed = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => CloseInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: listing, error } = await context.supabase
+      .from("marketplace_listings")
+      .select("id, provider_metadata")
+      .eq("product_id", data.productId)
+      .eq("marketplace", data.marketplace)
+      .eq("status", "active")
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!listing) throw new Error("No active listing found.");
+
+    const metadata = (listing.provider_metadata as Record<string, unknown>) ?? {};
+    const { error: updateError } = await context.supabase
+      .from("marketplace_listings")
+      .update({
+        status: "ended",
+        error_message: null,
+        last_failed_step: null,
+        provider_metadata: {
+          ...metadata,
+          closurePending: false,
+          manuallyClosedAt: new Date().toISOString(),
+        },
+      })
+      .eq("id", listing.id);
+    if (updateError) throw new Error(updateError.message);
+    return { ok: true };
   });
 
 const SoldInput = z.object({
@@ -396,13 +431,11 @@ export const markAssistedSold = createServerFn({ method: "POST" })
       .eq("id", data.productId)
       .neq("status", "sold");
 
-    // Find other active listings for the same product so the UI can warn.
-    const { data: otherActive } = await supabase
-      .from("marketplace_listings")
-      .select("marketplace, listing_url")
-      .eq("product_id", data.productId)
-      .eq("status", "active")
-      .neq("marketplace", data.marketplace);
+    const closureResults = await closeOtherActiveListings(
+      supabase,
+      data.productId,
+      data.marketplace,
+    );
 
-    return { ok: true, otherActive: otherActive ?? [] };
+    return { ok: true, closureResults };
   });

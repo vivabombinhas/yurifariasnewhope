@@ -620,5 +620,11 @@ async function processLineItem(
   if (error) throw error;
 
   if (rpcRes?.already_processed) return "already";
+  if (matched && listing?.product_id) {
+    const { closeOtherActiveListings } = await import(
+      "@/lib/marketplaces/close-product-listings.server"
+    );
+    await closeOtherActiveListings(supabaseAdmin, listing.product_id, "ebay");
+  }
   return matched ? "recorded" : "unmatched";
 }
