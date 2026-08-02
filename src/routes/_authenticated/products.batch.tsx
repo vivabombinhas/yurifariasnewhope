@@ -10,6 +10,7 @@ import { groupPhotosBySimilarity } from "@/lib/batch-grouping.functions";
 import { analyzeProductWithAI, type AiSuggestion } from "@/lib/ai-suggestions.functions";
 import {
   analyzeProductV2,
+  finalizeProductV2,
   type MarketplaceDraftV2,
   type VerificationQuestionV2,
 } from "@/lib/ai-listing-v2.functions";
@@ -44,7 +45,7 @@ type StagedPhoto = {
   uploading: boolean;
 };
 
-type DraftStatus = "pending" | "uploading" | "analyzing" | "ready" | "error";
+type DraftStatus = "pending" | "uploading" | "analyzing" | "refining" | "ready" | "error";
 
 type ItemSpecific = { name: string; value: string };
 
@@ -71,6 +72,7 @@ type BatchDraft = {
   verificationAnswers: Record<string, string>;
   marketplaceDrafts: MarketplaceDraftV2[];
   qualityFlags: string[];
+  answersApplied: boolean;
 };
 
 function rid() {
@@ -88,6 +90,7 @@ function BatchIntakePage() {
   const groupFn = useServerFn(groupPhotosBySimilarity);
   const analyzeFn = useServerFn(analyzeProductWithAI);
   const analyzeV2Fn = useServerFn(analyzeProductV2);
+  const finalizeV2Fn = useServerFn(finalizeProductV2);
 
   const sessionId = useMemo(() => rid(), []);
   const [photos, setPhotos] = useState<StagedPhoto[]>([]);
@@ -209,6 +212,7 @@ function BatchIntakePage() {
       verificationAnswers: {},
       marketplaceDrafts: [],
       qualityFlags: [],
+      answersApplied: true,
     };
   }
 
@@ -345,6 +349,7 @@ function BatchIntakePage() {
               verificationAnswers: {},
               marketplaceDrafts: v2?.marketplace_drafts ?? [],
               qualityFlags: v2?.quality_flags ?? [],
+              answersApplied: !v2?.verification_questions?.length,
             }
           : d,
       ),
@@ -370,6 +375,63 @@ function BatchIntakePage() {
       toast.success("Batch analysis complete.");
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function refineDraft(draftId: string) {
+    const draft = drafts.find((item) => item.id === draftId);
+    if (!draft?.aiAnalysisId) return;
+    const missing = draft.verificationQuestions.filter(
+      (question) => question.required && !draft.verificationAnswers[question.key],
+    );
+    if (missing.length) {
+      toast.error(`Answer ${missing.length} required question(s) first.`);
+      return;
+    }
+    setDrafts((current) =>
+      current.map((item) => (item.id === draftId ? { ...item, status: "refining" } : item)),
+    );
+    try {
+      const revised = await finalizeV2Fn({
+        data: {
+          analysisId: draft.aiAnalysisId,
+          answers: draft.verificationAnswers,
+        },
+      });
+      const ebay = revised.marketplace_drafts.find((listing) => listing.marketplace === "ebay");
+      setDrafts((current) =>
+        current.map((item) =>
+          item.id === draftId
+            ? {
+                ...item,
+                status: "ready",
+                title: ebay?.title ?? revised.identification.product_name,
+                description: ebay?.description ?? item.description,
+                brand: revised.identification.brand,
+                category: revised.identification.category,
+                condition: revised.identification.condition,
+                price:
+                  ebay?.listing_price_cents == null
+                    ? ""
+                    : (ebay.listing_price_cents / 100).toFixed(2),
+                condition_grade: revised.identification.condition_grade,
+                condition_notes: revised.identification.condition_notes,
+                shipping_notes: ebay?.shipping_text ?? "",
+                item_specifics: revised.identification.item_specifics,
+                verificationQuestions: revised.verification_questions,
+                marketplaceDrafts: revised.marketplace_drafts,
+                qualityFlags: revised.quality_flags,
+                answersApplied: true,
+              }
+            : item,
+        ),
+      );
+      toast.success("Answers applied to all marketplace drafts.");
+    } catch (error: any) {
+      setDrafts((current) =>
+        current.map((item) => (item.id === draftId ? { ...item, status: "ready" } : item)),
+      );
+      toast.error(error?.message ?? "Could not refresh marketplace drafts.");
     }
   }
 
@@ -601,6 +663,7 @@ function BatchIntakePage() {
                   onSplit={(photoId) => splitDraft(d.id, photoId)}
                   onMove={movePhoto}
                   onDelete={() => deleteDraft(d.id)}
+                  onRefine={() => refineDraft(d.id)}
                   t={t}
                 />
               ))}
@@ -620,9 +683,10 @@ function BatchIntakePage() {
                   drafts.some(
                     (d) =>
                       d.status === "ready" &&
-                      d.verificationQuestions.some(
+                      (d.verificationQuestions.some(
                         (q) => q.required && !d.verificationAnswers[q.key],
-                      ),
+                      ) ||
+                        !d.answersApplied),
                   )
                 }
               >
@@ -649,6 +713,7 @@ function statusVariant(s: DraftStatus): "default" | "secondary" | "destructive" 
     case "error":
       return "destructive";
     case "analyzing":
+    case "refining":
     case "uploading":
       return "secondary";
     default:
@@ -665,6 +730,7 @@ function DraftCard({
   onSplit,
   onMove,
   onDelete,
+  onRefine,
   t,
 }: {
   draft: BatchDraft;
@@ -675,6 +741,7 @@ function DraftCard({
   onSplit: (photoId: string) => void;
   onMove: (photoId: string, toDraftId: string) => void;
   onDelete: () => void;
+  onRefine: () => void;
   t: ReturnType<typeof useT>;
 }) {
   const groupPhotos = draft.photoIds
@@ -701,7 +768,7 @@ function DraftCard({
 
       {draft.errorMessage && <p className="text-xs text-destructive">{draft.errorMessage}</p>}
 
-      {draft.status === "ready" && draft.aiVersion === 2 && (
+      {(draft.status === "ready" || draft.status === "refining") && draft.aiVersion === 2 && (
         <div className="space-y-3 rounded-md border border-primary/20 bg-primary/5 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge>AI v2</Badge>
@@ -741,6 +808,7 @@ function DraftCard({
                           ...draft.verificationAnswers,
                           [question.key]: option,
                         },
+                        answersApplied: false,
                       })
                     }
                   >
@@ -752,6 +820,29 @@ function DraftCard({
           ))}
           {draft.qualityFlags.length > 0 && (
             <p className="text-xs text-amber-700">Check: {draft.qualityFlags.join(" · ")}</p>
+          )}
+          {draft.verificationQuestions.length > 0 && (
+            <Button
+              type="button"
+              className="h-10 w-full"
+              onClick={onRefine}
+              disabled={
+                draft.status === "refining" ||
+                draft.verificationQuestions.some(
+                  (question) => question.required && !draft.verificationAnswers[question.key],
+                )
+              }
+            >
+              {draft.status === "refining" ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating listings…
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" /> Apply answers to all listings
+                </>
+              )}
+            </Button>
           )}
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {draft.marketplaceDrafts.map((listing) => (

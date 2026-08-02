@@ -3,6 +3,10 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const Input = z.object({ productId: z.string().uuid() });
+const FinalizeInput = z.object({
+  analysisId: z.string().uuid(),
+  answers: z.record(z.string(), z.string().min(1)),
+});
 
 export type VerificationQuestionV2 = {
   key: string;
@@ -208,7 +212,7 @@ async function loadPhotoUrls(supabase: any, productId: string) {
   return (signed ?? []).map((x: any) => x.signedUrl).filter(Boolean);
 }
 
-async function callGateway(apiKey: string, imageUrls: string[]) {
+async function callGateway(apiKey: string, imageUrls: string[], userText: string) {
   const model = configuredModel();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
@@ -225,7 +229,7 @@ async function callGateway(apiKey: string, imageUrls: string[]) {
             content: [
               {
                 type: "text",
-                text: "Analyze this product and create the three marketplace drafts.",
+                text: userText,
               },
               ...imageUrls.map((url) => ({ type: "image_url", image_url: { url } })),
             ],
@@ -264,7 +268,11 @@ export const analyzeProductV2 = createServerFn({ method: "POST" })
     if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
     const { supabase, userId } = context;
     const imageUrls = await loadPhotoUrls(supabase, data.productId);
-    const { model, raw, parsed } = await callGateway(apiKey, imageUrls);
+    const { model, raw, parsed } = await callGateway(
+      apiKey,
+      imageUrls,
+      "Analyze this product and create the three marketplace drafts.",
+    );
     const questions = Array.isArray(parsed.verification_questions)
       ? parsed.verification_questions
       : [];
@@ -298,6 +306,94 @@ export const analyzeProductV2 = createServerFn({ method: "POST" })
     return {
       ...parsed,
       analysisId: analysis.id,
+      status,
+      verification_questions: questions,
+      marketplace_drafts: drafts,
+    };
+  });
+
+export const finalizeProductV2 = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => FinalizeInput.parse(input))
+  .handler(async ({ data, context }): Promise<AiListingV2> => {
+    const apiKey = process.env.LOVABLE_API_KEY;
+    if (!apiKey) throw new Error("Missing LOVABLE_API_KEY on the server.");
+    const { supabase } = context;
+    const db = supabase as any;
+    const { data: analysis, error: analysisError } = await db
+      .from("ai_product_analyses")
+      .select("id, product_id, identification, verification_questions, quality_flags")
+      .eq("id", data.analysisId)
+      .single();
+    if (analysisError || !analysis)
+      throw new Error(`Load AI v2 analysis: ${analysisError?.message ?? "not found"}`);
+
+    const { data: currentDrafts, error: draftsError } = await db
+      .from("ai_marketplace_drafts")
+      .select(
+        "marketplace, title, condition_text, description, shipping_text, listing_price_cents, minimum_offer_cents, buyer_shipping_cents, estimated_buyer_total_cents, price_confidence, pricing_basis, keywords, validation_flags",
+      )
+      .eq("analysis_id", data.analysisId);
+    if (draftsError) throw new Error(`Load marketplace drafts: ${draftsError.message}`);
+
+    const imageUrls = await loadPhotoUrls(supabase, analysis.product_id);
+    const answerLines = Object.entries(data.answers)
+      .map(([key, value]) => `- ${key}: ${value}`)
+      .join("\n");
+    const { model, raw, parsed } = await callGateway(
+      apiKey,
+      imageUrls,
+      `Revise the existing analysis and all three drafts using the operator's confirmed answers.
+
+OPERATOR ANSWERS (authoritative):
+${answerLines || "(none)"}
+
+PREVIOUS IDENTIFICATION:
+${JSON.stringify(analysis.identification)}
+
+PREVIOUS QUESTIONS:
+${JSON.stringify(analysis.verification_questions)}
+
+PREVIOUS MARKETPLACE DRAFTS:
+${JSON.stringify(currentDrafts ?? [])}
+
+Apply each answer consistently to identification, condition, titles, descriptions, shipping and pricing. Do not preserve a contradicted assumption. Return only genuinely unresolved verification questions.`,
+    );
+    const questions = Array.isArray(parsed.verification_questions)
+      ? parsed.verification_questions
+      : [];
+    const status = questions.some((q) => q.required) ? "needs_review" : "ready";
+    const drafts = (parsed.marketplace_drafts ?? []).filter((draft) =>
+      ["ebay", "poshmark", "depop"].includes(draft.marketplace),
+    );
+
+    const { error: updateError } = await db
+      .from("ai_product_analyses")
+      .update({
+        status,
+        model,
+        identification: parsed.identification,
+        verification_questions: questions,
+        verification_answers: data.answers,
+        quality_flags: parsed.quality_flags ?? [],
+        raw_response: raw,
+      })
+      .eq("id", data.analysisId);
+    if (updateError) throw new Error(`Update AI v2 analysis: ${updateError.message}`);
+
+    const { error: upsertError } = await db.from("ai_marketplace_drafts").upsert(
+      drafts.map((draft) => ({
+        ...draft,
+        analysis_id: data.analysisId,
+        product_id: analysis.product_id,
+      })),
+      { onConflict: "analysis_id,marketplace" },
+    );
+    if (upsertError) throw new Error(`Update marketplace drafts: ${upsertError.message}`);
+
+    return {
+      ...parsed,
+      analysisId: data.analysisId,
       status,
       verification_questions: questions,
       marketplace_drafts: drafts,
