@@ -240,8 +240,64 @@ function BatchIntakePage() {
     );
   }
 
-  function deleteDraft(draftId: string) {
-    setDrafts((cur) => cur.filter((d) => d.id !== draftId));
+  async function deleteDraft(draftId: string) {
+    const draft = drafts.find((item) => item.id === draftId);
+    if (!draft) return;
+    if (!confirm("Remove this draft and its uploaded photos?")) return;
+    if (draft.productId) {
+      const { data: storedPhotos } = await supabase
+        .from("product_photos")
+        .select("storage_path")
+        .eq("product_id", draft.productId);
+      const paths = (storedPhotos ?? []).map((photo) => photo.storage_path);
+      const { error: productError } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", draft.productId);
+      if (productError) {
+        toast.error(`Could not remove draft: ${productError.message}`);
+        return;
+      }
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage.from("product-photos").remove(paths);
+        if (storageError) console.warn("[batch] orphaned draft photos", storageError);
+      }
+    }
+    setDrafts((current) => current.filter((item) => item.id !== draftId));
+    toast.success("Draft removed.");
+  }
+
+  async function cancelBatch() {
+    const materialized = drafts.filter((draft) => draft.productId);
+    if (
+      materialized.length > 0 &&
+      !confirm(
+        `Cancel this batch and permanently remove ${materialized.length} unsaved draft(s) and their photos?`,
+      )
+    )
+      return;
+    const results = await runWithConcurrency(materialized, 3, async (draft) => {
+      const { data: storedPhotos } = await supabase
+        .from("product_photos")
+        .select("storage_path")
+        .eq("product_id", draft.productId!);
+      const paths = (storedPhotos ?? []).map((photo) => photo.storage_path);
+      const { error: productError } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", draft.productId!);
+      if (productError) throw productError;
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage.from("product-photos").remove(paths);
+        if (storageError) console.warn("[batch] orphaned draft photos", storageError);
+      }
+    });
+    const failed = results.filter((result) => !result.ok).length;
+    if (failed) {
+      toast.error(`${failed} unsaved draft(s) could not be removed. Please try again.`);
+      return;
+    }
+    navigate({ to: "/products" });
   }
 
   async function materializeAndAnalyze(draft: BatchDraft): Promise<void> {
@@ -673,7 +729,7 @@ function BatchIntakePage() {
                   }
                   onSplit={(photoId) => splitDraft(d.id, photoId)}
                   onMove={movePhoto}
-                  onDelete={() => deleteDraft(d.id)}
+                  onDelete={() => void deleteDraft(d.id)}
                   onRefine={() => refineDraft(d.id)}
                   t={t}
                 />
@@ -681,7 +737,7 @@ function BatchIntakePage() {
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => navigate({ to: "/products" })}>
+              <Button type="button" variant="outline" onClick={() => void cancelBatch()}>
                 Cancel
               </Button>
               <Button
