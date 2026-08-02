@@ -164,9 +164,14 @@ export const prepareAssistedListing = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!ASSISTED.has(data.marketplace)) throw new Error("Not an assisted marketplace.");
     const { supabase } = context;
+    const { data: product } = await supabase
+      .from("products")
+      .select("sku")
+      .eq("id", data.productId)
+      .single();
     const { data: existing } = await supabase
       .from("marketplace_listings")
-      .select("id, status")
+      .select("id, status, provider_metadata")
       .eq("product_id", data.productId)
       .eq("marketplace", data.marketplace)
       .maybeSingle();
@@ -177,7 +182,12 @@ export const prepareAssistedListing = createServerFn({ method: "POST" })
         await supabase
           .from("marketplace_listings")
           .update({
-            provider_metadata: { assisted: true, prepared_at: new Date().toISOString() },
+            provider_metadata: {
+              ...((existing.provider_metadata as Record<string, unknown>) ?? {}),
+              assisted: true,
+              sku: product?.sku ?? null,
+              prepared_at: new Date().toISOString(),
+            },
           })
           .eq("id", existing.id);
       }
@@ -190,7 +200,11 @@ export const prepareAssistedListing = createServerFn({ method: "POST" })
         product_id: data.productId,
         marketplace: data.marketplace,
         status: "draft",
-        provider_metadata: { assisted: true, prepared_at: new Date().toISOString() },
+        provider_metadata: {
+          assisted: true,
+          sku: product?.sku ?? null,
+          prepared_at: new Date().toISOString(),
+        },
       })
       .select("id")
       .single();
@@ -212,6 +226,11 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
     const { supabase } = context;
     const now = new Date().toISOString();
     const normalized = normalizeListingUrl(data.marketplace, data.listingUrl);
+    const { data: product } = await supabase
+      .from("products")
+      .select("sku")
+      .eq("id", data.productId)
+      .single();
 
     const { data: existing } = await supabase
       .from("marketplace_listings")
@@ -223,6 +242,7 @@ export const markAssistedPublished = createServerFn({ method: "POST" })
     const meta = {
       ...((existing?.provider_metadata as any) ?? {}),
       assisted: true,
+      sku: product?.sku ?? null,
       marked_published_at: now,
     };
 

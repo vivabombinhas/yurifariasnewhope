@@ -10,16 +10,22 @@ import {
   startEbayOAuth,
   disconnectEbay,
 } from "@/lib/marketplaces/ebay/account.functions";
+import { getDepopReadiness } from "@/lib/marketplaces/depop/readiness.functions";
 
 export function MarketplaceConnections() {
   const queryClient = useQueryClient();
   const fetchAccount = useServerFn(getEbayAccount);
   const startOAuth = useServerFn(startEbayOAuth);
   const disconnect = useServerFn(disconnectEbay);
+  const fetchDepopReadiness = useServerFn(getDepopReadiness);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["ebay-account"],
     queryFn: () => fetchAccount(),
+  });
+  const depop = useQuery({
+    queryKey: ["depop-readiness"],
+    queryFn: () => fetchDepopReadiness(),
   });
 
   const [busy, setBusy] = useState(false);
@@ -66,11 +72,7 @@ export function MarketplaceConnections() {
 
   const status = data?.status ?? "not_connected";
   const variant: "default" | "secondary" | "destructive" =
-    status === "connected"
-      ? "default"
-      : status === "error"
-        ? "destructive"
-        : "secondary";
+    status === "connected" ? "default" : status === "error" ? "destructive" : "secondary";
 
   const REQUIRED_SCOPES = [
     "https://api.ebay.com/oauth/api_scope/sell.inventory",
@@ -92,27 +94,25 @@ export function MarketplaceConnections() {
             <div className="flex items-center gap-2">
               <span className="font-medium">eBay</span>
               <Badge variant={variant}>
-                {isLoading ? "…" : data?.connected ? "Connected" : status === "error" ? "Error" : "Not connected"}
+                {isLoading
+                  ? "…"
+                  : data?.connected
+                    ? "Connected"
+                    : status === "error"
+                      ? "Error"
+                      : "Not connected"}
               </Badge>
-              {data?.environment && (
-                <Badge variant="outline">{data.environment}</Badge>
-              )}
+              {data?.environment && <Badge variant="outline">{data.environment}</Badge>}
             </div>
             {data?.connected && (
               <div className="text-xs text-muted-foreground space-y-0.5">
                 {data.accountName && <div>Account: {data.accountName}</div>}
-                {data.externalAccountId && (
-                  <div>User ID: {data.externalAccountId}</div>
-                )}
+                {data.externalAccountId && <div>User ID: {data.externalAccountId}</div>}
                 {data.connectedAt && (
-                  <div>
-                    Connected: {new Date(data.connectedAt).toLocaleString()}
-                  </div>
+                  <div>Connected: {new Date(data.connectedAt).toLocaleString()}</div>
                 )}
                 {data.scopes && data.scopes.length > 0 && (
-                  <div className="break-all">
-                    Scopes: {data.scopes.length}
-                  </div>
+                  <div className="break-all">Scopes: {data.scopes.length}</div>
                 )}
               </div>
             )}
@@ -134,12 +134,7 @@ export function MarketplaceConnections() {
                     Reconnect eBay
                   </Button>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onDisconnect}
-                  disabled={busy}
-                >
+                <Button variant="outline" size="sm" onClick={onDisconnect} disabled={busy}>
                   Disconnect
                 </Button>
               </>
@@ -148,6 +143,34 @@ export function MarketplaceConnections() {
                 Connect eBay
               </Button>
             )}
+          </div>
+        </div>
+        <div className="flex items-start justify-between gap-4 rounded-md border p-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Depop</span>
+              <Badge variant={depop.data?.configured ? "default" : "secondary"}>
+                {depop.isLoading
+                  ? "…"
+                  : depop.data?.configured
+                    ? "API pronta"
+                    : "Aguardando API Key"}
+              </Badge>
+              {depop.data?.environment && <Badge variant="outline">{depop.data.environment}</Badge>}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {depop.data?.configured
+                ? "Credencial detectada no servidor. Valide no ambiente de testes antes de ativar publicação automática."
+                : "A solicitação de acesso está em análise pelo Depop. A postagem assistida continua disponível."}
+            </p>
+            <a
+              href={depop.data?.taxonomySource}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-primary hover:underline"
+            >
+              Abrir taxonomia oficial do Depop
+            </a>
           </div>
         </div>
       </CardContent>

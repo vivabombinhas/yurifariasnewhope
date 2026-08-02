@@ -16,7 +16,9 @@ export async function closeOtherActiveListings(
 ): Promise<ListingClosureResult[]> {
   const { data: listings, error } = await supabase
     .from("marketplace_listings")
-    .select("id, marketplace, listing_url, external_listing_id, provider_metadata")
+    .select(
+      "id, marketplace, listing_url, external_listing_id, provider_metadata, product:products(sku)",
+    )
     .eq("product_id", productId)
     .eq("status", "active");
   if (error) throw error;
@@ -46,6 +48,42 @@ export async function closeOtherActiveListings(
         });
       }
       continue;
+    }
+
+    if (marketplace === "depop") {
+      const metadata = (listing.provider_metadata as Record<string, unknown>) ?? {};
+      const sku = String(metadata.sku ?? listing.product?.sku ?? "").trim();
+      try {
+        const { isDepopConfigured, markDepopProductSoldBySku } =
+          await import("@/lib/marketplaces/depop/client.server");
+        if (isDepopConfigured() && sku) {
+          await markDepopProductSoldBySku(sku);
+          await supabase
+            .from("marketplace_listings")
+            .update({
+              status: "ended",
+              error_message: null,
+              last_failed_step: null,
+              provider_metadata: {
+                ...metadata,
+                closurePending: false,
+                automaticallyMarkedSoldAt: new Date().toISOString(),
+              },
+            })
+            .eq("id", listing.id);
+          results.push({
+            marketplace,
+            listingUrl: listing.listing_url,
+            externalListingId: listing.external_listing_id,
+            status: "closed",
+            message: "Depop product marked as sold automatically.",
+          });
+          continue;
+        }
+      } catch {
+        // Existing manually-created Depop listings may not carry our SKU.
+        // Keep the assisted link workflow as a safe fallback.
+      }
     }
 
     const message = `Open the saved ${marketplace.replace(/_/g, " ")} listing and mark it not for sale.`;
