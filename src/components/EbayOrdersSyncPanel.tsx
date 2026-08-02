@@ -2,31 +2,21 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Clock, Lock } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  syncEbayOrdersNow,
   getEbayOrdersSyncStatus,
+  syncEbayOrdersNow,
 } from "@/lib/marketplaces/ebay/sync-orders.functions";
 
-const STALE_MS = 30 * 60 * 1000; // 30 min
-const LOCK_TTL_MS = 10 * 60 * 1000; // 10 min
+const STALE_MS = 30 * 60 * 1000;
+const LOCK_TTL_MS = 10 * 60 * 1000;
 
-function fmt(ts?: string | null) {
-  if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return String(ts);
-  }
+function fmt(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : "—";
 }
 
 export function EbayOrdersSyncPanel() {
@@ -34,7 +24,6 @@ export function EbayOrdersSyncPanel() {
   const fetchStatus = useServerFn(getEbayOrdersSyncStatus);
   const runSync = useServerFn(syncEbayOrdersNow);
   const [busy, setBusy] = useState<"dry" | "real" | null>(null);
-
   const { data } = useQuery({
     queryKey: ["ebay-orders-sync-status"],
     queryFn: () => fetchStatus(),
@@ -46,146 +35,130 @@ export function EbayOrdersSyncPanel() {
   const handleRun = async (dryRun: boolean) => {
     setBusy(dryRun ? "dry" : "real");
     try {
-      const res = await runSync({ data: { dryRun } });
-      const summary =
-        `Orders: ${res.ordersFetched} · Line items: ${res.lineItemsProcessed} · ` +
-        `Sales: ${res.salesRecorded} · Already: ${res.alreadyProcessed} · ` +
-        `Unmatched: ${res.unmatchedItems}`;
-      if (res.status === "success") {
-        toast.success(dryRun ? `Dry run OK — ${summary}` : `Sync OK — ${summary}`);
-      } else if (res.status === "partial") {
-        toast.warning(`Partial — ${summary}`);
-      } else {
-        toast.error(
-          `Sync failed: ${res.errors[0]?.message ?? "see status"} — ${summary}`,
-        );
-      }
+      const result = await runSync({ data: { dryRun } });
+      const summary = `Pedidos: ${result.ordersFetched} · Itens: ${result.lineItemsProcessed} · Vendas: ${result.salesRecorded} · Não identificados: ${result.unmatchedItems}`;
+      if (result.status === "success")
+        toast.success(`${dryRun ? "Teste concluído" : "Sincronização concluída"} — ${summary}`);
+      else if (result.status === "partial") toast.warning(`Sincronização parcial — ${summary}`);
+      else toast.error(`Falha na sincronização — ${summary}`);
       qc.invalidateQueries({ queryKey: ["ebay-orders-sync-status"] });
-    } catch (e: any) {
-      toast.error(`Sync error: ${e?.message ?? e}`);
+      qc.invalidateQueries({ queryKey: ["sales-operations"] });
+    } catch (error: any) {
+      toast.error(`Erro de sincronização: ${error?.message ?? error}`);
     } finally {
       setBusy(null);
     }
   };
 
   const needsReconnect =
-    data.accountStatus === "needs_reconnect" ||
-    data.lastStatus === "needs_reconnect";
-
-  const now = Date.now();
+    data.accountStatus === "needs_reconnect" || data.lastStatus === "needs_reconnect";
   const lastSuccessMs = data.lastSuccessAt ? new Date(data.lastSuccessAt).getTime() : 0;
   const lockHeldMs = data.lockHeldAt ? new Date(data.lockHeldAt).getTime() : 0;
-  const isStale =
-    !needsReconnect &&
-    data.lastStatus !== "error" &&
-    lastSuccessMs > 0 &&
-    now - lastSuccessMs > STALE_MS;
-  const lockStuck = data.lockHeld && lockHeldMs > 0 && now - lockHeldMs > LOCK_TTL_MS;
   const isError = data.lastStatus === "error";
+  const isStale =
+    !needsReconnect && !isError && lastSuccessMs > 0 && Date.now() - lastSuccessMs > STALE_MS;
+  const lockStuck = data.lockHeld && lockHeldMs > 0 && Date.now() - lockHeldMs > LOCK_TTL_MS;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle className="text-base">eBay sales sync</CardTitle>
+        <CardTitle className="text-base">Sincronização automática do eBay</CardTitle>
         {needsReconnect ? (
-          <Badge variant="destructive">Reconnect required</Badge>
+          <Badge variant="destructive">Reconectar</Badge>
         ) : isError ? (
-          <Badge variant="destructive">Error</Badge>
+          <Badge variant="destructive">Atenção</Badge>
         ) : isStale ? (
-          <Badge variant="outline" className="border-amber-500 text-amber-600">Stale</Badge>
+          <Badge variant="outline" className="border-amber-500 text-amber-600">
+            Atrasada
+          </Badge>
         ) : data.lastStatus === "success" ? (
           <Badge variant="secondary">OK</Badge>
-        ) : data.lastStatus ? (
-          <Badge variant="outline">{data.lastStatus}</Badge>
         ) : (
-          <Badge variant="outline">Idle</Badge>
+          <Badge variant="outline">Aguardando</Badge>
         )}
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {needsReconnect ? (
+        {needsReconnect && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Reconnect eBay account</AlertTitle>
+            <AlertTitle>Reconecte a conta do eBay</AlertTitle>
             <AlertDescription>
-              The stored eBay authorization is no longer valid. Reconnect the
-              account to resume sales sync.
+              A autorização expirou e precisa ser renovada nas Configurações.
             </AlertDescription>
           </Alert>
-        ) : null}
-        {isError ? (
+        )}
+        {isError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Last sync failed</AlertTitle>
+            <AlertTitle>A última sincronização falhou</AlertTitle>
             <AlertDescription>
-              {(data.lastError as { message?: string } | null)?.message ?? "See raw error below."}
+              Execute novamente após publicar a atualização. Se continuar falhando, abra o
+              diagnóstico técnico.
             </AlertDescription>
           </Alert>
-        ) : null}
-        {isStale ? (
+        )}
+        {isStale && (
           <Alert>
             <Clock className="h-4 w-4" />
-            <AlertTitle>Sync delayed</AlertTitle>
+            <AlertTitle>Sincronização atrasada</AlertTitle>
             <AlertDescription>
-              No successful sync in the last 30 minutes. Check the scheduled
-              job or run a manual sync.
+              Não houve uma sincronização bem-sucedida nos últimos 30 minutos.
             </AlertDescription>
           </Alert>
-        ) : null}
-        {lockStuck ? (
+        )}
+        {lockStuck && (
           <Alert>
             <Lock className="h-4 w-4" />
-            <AlertTitle>Sync lock stuck</AlertTitle>
+            <AlertTitle>Sincronização ocupada</AlertTitle>
             <AlertDescription>
-              A sync lock has been held longer than the 10-minute TTL. The
-              next scheduled run will reclaim it automatically.
+              A próxima execução automática tentará liberar o processo.
             </AlertDescription>
           </Alert>
-        ) : null}
+        )}
 
-        <div className="grid grid-cols-2 gap-y-1 gap-x-4">
-          <span className="text-muted-foreground">Last successful sync</span>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <span className="text-muted-foreground">Última sincronização</span>
           <span>{fmt(data.lastSuccessAt)}</span>
-          <span className="text-muted-foreground">Last attempt</span>
+          <span className="text-muted-foreground">Última tentativa</span>
           <span>{fmt(data.lastAttemptAt)}</span>
-          <span className="text-muted-foreground">Sales found (24h)</span>
+          <span className="text-muted-foreground">Vendas encontradas (24h)</span>
           <span>{data.salesLast24h}</span>
-          <span className="text-muted-foreground">Unmatched (24h)</span>
+          <span className="text-muted-foreground">Não identificadas (24h)</span>
           <span>{data.unmatchedLast24h}</span>
-          {data.lockHeld ? (
-            <>
-              <span className="text-muted-foreground">Lock held since</span>
-              <span>{fmt(data.lockHeldAt)}</span>
-            </>
-          ) : null}
         </div>
 
-        {data.lastError ? (
-          <pre className="bg-muted text-xs p-2 rounded overflow-auto max-h-32">
-            {JSON.stringify(data.lastError, null, 2)}
-          </pre>
-        ) : null}
-
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!!busy || needsReconnect}
-            onClick={() => handleRun(true)}
-          >
-            {busy === "dry" ? "Running…" : "Dry run"}
-          </Button>
-          <Button
-            size="sm"
-            disabled={!!busy || needsReconnect}
-            onClick={() => handleRun(false)}
-          >
-            {busy === "real" ? "Syncing…" : "Sync orders now"}
-          </Button>
-        </div>
+        <Button
+          className="w-full sm:w-auto"
+          disabled={!!busy || needsReconnect}
+          onClick={() => handleRun(false)}
+        >
+          {busy === "real" ? "Sincronizando…" : "Sincronizar vendas agora"}
+        </Button>
         <p className="text-xs text-muted-foreground">
-          Manual sync respects a 60-second cooldown and the same per-account
-          lock used by the scheduled cron.
+          A sincronização é automática. Use o botão somente para atualizar imediatamente ou tentar
+          novamente após um erro.
         </p>
+
+        <details className="rounded-md border p-3 text-xs">
+          <summary className="cursor-pointer font-medium">Diagnóstico técnico</summary>
+          <div className="mt-3 space-y-3">
+            {data.lastError ? (
+              <pre className="max-h-40 overflow-auto rounded bg-muted p-2">
+                {JSON.stringify(data.lastError, null, 2)}
+              </pre>
+            ) : (
+              <p className="text-muted-foreground">Nenhum erro técnico registrado.</p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!!busy || needsReconnect}
+              onClick={() => handleRun(true)}
+            >
+              {busy === "dry" ? "Executando…" : "Executar teste sem alterar dados"}
+            </Button>
+          </div>
+        </details>
       </CardContent>
     </Card>
   );

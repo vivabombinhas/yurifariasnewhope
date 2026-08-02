@@ -117,8 +117,6 @@ function SalesOperationsPage() {
         </Button>
       </div>
 
-      <EbayOrdersSyncPanel />
-
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Registrar venda manual</CardTitle>
@@ -291,6 +289,7 @@ function SalesOperationsPage() {
           )}
         </CardContent>
       </Card>
+      <EbayOrdersSyncPanel />
       <ReviewSaleDialog
         sale={reviewSale}
         open={!!reviewSale}
