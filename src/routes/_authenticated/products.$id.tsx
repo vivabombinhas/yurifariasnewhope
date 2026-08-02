@@ -199,6 +199,16 @@ function ProductDetail() {
         </Button>
       </header>
 
+      <ProductSaleCard
+        product={p}
+        listings={listings.data ?? []}
+        onSaved={() => {
+          product.refetch();
+          listings.refetch();
+          history.refetch();
+        }}
+      />
+
       <PhotosSection productId={id} photos={photos.data ?? []} onChange={() => photos.refetch()} />
 
       <AiSuggestionPanel
@@ -211,16 +221,6 @@ function ProductDetail() {
       />
 
       <CopyActions product={p} />
-
-      <ProductSaleCard
-        product={p}
-        listings={listings.data ?? []}
-        onSaved={() => {
-          product.refetch();
-          listings.refetch();
-          history.refetch();
-        }}
-      />
 
       <OperationalCard product={p} onSaved={() => product.refetch()} />
 
