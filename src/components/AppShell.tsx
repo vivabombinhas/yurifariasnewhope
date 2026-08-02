@@ -16,7 +16,7 @@ const NAV: Array<{
   { to: "/products", labelKey: "nav.products", icon: Package },
   { to: "/intake", labelKey: "nav.intake", icon: Zap },
   { to: "/locations", labelKey: "nav.locations", icon: MapPin },
-  { to: "/publishing", labelKey: "nav.publishing", label: "Publishing", icon: Send },
+  { to: "/publishing", labelKey: "nav.publishing", label: "Vendas", icon: Send },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -88,7 +88,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="icon" asChild aria-label={t("nav.settings")}>
-            <Link to="/settings"><Settings className="h-4 w-4" /></Link>
+            <Link to="/settings">
+              <Settings className="h-4 w-4" />
+            </Link>
           </Button>
           <Button variant="ghost" size="icon" onClick={signOut} aria-label={t("nav.signOut")}>
             <LogOut className="h-4 w-4" />

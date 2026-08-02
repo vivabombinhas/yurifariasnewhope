@@ -1,122 +1,160 @@
-import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
+import { ExternalLink, Loader2, RefreshCw, ShoppingBag } from "lucide-react";
+import { EbayOrdersSyncPanel } from "@/components/EbayOrdersSyncPanel";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Send, AlertCircle, CheckCircle2, Clock } from "lucide-react";
-import { listPublishingJobs } from "@/lib/publishing-jobs.functions";
-import { MARKETPLACES } from "@/lib/marketplaces";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { markAssistedClosed } from "@/lib/marketplaces/assisted.functions";
+import { listSalesOperations } from "@/lib/sales-operations.functions";
 
 export const Route = createFileRoute("/_authenticated/publishing")({
-  component: PublishingQueuePage,
+  component: SalesOperationsPage,
 });
 
-type Status = "all" | "pending" | "processing" | "success" | "error";
+function marketplaceName(value: string) {
+  return value === "poshmark" ? "Poshmark" : value === "depop" ? "Depop" : "eBay";
+}
 
-const STATUS_META: Record<
-  Exclude<Status, "all">,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; Icon: typeof Clock }
-> = {
-  pending: { label: "Pending", variant: "outline", Icon: Clock },
-  processing: { label: "Processing", variant: "secondary", Icon: Loader2 },
-  success: { label: "Success", variant: "default", Icon: CheckCircle2 },
-  error: { label: "Error", variant: "destructive", Icon: AlertCircle },
-};
+function fmt(value?: string | null) {
+  return value ? new Date(value).toLocaleString() : "—";
+}
 
-function PublishingQueuePage() {
-  const [status, setStatus] = useState<Status>("all");
-  const fn = useServerFn(listPublishingJobs);
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["publishing-jobs", status],
-    queryFn: () => fn({ data: { status, limit: 100 } }),
-    refetchInterval: 5000,
+function SalesOperationsPage() {
+  const qc = useQueryClient();
+  const load = useServerFn(listSalesOperations);
+  const confirmClosed = useServerFn(markAssistedClosed);
+  const query = useQuery({
+    queryKey: ["sales-operations"],
+    queryFn: () => load(),
+    refetchInterval: 30_000,
+  });
+  const closeMutation = useMutation({
+    mutationFn: (row: { product_id: string; marketplace: "poshmark" | "depop" }) =>
+      confirmClosed({ data: { productId: row.product_id, marketplace: row.marketplace } }),
+    onSuccess: () => {
+      toast.success("Remoção confirmada.");
+      qc.invalidateQueries({ queryKey: ["sales-operations"] });
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
-  const marketplaceLabel = (id: string) =>
-    MARKETPLACES.find((m) => m.id === id)?.label ?? id;
+  const pending = query.data?.pendingClosures ?? [];
+  const sales = query.data?.recentSales ?? [];
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Send className="h-5 w-5 text-primary" />
-        <h1 className="text-xl font-semibold">Publishing Queue</h1>
-        <Badge variant="outline" className="text-[10px]">scaffold</Badge>
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <ShoppingBag className="h-5 w-5" /> Vendas e remoções
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Sincronize vendas do eBay e retire rapidamente os mesmos produtos dos outros canais.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => query.refetch()}
+          aria-label="Atualizar"
+        >
+          <RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} />
+        </Button>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Jobs are recorded but not yet executed. An executor will process them in a future step.
-      </p>
 
-      <Tabs value={status} onValueChange={(v) => setStatus(v as Status)}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="processing">Processing</TabsTrigger>
-          <TabsTrigger value="success">Success</TabsTrigger>
-          <TabsTrigger value="error">Error</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <EbayOrdersSyncPanel />
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {data?.length ?? 0} job{(data?.length ?? 0) === 1 ? "" : "s"}
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-base">
+            Remoções pendentes
+            <Badge variant={pending.length ? "destructive" : "secondary"}>{pending.length}</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {query.isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
             </div>
-          ) : error ? (
-            <div className="text-sm text-destructive">{(error as Error).message}</div>
-          ) : !data || data.length === 0 ? (
-            <div className="text-sm text-muted-foreground">No jobs yet.</div>
+          ) : pending.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma remoção pendente.</p>
           ) : (
-            <ul className="divide-y rounded-md border">
-              {data.map((j: any) => {
-                const meta = STATUS_META[j.status as keyof typeof STATUS_META];
-                const Icon = meta?.Icon ?? Clock;
-                return (
-                  <li key={j.id} className="flex flex-wrap items-center gap-3 p-3 text-sm">
-                    <div className="min-w-[200px]">
-                      <div className="font-medium truncate">
-                        {j.product?.title ?? "(untitled)"}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {j.product?.sku}
+            <div className="space-y-3">
+              {pending.map((row: any) => (
+                <div key={row.id} className="rounded-lg border p-3">
+                  <div className="mb-3 min-w-0">
+                    <Link
+                      to="/products/$id"
+                      params={{ id: row.product_id }}
+                      className="font-medium hover:underline"
+                    >
+                      {row.product?.title || "Produto sem título"}
+                    </Link>
+                    <div className="text-xs text-muted-foreground">
+                      {row.product?.sku} · remover do {marketplaceName(row.marketplace)}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button asChild variant="outline" className="h-11">
+                      <a href={row.listing_url} target="_blank" rel="noreferrer">
+                        <ExternalLink className="mr-2 h-4 w-4" /> Abrir anúncio
+                      </a>
+                    </Button>
+                    <Button
+                      className="h-11"
+                      disabled={closeMutation.isPending}
+                      onClick={() => closeMutation.mutate(row)}
+                    >
+                      Confirmar remoção
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Vendas recentes do eBay</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {sales.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma venda sincronizada ainda.</p>
+          ) : (
+            <div className="divide-y rounded-md border">
+              {sales.map((sale: any) => (
+                <div key={sale.id} className="p-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      {sale.product_id ? (
+                        <Link
+                          to="/products/$id"
+                          params={{ id: sale.product_id }}
+                          className="font-medium hover:underline"
+                        >
+                          {sale.product?.title || sale.sku || "Produto"}
+                        </Link>
+                      ) : (
+                        <span className="font-medium">{sale.sku || "Item não identificado"}</span>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        Pedido {sale.external_order_id} · {fmt(sale.order_created_at)}
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">
-                      {marketplaceLabel(j.marketplace)}
+                    <Badge
+                      variant={sale.processing_status === "matched" ? "secondary" : "destructive"}
+                    >
+                      {sale.processing_status === "matched" ? "Identificado" : "Revisar"}
                     </Badge>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {j.action}
-                    </Badge>
-                    {meta && (
-                      <Badge variant={meta.variant} className="text-[10px] gap-1">
-                        <Icon className={`h-3 w-3 ${j.status === "processing" ? "animate-spin" : ""}`} />
-                        {meta.label}
-                      </Badge>
-                    )}
-                    {j.attempt_count > 0 && (
-                      <span className="text-[11px] text-muted-foreground">
-                        attempts: {j.attempt_count}
-                      </span>
-                    )}
-                    {j.last_error && (
-                      <span className="text-[11px] text-destructive max-w-xs truncate" title={j.last_error}>
-                        {j.last_error}
-                      </span>
-                    )}
-                    <span className="ml-auto text-[11px] text-muted-foreground">
-                      {new Date(j.created_at).toLocaleString()}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

@@ -28,7 +28,7 @@ const en: Dict = {
   "nav.intake": "Intake",
   "nav.new": "New",
   "nav.locations": "Locations",
-  "nav.publishing": "Publishing",
+  "nav.publishing": "Sales",
   "nav.settings": "Settings",
   "nav.signOut": "Sign out",
   "nav.appName": "Inventory",
@@ -162,8 +162,7 @@ const en: Dict = {
   // Settings
   "settings.title": "Settings",
   "settings.language": "Language",
-  "settings.languageHelp":
-    "Interface language. AI-generated listings stay in English.",
+  "settings.languageHelp": "Interface language. AI-generated listings stay in English.",
 
   // Product statuses
   "status.received": "Received",
@@ -199,7 +198,7 @@ const es: Dict = {
   "nav.intake": "Ingreso",
   "nav.new": "Nuevo",
   "nav.locations": "Ubicaciones",
-  "nav.publishing": "Publicación",
+  "nav.publishing": "Ventas",
   "nav.settings": "Ajustes",
   "nav.signOut": "Cerrar sesión",
   "nav.appName": "Inventario",
@@ -324,8 +323,7 @@ const es: Dict = {
 
   "settings.title": "Ajustes",
   "settings.language": "Idioma",
-  "settings.languageHelp":
-    "Idioma de la interfaz. Los anuncios generados por IA siguen en inglés.",
+  "settings.languageHelp": "Idioma de la interfaz. Los anuncios generados por IA siguen en inglés.",
 
   "status.received": "Recibido",
   "status.photographed": "Fotografiado",
@@ -358,7 +356,7 @@ const ptBR: Dict = {
   "nav.intake": "Entrada",
   "nav.new": "Novo",
   "nav.locations": "Locais",
-  "nav.publishing": "Publicação",
+  "nav.publishing": "Vendas",
   "nav.settings": "Configurações",
   "nav.signOut": "Sair",
   "nav.appName": "Inventário",
@@ -483,8 +481,7 @@ const ptBR: Dict = {
 
   "settings.title": "Configurações",
   "settings.language": "Idioma",
-  "settings.languageHelp":
-    "Idioma da interface. Anúncios gerados pela IA permanecem em inglês.",
+  "settings.languageHelp": "Idioma da interface. Anúncios gerados pela IA permanecem em inglês.",
 
   "status.received": "Recebido",
   "status.photographed": "Fotografado",
