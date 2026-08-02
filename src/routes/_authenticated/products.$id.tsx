@@ -2,7 +2,11 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getUnsupportedImageMessage, prepareImageForUpload, isAiSupportedPath } from "@/lib/image-convert";
+import {
+  getUnsupportedImageMessage,
+  prepareImageForUpload,
+  isAiSupportedPath,
+} from "@/lib/image-convert";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -25,11 +29,21 @@ import {
   type MarketplaceId,
 } from "@/lib/marketplaces";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowLeft as ArrLeft, ArrowRight, Copy, ExternalLink, ImagePlus, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowLeft as ArrLeft,
+  ArrowRight,
+  Copy,
+  ExternalLink,
+  ImagePlus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { AiSuggestionPanel } from "@/components/AiSuggestionPanel";
 
 import { MarketplacePublishingPanel } from "@/components/MarketplacePublishingPanel";
 import { markEbayDraftOutdatedForProduct } from "@/lib/marketplaces/ebay/mark-outdated.functions";
+import { registerManualSale } from "@/lib/sales-operations.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { useT, tStatus, tCondition } from "@/lib/i18n";
 
@@ -44,9 +58,7 @@ export const Route = createFileRoute("/_authenticated/products/$id")({
 
 function ProductNotFound() {
   const t = useT();
-  return (
-    <p className="text-sm text-muted-foreground p-6 text-center">{t("detail.notFound")}</p>
-  );
+  return <p className="text-sm text-muted-foreground p-6 text-center">{t("detail.notFound")}</p>;
 }
 
 function ProductDetail() {
@@ -83,10 +95,7 @@ function ProductDetail() {
   const listings = useQuery({
     queryKey: ["listings", id],
     queryFn: async () => {
-      const { data } = await supabase
-        .from("marketplace_listings")
-        .select("*")
-        .eq("product_id", id);
+      const { data } = await supabase.from("marketplace_listings").select("*").eq("product_id", id);
       return data ?? [];
     },
   });
@@ -102,7 +111,8 @@ function ProductDetail() {
     },
   });
 
-  if (product.isLoading) return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
+  if (product.isLoading)
+    return <p className="text-sm text-muted-foreground">{t("common.loading")}</p>;
   if (product.error || !product.data)
     return <p className="text-sm text-destructive">{t("detail.notFound")}</p>;
 
@@ -112,7 +122,9 @@ function ProductDetail() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/products"><ArrowLeft className="h-4 w-4 mr-1" /> {t("common.back")}</Link>
+          <Link to="/products">
+            <ArrowLeft className="h-4 w-4 mr-1" /> {t("common.back")}
+          </Link>
         </Button>
         <Button
           variant="outline"
@@ -133,7 +145,9 @@ function ProductDetail() {
         <h1 className="text-2xl font-semibold break-words">{p.title || t("common.untitled")}</h1>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.sku")}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {t("common.sku")}
+            </div>
             <button
               type="button"
               onClick={() => {
@@ -146,15 +160,21 @@ function ProductDetail() {
             </button>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.location")}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {t("common.location")}
+            </div>
             <div className="mt-1 text-base font-semibold break-words">
               {p.location?.label ?? "—"}
             </div>
           </div>
           <div className="rounded-lg border bg-muted/40 p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{t("common.status")}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {t("common.status")}
+            </div>
             <div className="mt-1">
-              <Badge variant="secondary" className="text-sm">{tStatus(t, p.status)}</Badge>
+              <Badge variant="secondary" className="text-sm">
+                {tStatus(t, p.status)}
+              </Badge>
             </div>
           </div>
         </div>
@@ -192,20 +212,30 @@ function ProductDetail() {
 
       <CopyActions product={p} />
 
-      <OperationalCard product={p} onSaved={() => product.refetch()} />
-
-      <MarketplacePublishingPanel
-        productId={id}
+      <ProductSaleCard
         product={p}
-        onSaved={() => product.refetch()}
+        listings={listings.data ?? []}
+        onSaved={() => {
+          product.refetch();
+          listings.refetch();
+          history.refetch();
+        }}
       />
 
+      <OperationalCard product={p} onSaved={() => product.refetch()} />
 
+      <MarketplacePublishingPanel productId={id} product={p} onSaved={() => product.refetch()} />
 
-      <ListingsSection productId={id} rows={listings.data ?? []} onChange={() => listings.refetch()} />
+      <ListingsSection
+        productId={id}
+        rows={listings.data ?? []}
+        onChange={() => listings.refetch()}
+      />
 
       <Card>
-        <CardHeader><CardTitle className="text-base">{t("detail.statusHistory")}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">{t("detail.statusHistory")}</CardTitle>
+        </CardHeader>
         <CardContent>
           {history.data?.length ? (
             <ul className="space-y-1 text-sm">
@@ -225,6 +255,90 @@ function ProductDetail() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function ProductSaleCard({
+  product,
+  listings,
+  onSaved,
+}: {
+  product: any;
+  listings: any[];
+  onSaved: () => void;
+}) {
+  const qc = useQueryClient();
+  const saveSale = useServerFn(registerManualSale);
+  const [soldOn, setSoldOn] = useState<"ebay" | "poshmark" | "depop" | "local">("local");
+  const mutation = useMutation({
+    mutationFn: () => saveSale({ data: { productId: product.id, soldOn } }),
+    onSuccess: (result) => {
+      const pending = result.closureResults.filter((item) => item.status === "manual_required");
+      const failed = result.closureResults.filter((item) => item.status === "failed");
+      toast.success("Venda registrada e estoque atualizado.");
+      if (pending.length) toast.warning(`${pending.length} anúncio(s) aguardando remoção.`);
+      if (failed.length) toast.error(`${failed.length} anúncio(s) não puderam ser encerrados.`);
+      qc.invalidateQueries({ queryKey: ["sales-operations"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      onSaved();
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  if (product.status === "sold") {
+    return (
+      <Card className="border-emerald-500/40 bg-emerald-500/5">
+        <CardContent className="flex items-center gap-2 p-4 text-sm font-medium">
+          <Badge variant="secondary">Vendido</Badge>
+          Este produto já está marcado como vendido.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const activeChannels = listings
+    .filter((listing) => listing.status === "active")
+    .map((listing) => listing.marketplace);
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Este produto foi vendido?</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Registre aqui sem precisar procurar o produto na tela Vendas. Canais ativos:{" "}
+          {activeChannels.length ? activeChannels.join(", ") : "nenhum"}.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Select value={soldOn} onValueChange={(value) => setSoldOn(value as typeof soldOn)}>
+            <SelectTrigger className="h-11">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ebay">Vendido no eBay</SelectItem>
+              <SelectItem value="poshmark">Vendido no Poshmark</SelectItem>
+              <SelectItem value="depop">Vendido no Depop</SelectItem>
+              <SelectItem value="local">Venda local / outro</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="destructive"
+            className="h-11"
+            disabled={mutation.isPending}
+            onClick={() => {
+              if (confirm(`Confirmar a venda do produto ${product.sku}?`)) mutation.mutate();
+            }}
+          >
+            {mutation.isPending ? "Registrando…" : "Registrar como vendido"}
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          O eBay será encerrado automaticamente quando a venda ocorrer em outro canal. Poshmark e
+          Depop serão enviados para Remoções pendentes.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -249,15 +363,20 @@ function PhotosSection({
     let cancelled = false;
     (async () => {
       if (!photos.length) return setUrls({});
-      const { data } = await supabase.storage
-        .from("product-photos")
-        .createSignedUrls(photos.map((p) => p.storage_path), 3600);
+      const { data } = await supabase.storage.from("product-photos").createSignedUrls(
+        photos.map((p) => p.storage_path),
+        3600,
+      );
       if (cancelled || !data) return;
       const map: Record<string, string> = {};
-      data.forEach((d, i) => { if (d.signedUrl) map[photos[i].id] = d.signedUrl; });
+      data.forEach((d, i) => {
+        if (d.signedUrl) map[photos[i].id] = d.signedUrl;
+      });
       setUrls(map);
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [photos]);
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -266,7 +385,10 @@ function PhotosSection({
     if (!files.length) return;
     const nextPos = (photos[photos.length - 1]?.position ?? -1) + 1;
     try {
-      console.log("[product detail] preparing upload photos", files.map((f) => ({ name: f.name, type: f.type })));
+      console.log(
+        "[product detail] preparing upload photos",
+        files.map((f) => ({ name: f.name, type: f.type })),
+      );
       for (let i = 0; i < files.length; i++) {
         const file = await prepareImageForUpload(files[i]);
         const path = `${productId}/${crypto.randomUUID()}-${file.name}`;
@@ -318,11 +440,16 @@ function PhotosSection({
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">Photos</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">Photos</CardTitle>
+      </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {photos.map((ph, i) => (
-            <div key={ph.id} className="relative aspect-square overflow-hidden rounded-md border bg-muted">
+            <div
+              key={ph.id}
+              className="relative aspect-square overflow-hidden rounded-md border bg-muted"
+            >
               {urls[ph.id] ? (
                 <img src={urls[ph.id]} alt="" className="h-full w-full object-cover" />
               ) : (
@@ -433,22 +560,38 @@ function CopyActions({ product }: { product: any }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">{t("detail.quickActions")}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">{t("detail.quickActions")}</CardTitle>
+      </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => copy(product.title ?? "", t("detail.copyTitle"))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copy(product.title ?? "", t("detail.copyTitle"))}
+          >
             <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyTitle")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => copy(product.description ?? "", t("detail.copyDescription"))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copy(product.description ?? "", t("detail.copyDescription"))}
+          >
             <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyDescription")}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => copy(full, t("detail.copyFullListing"))}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => copy(full, t("detail.copyFullListing"))}
+          >
             <Copy className="h-3.5 w-3.5 mr-1" /> {t("detail.copyFullListing")}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => copy(formatPrice(product.price_cents, product.currency), t("common.price"))}
+            onClick={() =>
+              copy(formatPrice(product.price_cents, product.currency), t("common.price"))
+            }
           >
             <Copy className="h-3.5 w-3.5 mr-1" /> {t("common.price")}
           </Button>
@@ -464,8 +607,6 @@ function CopyActions({ product }: { product: any }) {
     </Card>
   );
 }
-
-
 
 function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
   const qc = useQueryClient();
@@ -490,15 +631,18 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
 
   const locations = useQuery({
     queryKey: ["locations"],
-    queryFn: async () => (await supabase.from("locations").select("id, label").order("area")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("locations").select("id, label").order("area")).data ?? [],
   });
   const brandList = useQuery({
     queryKey: ["brands"],
-    queryFn: async () => (await supabase.from("brands").select("id, name").order("name")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("brands").select("id, name").order("name")).data ?? [],
   });
   const categoryList = useQuery({
     queryKey: ["categories"],
-    queryFn: async () => (await supabase.from("categories").select("id, name").order("name")).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("categories").select("id, name").order("name")).data ?? [],
   });
 
   async function ensureRow(
@@ -536,9 +680,7 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
           condition_grade: conditionGrade.trim() || null,
           condition_notes: conditionNotes.trim() || null,
           shipping_notes: shippingNotes.trim() || null,
-          item_specifics: itemSpecifics.filter(
-            (s) => s.name.trim() && s.value.trim(),
-          ) as any,
+          item_specifics: itemSpecifics.filter((s) => s.name.trim() && s.value.trim()) as any,
         })
         .eq("id", product.id);
       if (error) throw error;
@@ -557,10 +699,15 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">{tr("detail.details")}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">{tr("detail.details")}</CardTitle>
+      </CardHeader>
       <CardContent>
         <form
-          onSubmit={(e) => { e.preventDefault(); save.mutate(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
           className="space-y-4"
         >
           <div className="space-y-2">
@@ -570,7 +717,9 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>{tr("common.description")}</Label>
-              <span className={`text-[11px] ${description.length > 900 ? "text-destructive" : "text-muted-foreground"}`}>
+              <span
+                className={`text-[11px] ${description.length > 900 ? "text-destructive" : "text-muted-foreground"}`}
+              >
                 {description.length} / 900
               </span>
             </div>
@@ -589,7 +738,8 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
             </summary>
             <div className="px-3 pb-3 pt-1 space-y-4">
               <p className="text-xs text-muted-foreground">
-                Technical fields generated by AI. Reused by Marketplace Publishing and eBay Auto-fill.
+                Technical fields generated by AI. Reused by Marketplace Publishing and eBay
+                Auto-fill.
               </p>
               <div className="space-y-2">
                 <Label>Item specifics</Label>
@@ -627,40 +777,66 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>{tr("common.brand")}</Label>
-              <Input value={brand} onChange={(e) => setBrand(e.target.value)} list="brands-list-edit" />
+              <Input
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                list="brands-list-edit"
+              />
               <datalist id="brands-list-edit">
-                {brandList.data?.map((b) => <option key={b.id} value={b.name} />)}
+                {brandList.data?.map((b) => (
+                  <option key={b.id} value={b.name} />
+                ))}
               </datalist>
             </div>
             <div className="space-y-2">
               <Label>{tr("common.category")}</Label>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} list="cats-list-edit" />
+              <Input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                list="cats-list-edit"
+              />
               <datalist id="cats-list-edit">
-                {categoryList.data?.map((c) => <option key={c.id} value={c.name} />)}
+                {categoryList.data?.map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
               </datalist>
             </div>
             <div className="space-y-2">
               <Label>{tr("common.condition")}</Label>
               <Select value={condition} onValueChange={setCondition}>
-                <SelectTrigger><SelectValue placeholder={tr("common.select")} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder={tr("common.select")} />
+                </SelectTrigger>
                 <SelectContent>
                   {PRODUCT_CONDITIONS.map((c) => (
-                    <SelectItem key={c} value={c}>{tCondition(tr, c)}</SelectItem>
+                    <SelectItem key={c} value={c}>
+                      {tCondition(tr, c)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>{tr("common.priceUsd")}</Label>
-              <Input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label>{tr("common.location")}</Label>
               <Select value={locationId} onValueChange={setLocationId}>
-                <SelectTrigger><SelectValue placeholder={tr("newProduct.selectLocation")} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder={tr("newProduct.selectLocation")} />
+                </SelectTrigger>
                 <SelectContent>
                   {locations.data?.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>{l.label}</SelectItem>
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -668,10 +844,14 @@ function EditForm({ product, onSaved }: { product: any; onSaved: () => void }) {
             <div className="space-y-2">
               <Label>{tr("common.status")}</Label>
               <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {PRODUCT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{tStatus(tr, s)}</SelectItem>
+                    <SelectItem key={s} value={s}>
+                      {tStatus(tr, s)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -717,23 +897,32 @@ function ListingsSection({
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">{t("detail.marketplaceTracking")}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">{t("detail.marketplaceTracking")}</CardTitle>
+      </CardHeader>
       <CardContent className="space-y-3">
         {MARKETPLACES.map((m) => {
           const row = rows.find((r) => r.marketplace === m.id);
           const isEbay = m.id === "ebay";
           return (
-            <div key={m.id} className="flex flex-col sm:flex-row gap-2 sm:items-center border rounded-md p-3">
+            <div
+              key={m.id}
+              className="flex flex-col sm:flex-row gap-2 sm:items-center border rounded-md p-3"
+            >
               <div className="w-40 font-medium text-sm">{m.label}</div>
               <Select
                 value={row?.status ?? "draft"}
                 onValueChange={(v) => upsert(m.id, { status: v })}
                 disabled={isEbay}
               >
-                <SelectTrigger className="sm:w-32"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="sm:w-32">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {LISTING_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{tStatus(t, s)}</SelectItem>
+                    <SelectItem key={s} value={s}>
+                      {tStatus(t, s)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -767,7 +956,6 @@ function ListingsSection({
             </div>
           );
         })}
-
       </CardContent>
     </Card>
   );
@@ -804,7 +992,13 @@ function SpecificsList({
             value={r.value}
             onChange={(e) => update(i, { value: e.target.value })}
           />
-          <Button type="button" size="sm" variant="ghost" onClick={() => remove(i)} aria-label="Remove">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => remove(i)}
+            aria-label="Remove"
+          >
             <X className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -847,13 +1041,14 @@ function OperationalCard({ product, onSaved }: { product: any; onSaved: () => vo
     onError: (e: any) => toast.error(e.message),
   });
 
-  const dirty =
-    (locationId || "") !== (product.location_id ?? "") || status !== product.status;
+  const dirty = (locationId || "") !== (product.location_id ?? "") || status !== product.status;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{tr("common.location")} & {tr("common.status")}</CardTitle>
+        <CardTitle className="text-base">
+          {tr("common.location")} & {tr("common.status")}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
@@ -895,4 +1090,3 @@ function OperationalCard({ product, onSaved }: { product: any; onSaved: () => vo
     </Card>
   );
 }
-
