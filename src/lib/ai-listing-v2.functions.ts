@@ -73,7 +73,8 @@ GLOBAL RULES:
 - Use NWT/New With Tags only when a physical retail/manufacturer tag is visibly attached. A sticker on packaging, hologram, or loose price sticker alone is not sufficient.
 
 PLATFORM RULES:
-- eBay: title <=80 characters; keyword-first. Description 500-900 characters when enough facts are visible. Structure the copy as factual item identification, an explicit Condition paragraph, and a final NOTE: "Please visit our store for additional similar items." shipping_text must mention FREE SHIPPING, an honest estimated packed weight and package dimensions when reasonably inferable (clearly label both Estimated), the packaging method, and ships from Cartersville, Georgia in 2-5 business days. eBay uses FREE SHIPPING, so buyer_shipping_cents=0 and estimated total equals listing price.
+- eBay: title <=80 characters; keyword-first. Description 500-900 characters when enough facts are visible. Write concise factual paragraphs: identify exactly what is included, describe visible condition and flaws, say "Sold together exactly as pictured" for lots when appropriate, and finish with a category-specific NOTE inviting buyers to view related store items. Do not repeat Shipping inside the description.
+- eBay shipping_text must use this exact readable structure: first line "Ships from Cartersville, Georgia, 30121"; blank line; one item-specific packaging/protection sentence; blank line; "- Estimated packaged weight: ..."; next line "- Estimated package size: ...". Estimates must include units and realistic packed values or ranges, accounting for cushioning and the box. Finish with "FREE SHIPPING. Ships within 2-5 business days." Never present an estimate as an exact measurement. eBay uses FREE SHIPPING, so buyer_shipping_cents=0 and estimated total equals listing price.
 - Poshmark: concise, brand/style/size focused; buyer pays shipping. Do not say free shipping.
 - Depop: concise and natural; emphasize relevant era/style/aesthetic only when supported. Avoid keyword spam and excessive hashtags.
 - Each platform gets its own title and description; do not mechanically copy eBay.
@@ -201,7 +202,66 @@ function configuredModel() {
 
 const UNCERTAIN_ATTRIBUTE =
   /\b(presum(?:ed|ably)|likely|appears?|possibly|maybe|unknown|guess(?:ed)?|style)\b/i;
-const NOTE_LINE = "NOTE: Please visit our store for additional similar items.";
+function noteLineFor(identification: AiListingV2["identification"]) {
+  const text =
+    `${identification.product_name} ${identification.brand} ${identification.category}`.toLowerCase();
+  if (/michael jordan/.test(text)) {
+    return "NOTE: Please visit our store for additional Michael Jordan and vintage sports collectibles.";
+  }
+  if (/christmas|holiday|ornament|santa/.test(text)) {
+    return "NOTE: Please visit our store for additional Christmas and collectible décor.";
+  }
+  if (/sports|basketball|baseball|football|soccer|hockey/.test(text)) {
+    return "NOTE: Please visit our store for additional vintage sports collectibles.";
+  }
+  if (/jewel|necklace|bracelet|earring|ring\b/.test(text)) {
+    return "NOTE: Please visit our store for additional jewelry and accessories.";
+  }
+  if (/watch|clock/.test(text)) {
+    return "NOTE: Please visit our store for additional watches and collectibles.";
+  }
+  if (/clothing|apparel|shirt|dress|jacket|shoe|hat\b/.test(text)) {
+    return "NOTE: Please visit our store for additional clothing and accessories.";
+  }
+  if (/decor|home|plate|mug|glass|ceramic/.test(text)) {
+    return "NOTE: Please visit our store for additional home décor and collectibles.";
+  }
+  return "NOTE: Please visit our store for additional similar items.";
+}
+
+function normalizeEbayShipping(value: string, validation: string[]) {
+  const lines = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const weight = lines.find((line) => /estimated packaged weight\s*:/i.test(line));
+  const size = lines.find((line) => /estimated package size\s*:/i.test(line));
+  const packaging = lines.find(
+    (line) =>
+      !/ships? from|free shipping|business days|estimated packaged weight|estimated package size/i.test(
+        line,
+      ),
+  );
+  if (!weight) validation.push("missing_estimated_packaged_weight");
+  if (!size) validation.push("missing_estimated_package_size");
+  if (!packaging) validation.push("missing_item_specific_packaging_plan");
+  return [
+    "Ships from Cartersville, Georgia, 30121",
+    packaging || "Packed securely with protective cushioning in an appropriate shipping box.",
+    weight
+      ? `- ${weight.replace(/^[-•]\s*/, "")}`
+      : "- Estimated packaged weight: confirm before publishing",
+    size
+      ? `- ${size.replace(/^[-•]\s*/, "")}`
+      : "- Estimated package size: confirm before publishing",
+    "FREE SHIPPING. Ships within 2-5 business days.",
+  ]
+    .join("\n\n")
+    .replace(
+      /\n\n(- Estimated packaged weight:[^\n]+)\n\n(- Estimated package size:)/,
+      "\n\n$1\n$2",
+    );
+}
 
 function normalizeResult(
   parsed: Omit<AiListingV2, "analysisId" | "status">,
@@ -301,6 +361,7 @@ function normalizeResult(
 
   const drafts = (parsed.marketplace_drafts ?? []).map((source) => {
     const validation = [...(source.validation_flags ?? [])];
+    const noteLine = noteLineFor(identification);
     let title = sanitizeCopy((source.title ?? "").trim(), validation);
     const titleLimit = source.marketplace === "ebay" ? 80 : 100;
     if (title.length > titleLimit) {
@@ -322,8 +383,8 @@ function normalizeResult(
           !/^NOTE:/i.test(paragraph),
       );
     const descriptionBody = paragraphs.join("\n\n");
-    const maxBodyLength = 900 - NOTE_LINE.length - 2;
-    description = `${descriptionBody.slice(0, maxBodyLength).trim()}\n\n${NOTE_LINE}`.trim();
+    const maxBodyLength = 900 - noteLine.length - 2;
+    description = `${descriptionBody.slice(0, maxBodyLength).trim()}\n\n${noteLine}`.trim();
     if (descriptionBody.length > maxBodyLength) {
       validation.push("description_trimmed_to_900_characters");
     }
@@ -335,7 +396,13 @@ function normalizeResult(
       title,
       description,
       condition_text: conditionText,
-      shipping_text: sanitizeCopy((source.shipping_text ?? "").trim(), validation),
+      shipping_text:
+        source.marketplace === "ebay"
+          ? normalizeEbayShipping(
+              sanitizeCopy((source.shipping_text ?? "").trim(), validation),
+              validation,
+            )
+          : sanitizeCopy((source.shipping_text ?? "").trim(), validation),
       keywords: source.keywords ?? [],
       validation_flags: [...new Set(validation)],
     };
